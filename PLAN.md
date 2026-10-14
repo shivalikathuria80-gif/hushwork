@@ -14,6 +14,36 @@ Written 2026-10-14. Based on reading every file in `hushwork/`, running the UI/U
 
 ---
 
+## Progress (updated 2026-10-14)
+
+**Phase 0 and Phase 1 are done.** Each step is its own Git commit, so any one can be undone (`git log --oneline` lists them).
+
+| Step | Status | Notes |
+|---|---|---|
+| 0 Safety net, `PRODUCT.md` | Done | Audience, "waitlist only" status and Supabase decision recorded. |
+| 1.1 Real waitlist | Done | Supabase project `hushwork`; public can insert only; verified with real requests and through the form. |
+| 1.2 Copy and truth | Done | "Private beta" badge, "Saved to drafts" and the fake login are gone. One CTA label. Em dashes removed. |
+| 1.3 Hide login | Done | `Login.jsx` kept, not loaded. |
+| 1.4 Tokens and contrast | Done | Final scan: 103 text elements, 0 failures in both themes, lowest ratio 4.91:1. |
+| 1.5 Navigation | Done | Sidebar removed; one top bar. |
+| 1.6 Hero | Done | Real agent box beside the promise; fake screenshot band removed. |
+| 1.7 Sections | Done | Timeline, folder tabs, feature samples. |
+| 1.8 Motion | Done | No endless animation, no JS or SVG motion loops. |
+| 1.9 Type and shape | Done with one open question | Geist. Impeccable's detector calls Geist "overused" while Taste recommends it. Your call. |
+| 1.10 Accessibility and meta | Done | Skip link, `<main>`, 44px tap targets, meta and Open Graph tags, `privacy.html` (draft). |
+| 1.11 Verification | Done | Detector 5 findings down to 1; contrast, phone layout, menu, keyboard behaviour measured. |
+
+**Still open before launch:**
+
+- Review `privacy.html` and confirm `hello@hushwork.co` is a real mailbox.
+- Decide on Geist versus another face.
+- Add a social preview image (`og:image`); none exists yet and none was invented.
+- Look at the finished page yourself in light and dark at phone width. The in-app browser pane was hidden during testing, so my checks were measurements, not eyeballed screenshots.
+
+**Shipped values that differ from the plan below:** the radius scale is 12 / 16 / 24px (controls / cards / panels), not 14 / 20 / 28. Impeccable's floor says card radii stay at 12 to 16px.
+
+---
+
 ## 1. What is in the workspace
 
 | Piece | File | Real or simulated? |

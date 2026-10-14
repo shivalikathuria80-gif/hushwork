@@ -80,7 +80,7 @@ function Waitlist() {
       : <form onSubmit={submit} noValidate className="relative mx-auto mt-8 max-w-md text-left">
         <label htmlFor="wait-email" className="mb-1.5 block text-sm font-medium">Email address</label>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input id="wait-email" ref={inputRef} type="email" inputMode="email" autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); if (invalid) setInvalid(false); }} placeholder="you@company.com" aria-invalid={invalid || undefined} aria-describedby={problem ? 'wait-error wait-privacy' : 'wait-privacy'} className="h-12 min-w-0 flex-1 rounded-xl bg-white px-4 text-[15px] text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-accent" />
+          <input id="wait-email" ref={inputRef} type="email" inputMode="email" autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); if (invalid) setInvalid(false); }} placeholder="you@company.com" aria-invalid={invalid || undefined} aria-describedby={problem ? 'wait-error wait-privacy' : 'wait-privacy'} className="h-12 w-full min-w-0 rounded-xl bg-white sm:w-auto sm:flex-1 px-4 text-[15px] text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-accent" />
           <Btn type="submit" variant="dark" size="lg" loading={status === 'sending'} className="w-full sm:w-auto">Join the waitlist</Btn>
         </div>
         <input ref={trap} type="text" name="company" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 opacity-0" />

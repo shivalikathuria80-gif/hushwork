@@ -20,7 +20,7 @@ function Btn({ variant = 'primary', size = 'md', loading, icon, iconRight, type 
   return <button {...p} type={type} aria-busy={loading || undefined} disabled={p.disabled || loading} className={cls}>{inner}</button>;
 }
 function Logo({ className = '' }) {
-  return <a href="#top" className={`inline-flex items-center gap-2 font-semibold tracking-tight text-ink hover:opacity-100 ${className}`}>
+  return <a href="#top" className={`inline-flex min-h-11 items-center gap-2 font-semibold tracking-tight text-ink hover:opacity-100 ${className}`}>
     <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-[15px] font-bold text-white">H</span>Hushwork</a>;
 }
 function useTheme() {

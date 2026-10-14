@@ -32,8 +32,8 @@ Jobs the page leads with: invoice chasing, weekly client report, inbox triage, l
 
 - **Status: pre-launch, waitlist only.** Nobody is using the product. No workflow runs for anyone. This is confirmed, so the page must not claim a private beta or active users.
 - The agent box on the page is a simulation (keyword matching in `hushwork/AgentBox.jsx`), clearly labelled as a preview. No AI model is called.
-- Login, "Continue with Google" and "Save workflow" are simulated and store nothing real.
-- **Waitlist storage: Supabase** (confirmed). It is also intended as the base for login and data when the product is built.
+- Login, "Continue with Google" and "Save workflow" were simulated. The public site no longer shows them (`Login.jsx` is kept, not loaded, for the real product).
+- **Waitlist storage: Supabase** (confirmed and live, 2026-10-14). Project `hushwork`, region ap-south-1, table `waitlist`. The public can add an email and cannot read, change or delete rows. Setup is recorded in `supabase/waitlist.sql`. Supabase is also intended as the base for login and data when the product is built.
 - Current stack: React 18 with in-browser Babel and Tailwind from a CDN, no build step. A move to a built project is proposed in `PLAN.md` (Phase 2) and is not yet confirmed.
 - Undecided: the first product slice to build (the Invoice Chaser is proposed, not confirmed); the framework for Phase 2; whether Gmail access is feasible, because Google's app-review requirements have not been checked.
 

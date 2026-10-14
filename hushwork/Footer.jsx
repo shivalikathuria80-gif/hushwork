@@ -27,7 +27,7 @@ function Footer() {
   return <footer className="border-t border-line bg-bg px-5 pt-14 text-sm md:px-10">
     <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 lg:grid-cols-4">
       <div><Logo /><p className="mt-3 max-w-xs text-mute">Describe the task. Hushwork handles it.</p></div>
-      {cols.map(([h, ls]) => <div key={h}><p className="font-medium">{h}</p><ul className="mt-3 space-y-2">{ls.map(([l, href]) => <li key={l}><a href={href} className="text-mute transition-colors hover:text-ink hover:opacity-100">{l}</a></li>)}</ul></div>)}</div>
+      {cols.map(([h, ls]) => <div key={h}><p className="font-medium">{h}</p><ul className="mt-1">{ls.map(([l, href]) => <li key={l}><a href={href} className="inline-flex min-h-11 items-center text-mute transition-colors hover:text-ink hover:opacity-100">{l}</a></li>)}</ul></div>)}</div>
     <div className="mx-auto mt-12 flex max-w-6xl items-center justify-between border-t border-line pt-4 text-mute"><span>© 2026 Hushwork</span>
       <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition-colors hover:text-ink">Back to top<Icon name="ArrowUp" size={14} /></button></div>
     <div className="mx-auto mt-10 max-w-[1500px] md:mt-16"><DotWord /></div></footer>;

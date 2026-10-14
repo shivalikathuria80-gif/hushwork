@@ -32,6 +32,7 @@ function Features() {
     <h2 className="max-w-2xl text-3xl font-semibold tracking-tight md:text-5xl">Smart workflows, <span className="text-mute">zero babysitting</span></h2>
     <div className="mt-12 grid gap-4 md:grid-cols-3">
       <FeatureCard icon="MessageSquareText" title="Plain-English builder" body="Say what should happen. Hushwork turns it into a workflow you can read, edit and approve. No nodes to wire up, no code to write.">
+        <p className="mb-1 px-2 text-sm text-mute">Sample request</p>
         <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm">“Every Friday at 4pm, email each client a summary of what we shipped.”</p>
         <ol className="mt-2 space-y-0.5">{SAMPLE_PLAN.map(([ic, a, b]) => <StepRow key={a} icon={ic} title={a} sub={b} />)}</ol>
       </FeatureCard>
@@ -39,7 +40,7 @@ function Features() {
         <div className="grid gap-4 md:grid-cols-2">
           <div><p className="mb-1 flex items-center gap-2 px-2 text-sm text-mute"><Icon name="CircleCheck" className="text-accent-text" />Sample run</p>
             <ol className="space-y-0.5">{SAMPLE_LOG.map(([ic, a, b, d]) => <StepRow key={a} icon={ic} title={a} sub={b} right={<span className="font-mono text-xs tabular-nums text-mute">{d}</span>} />)}</ol></div>
-          <div className="space-y-3"><ApprovalSample /><PauseSample /></div>
+          <div><p className="mb-1 px-2 text-sm text-mute">Sample approval, try it</p><div className="space-y-3"><ApprovalSample /><PauseSample /></div></div>
         </div>
       </FeatureCard>
       <article className="grid gap-6 overflow-hidden rounded-2xl border border-line bg-surface p-6 md:col-span-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-center md:gap-10">
