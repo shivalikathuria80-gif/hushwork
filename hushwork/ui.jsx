@@ -5,7 +5,8 @@ function Icon({ name, size = 16, className = '', stroke = 1.75 }) {
   return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{(n[0] === 'svg' ? n[2] : n).map(([t, a], i) => React.createElement(t, { ...a, key: i }))}</svg>;
 }
 // Buttons are solid. Shape rule: controls use rounded-xl (12px), cards rounded-2xl (16px), big panels rounded-3xl (24px).
-function Btn({ variant = 'primary', size = 'md', loading, icon, iconRight, type = 'button', className = '', children, ...p }) {
+// Pass `href` to get a real link that looks like a button (a button inside a link is invalid HTML).
+function Btn({ variant = 'primary', size = 'md', loading, icon, iconRight, type = 'button', href, className = '', children, ...p }) {
   const v = {
     primary: 'border border-accent bg-accent text-white hover:bg-accent/90',
     secondary: 'border border-field bg-surface text-ink hover:bg-raised',
@@ -13,8 +14,10 @@ function Btn({ variant = 'primary', size = 'md', loading, icon, iconRight, type 
     dark: 'border border-ink bg-ink text-bg hover:bg-ink/90',
   }[variant];
   const s = { sm: 'h-11 px-3.5 text-sm md:h-9', md: 'h-11 px-5 text-[15px]', lg: 'h-12 px-6 text-base' }[size];
-  return <button {...p} type={type} aria-busy={loading || undefined} disabled={p.disabled || loading} className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition-colors duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 ${v} ${s} ${className}`}>
-    {loading ? <Icon name="Loader2" className="animate-[spin_1s_linear_infinite]" /> : icon && <Icon name={icon} />}{children}{iconRight && !loading && <Icon name={iconRight} />}</button>;
+  const cls = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition-colors duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 ${v} ${s} ${className}`;
+  const inner = <>{loading ? <Icon name="Loader2" className="animate-[spin_1s_linear_infinite]" /> : icon && <Icon name={icon} />}{children}{iconRight && !loading && <Icon name={iconRight} />}</>;
+  if (href) return <a {...p} href={href} className={cls + ' hover:opacity-100'}>{inner}</a>;
+  return <button {...p} type={type} aria-busy={loading || undefined} disabled={p.disabled || loading} className={cls}>{inner}</button>;
 }
 function Logo({ className = '' }) {
   return <a href="#top" className={`inline-flex items-center gap-2 font-semibold tracking-tight text-ink hover:opacity-100 ${className}`}>
