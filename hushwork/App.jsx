@@ -20,7 +20,7 @@ function Nav({ dark, toggle }) {
   </header>;
 }
 function Home() {
-  return <><Hero /><HowItWorks /><Automations /><Features /><AgentBox /><Waitlist /></>;
+  return <><Hero /><HowItWorks /><Automations /><Features /><Waitlist /></>;
 }
 function App() {
   const [dark, toggle] = useTheme();
