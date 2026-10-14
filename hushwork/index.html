@@ -1,41 +1,46 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hushwork — describe the task, we run it quietly</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hushwork: describe the task, we run it quietly</title>
+<meta name="description" content="Hushwork turns a plain-English description of your weekly admin into a workflow you can read, approve and let run. Join the early access list.">
+<meta name="color-scheme" content="dark light"><meta name="theme-color" content="#0B0A12">
+<meta property="og:type" content="website"><meta property="og:title" content="Hushwork: describe the task, we run it quietly"><meta property="og:description" content="Describe a weekly task in plain English. Hushwork builds the workflow, asks before it sends anything, and keeps a log of every run.">
+<meta name="twitter:card" content="summary"><meta name="twitter:title" content="Hushwork: describe the task, we run it quietly"><meta name="twitter:description" content="Describe a weekly task in plain English. Hushwork builds the workflow and runs it for you.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237C3AED'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' text-anchor='middle' fill='white'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{var t=localStorage.getItem('hw-theme');if(t!=='light')document.documentElement.classList.add('dark')}catch(e){}</script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','system-ui','sans-serif'],mono:['Geist Mono','ui-monospace','monospace']},colors:{bg:'rgb(var(--bg) / <alpha-value>)',surface:'rgb(var(--surface) / <alpha-value>)',raised:'rgb(var(--raised) / <alpha-value>)',ink:'rgb(var(--ink) / <alpha-value>)',mute:'rgb(var(--mute) / <alpha-value>)',line:'rgb(var(--line) / <alpha-value>)',accent:'rgb(var(--accent) / <alpha-value>)'},borderRadius:{xl:'14px','2xl':'20px','3xl':'28px'}}}}</script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Geist','system-ui','sans-serif'],mono:['Geist Mono','ui-monospace','monospace']},colors:{bg:'rgb(var(--bg) / <alpha-value>)',surface:'rgb(var(--surface) / <alpha-value>)',raised:'rgb(var(--raised) / <alpha-value>)',ink:'rgb(var(--ink) / <alpha-value>)',mute:'rgb(var(--mute) / <alpha-value>)',line:'rgb(var(--line) / <alpha-value>)',field:'rgb(var(--field) / <alpha-value>)',hint:'rgb(var(--hint) / <alpha-value>)',accent:'rgb(var(--accent) / <alpha-value>)','accent-text':'rgb(var(--accent-text) / <alpha-value>)'},borderRadius:{xl:'12px','2xl':'16px','3xl':'24px'}}}}</script>
 <style>
-:root{--bg:247 246 252;--surface:255 255 255;--raised:239 236 250;--ink:24 20 40;--mute:98 92 120;--line:226 222 240;--accent:124 58 237}
-.dark{--bg:11 10 18;--surface:21 18 31;--raised:32 26 56;--ink:244 242 251;--mute:185 180 204;--line:36 30 56;--accent:124 58 237}
-html{scroll-behavior:smooth}body{background:rgb(var(--bg));color:rgb(var(--ink));font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
-a{color:rgb(var(--accent))}a:hover{opacity:.8}
-:focus-visible{outline:2px solid rgb(var(--accent));outline-offset:2px}
-@keyframes hwRise{from{opacity:0;transform:translateY(24px);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}@keyframes hwFloat{0%,100%{transform:translate(-50%,0) scale(1)}50%{transform:translate(-46%,24px) scale(1.12)}}@keyframes hwShine{to{background-position:200% center}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+/* Colour tokens. Space-separated RGB so Tailwind can add opacity (bg-accent/20).
+   Text-on-surface pairs are >= 4.5:1, field borders and icons >= 3:1, in both themes. */
+:root{color-scheme:light;--bg:247 246 252;--surface:255 255 255;--raised:239 236 250;--ink:24 20 40;--mute:98 92 120;--line:226 222 240;--field:139 132 163;--hint:111 105 137;--accent:124 58 237;--accent-text:109 40 217}
+.dark{color-scheme:dark;--bg:11 10 18;--surface:21 18 31;--raised:32 26 56;--ink:244 242 251;--mute:185 180 204;--line:36 30 56;--field:107 100 133;--hint:168 163 188;--accent:124 58 237;--accent-text:196 181 253}
+html{scroll-behavior:smooth;scroll-padding-top:88px;scrollbar-color:rgb(var(--field)) transparent}
+body{background:rgb(var(--bg));color:rgb(var(--ink));font-family:Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased;transition:background-color .25s,color .25s}
+h1,h2,h3{text-wrap:balance}p{text-wrap:pretty}
+a{color:rgb(var(--accent-text));text-underline-offset:3px}a:hover{opacity:.8}
+::selection{background:rgb(var(--accent)/.35)}
+input,textarea{caret-color:rgb(var(--accent-text))}
+:focus-visible{outline:2px solid rgb(var(--accent-text));outline-offset:2px}
+.on-accent :focus-visible{outline-color:#fff}
+/* Motion: only what explains something. Hero entrance (once), plan steps, tab panel, loaders. */
+@keyframes hwRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes drift{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(30px,-20px,0)}}
-@keyframes dash{to{stroke-dashoffset:-24}}
-@keyframes draw{from{stroke-dashoffset:600}to{stroke-dashoffset:0}}
-@keyframes pulseDot{0%,100%{opacity:.4}50%{opacity:1}}
 @keyframes blink{50%{opacity:0}}
-.fade-up{animation:fadeUp .7s cubic-bezier(.2,.7,.2,1) both}
-.flow{stroke-dasharray:4 8;animation:dash 1.2s linear infinite}
 .caret{animation:blink 1s steps(1) infinite}
-.orbit{animation:spin var(--d,40s) linear infinite}.orbit>*{animation:spin var(--d,40s) linear infinite reverse}
-.noscroll::-webkit-scrollbar{display:none}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style></head>
-<body><div id="root"></div>
+<body><noscript><p style="padding:2rem;font-family:system-ui">Hushwork needs JavaScript to show this page. You can reach us at hello@hushwork.co.</p></noscript><div id="root"></div>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="config.js"></script>
 <script type="text/babel" src="ui.jsx"></script>
-<script type="text/babel" src="Hero.jsx"></script>
-<script type="text/babel" src="Features.jsx"></script>
-<script type="text/babel" src="Sections.jsx"></script>
 <script type="text/babel" src="AgentBox.jsx"></script>
-<script type="text/babel" src="Login.jsx"></script>
+<script type="text/babel" src="Hero.jsx"></script>
+<script type="text/babel" src="Sections.jsx"></script>
+<script type="text/babel" src="Features.jsx"></script>
 <script type="text/babel" src="Footer.jsx"></script>
 <script type="text/babel" src="App.jsx"></script>
 </body></html>
