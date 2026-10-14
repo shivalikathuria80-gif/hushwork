@@ -40,6 +40,4 @@ function StepRow({ icon, title, sub, right, delay = -1 }) {
     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line bg-raised text-ink"><Icon name={icon} size={16} /></span>
     <div className="min-w-0 flex-1 text-sm"><b className="font-medium">{title}</b><p className="text-mute">{sub}</p></div>{right}</li>;
 }
-// TEMPORARY: the old Features section still uses this. Removed when Features is rewritten.
-function Eyebrow({ children }) { return <span className="inline-flex items-center rounded-full border border-line bg-surface px-3 py-1 font-mono text-xs text-mute">{children}</span>; }
-Object.assign(window, { Icon, Btn, Logo, useTheme, Reveal, StepRow, Eyebrow });
+Object.assign(window, { Icon, Btn, Logo, useTheme, Reveal, StepRow });
