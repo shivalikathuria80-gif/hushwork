@@ -1,21 +1,50 @@
-
-const STEPS = [['01', 'Describe it', '“Every Monday, summarise new leads and email me the top five.”', 'MessageSquareText'], ['02', 'Review the plan', 'Hushwork shows each step and the tools it will touch. You approve or edit.', 'ListChecks'], ['03', 'Let it run', 'It runs on schedule, flags anything unusual and keeps a log of every action.', 'Play']];
+const STEPS = [
+  ['Describe it', '“Every Monday, summarise new leads and email me the top five.”', 'MessageSquareText'],
+  ['Review the plan', 'Hushwork shows each step and the tools it will touch. You approve or edit.', 'ListChecks'],
+  ['Let it run', 'It runs on schedule, flags anything unusual and keeps a log of every action.', 'Play'],
+];
+// A timeline reads top to bottom, so the order of the steps is shown by the rail instead of by numbers.
 function HowItWorks() {
-  const [on, setOn] = useState(-1);
-  return <section id="how" className="mx-auto max-w-6xl px-5 py-24"><Reveal><h2 className="mb-12 text-4xl font-semibold tracking-tight">Three steps. No code.</h2></Reveal>
-    <div className="grid gap-5 md:grid-cols-3">{STEPS.map(([n, t, b, ic], i) => <Reveal key={n} delay={i * .08}><button onClick={() => setOn(on === i ? -1 : i)} className={'block h-full w-full rounded-[20px] border p-7 text-left transition-all duration-200 ' + (on === i ? '-translate-y-1 border-accent bg-raised' : 'border-line bg-surface hover:-translate-y-0.5')}>
-      <div className="flex items-center justify-between"><span className="text-[13px] font-semibold text-violet-400">{n}</span><Icon name={ic} className="text-violet-400" /></div><h3 className="mb-2 mt-3 text-[22px] font-semibold">{t}</h3><p className="leading-normal text-mute">{b}</p></button></Reveal>)}</div></section>;
+  return <section id="how" className="mx-auto max-w-6xl px-5 py-24">
+    <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] md:gap-16">
+      <h2 className="text-3xl font-semibold tracking-tight md:sticky md:top-28 md:self-start md:text-4xl">Three steps. No code.</h2>
+      <ol>{STEPS.map(([title, body, icon], i) => <li key={title} className="relative pb-12 pl-16 last:pb-0">
+        {i < STEPS.length - 1 && <span className="absolute bottom-0 left-5 top-12 w-px bg-line" aria-hidden="true"></span>}
+        <span className="absolute left-0 top-0 grid h-10 w-10 place-items-center rounded-xl border border-line bg-surface text-accent-text"><Icon name={icon} /></span>
+        <Reveal delay={i * .1}><h3 className="text-xl font-semibold leading-10">{title}</h3><p className="mt-1 max-w-md leading-relaxed text-mute">{body}</p></Reveal>
+      </li>)}</ol>
+    </div>
+  </section>;
 }
-const FOLDERS = [['Sales', 'linear-gradient(135deg,#C2433F,#2A1E2A)', [['Score new leads', 'Hourly'], ['Top-5 digest', 'Mondays'], ['Follow-up nudges', 'Daily']]], ['Support', 'linear-gradient(135deg,#3E2850,#8F6C9C)', [['Triage inbox', 'Live'], ['Draft replies', 'On email'], ['Weekly themes', 'Fridays']]], ['Finance', 'linear-gradient(135deg,#173024,#A7843A)', [['Chase invoices', 'Weekly'], ['File receipts', 'On email'], ['Monthly summary', '1st']]]];
-function Folder({ name, art, files, open, onPick }) {
-  return <div onClick={onPick} className="relative h-[250px] cursor-pointer rounded-3xl" style={{ background: art }}>
-    {files.map(([n, m], j) => <div key={n} className="absolute inset-x-6 top-[70px] flex h-[130px] justify-between rounded-xl bg-white px-3.5 py-3 text-[13px] font-semibold text-zinc-900 shadow-[0_10px_24px_rgb(0_0_0/.3)]" style={{ transform: open ? 'translateY(' + (-70 - j * 34) + 'px) rotate(' + ((j - 1) * 3) + 'deg)' : 'translateY(' + (-j * 6) + 'px)', transition: 'all .5s cubic-bezier(.34,1.36,.5,1)' }}><span>{n}</span><span className="font-normal text-zinc-500">{m}</span></div>)}
-    <div className="absolute inset-x-0 bottom-0 h-[150px] rounded-b-3xl border-t border-white/40 bg-[rgb(40_30_60/.55)] p-6 text-white backdrop-blur-[18px]" style={{ transformOrigin: '50% 100%', transform: open ? 'perspective(600px) rotateX(-24deg)' : 'none', transition: 'transform .5s cubic-bezier(.34,1.36,.5,1)' }}><div className="text-[19px] font-semibold">{name}</div><div className="mt-1 text-[13px] opacity-75">{files.length} workflows</div></div></div>;
-}
+const FOLDERS = [
+  ['Sales', [['Score new leads', 'Hourly'], ['Top-5 digest', 'Mondays'], ['Follow-up nudges', 'Daily']]],
+  ['Support', [['Triage inbox', 'Live'], ['Draft replies', 'On email'], ['Weekly themes', 'Fridays']]],
+  ['Finance', [['Chase invoices', 'Weekly'], ['File receipts', 'On email'], ['Monthly summary', '1st']]],
+];
+// Folder tabs: a real tablist, so each folder is a button and the arrow keys move between them.
 function Automations() {
-  const [o, setO] = useState(-1);
-  return <section id="auto" className="mx-auto max-w-6xl px-5 pb-24 pt-8"><Reveal><h2 className="mb-3 text-4xl font-semibold tracking-tight">What it automates</h2><p className="mb-12 text-[17px] text-mute">Click a folder to see the workflows inside.</p></Reveal>
-    <div className="grid gap-7 pt-20 md:grid-cols-3">{FOLDERS.map(([n, a, f], i) => <Folder key={n} name={n} art={a} files={f} open={o === i} onPick={() => setO(o === i ? -1 : i)} />)}</div></section>;
+  const [sel, setSel] = useState(0); const tabs = useRef([]);
+  const onKey = e => {
+    const last = FOLDERS.length - 1; let n = sel;
+    if (e.key === 'ArrowRight') n = sel === last ? 0 : sel + 1; else if (e.key === 'ArrowLeft') n = sel === 0 ? last : sel - 1; else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = last; else return;
+    e.preventDefault(); setSel(n); tabs.current[n] && tabs.current[n].focus();
+  };
+  const [, files] = FOLDERS[sel];
+  return <section id="auto" className="mx-auto max-w-6xl px-5 pb-24 pt-8">
+    <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">What it automates</h2>
+    <p className="mt-3 max-w-xl text-[17px] text-mute">Pick a folder to see the workflows inside.</p>
+    <div className="mt-10">
+      <div role="tablist" aria-label="Workflow folders" onKeyDown={onKey} className="flex gap-1">
+        {FOLDERS.map(([name, f], i) => <button key={name} ref={el => tabs.current[i] = el} role="tab" id={`folder-tab-${i}`} aria-selected={sel === i} aria-controls="folder-panel" tabIndex={sel === i ? 0 : -1} onClick={() => setSel(i)}
+          className={`relative -mb-px inline-flex h-11 items-center gap-2 rounded-t-xl border px-4 text-sm font-medium transition-colors ${sel === i ? 'border-line border-b-surface bg-surface text-ink' : 'border-transparent bg-raised/70 text-mute hover:text-ink'}`}>
+          <Icon name={sel === i ? 'FolderOpen' : 'Folder'} size={16} />{name}<span className="font-normal text-mute">{f.length}</span></button>)}
+      </div>
+      <div role="tabpanel" id="folder-panel" aria-labelledby={`folder-tab-${sel}`} tabIndex={0} className="rounded-b-2xl rounded-tr-2xl border border-line bg-surface p-3 sm:p-4">
+        <ul key={sel} className="space-y-2">{files.map(([n, m], j) => <li key={n} className="flex items-center gap-3 rounded-xl border border-line bg-bg px-4 py-3.5" style={{ animation: `fadeUp .35s ${j * .06}s both` }}>
+          <Icon name="FileText" className="shrink-0 text-mute" /><span className="font-medium">{n}</span><span className="ml-auto text-sm text-mute">{m}</span></li>)}</ul>
+      </div>
+    </div>
+  </section>;
 }
 function Waitlist() {
   const [email, setEmail] = useState(''); const [done, setDone] = useState(false); const ok = /\S+@\S+\.\S+/.test(email);
