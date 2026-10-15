@@ -10,7 +10,7 @@ Install the packages once (this reads `package.json` and downloads what the proj
 npm install
 ```
 
-Start the development server, then open http://localhost:3000. Edits show up as soon as you save:
+Start the development server, then open http://localhost:3100. Edits show up as soon as you save. The port is 3100 on purpose, so port 3000 stays free for your other app:
 
 ```bash
 npm run dev

@@ -11,7 +11,7 @@ const title = "Hushwork: describe the task, we run it quietly";
 // Set NEXT_PUBLIC_SITE_URL once the site has its own domain. Vercel fills in its own address meanwhile.
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3100");
 
 export const metadata = {
   metadataBase: new URL(siteUrl),

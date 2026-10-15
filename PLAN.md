@@ -31,7 +31,7 @@ Written 2026-10-14. Based on reading every file in `hushwork/`, running the UI/U
 | Real-browser checks | Pass | Motion runs, Pause works, 0 contrast failures (dark and light), console clean, no sideways scroll from 320px to 1024px. |
 | Lighthouse, desktop | 100 / 100 / 100 / 100 | Performance, accessibility, best practices, SEO. LCP 0.7s, CLS 0. |
 | Lighthouse, phone | 80 / 100 / 100 / 100 | Lighthouse simulates a slow 4G connection and a CPU four times slower. It estimates LCP 3.0s (target was 2.5s); CLS 0. Measured in real time, the headline appears in about 0.5s. |
-| Deploy to Vercel | **Decided: not deploying** | Owner decision 2026-10-15: the site stays local at http://localhost:3000. Revisit only if the owner asks. |
+| Deploy to Vercel | **Decided: not deploying** | Owner decision 2026-10-15: the site stays local, on http://localhost:3100. Port 3000 is kept free for the owner's other app. Revisit only if the owner asks. |
 
 **Phone performance, for later (optional):** the page ships about 215KB of compressed JavaScript (React and Next.js, then the motion library at about 46KB, then icons at about 28KB). Ways to trim if it ever matters: load `motion` through `LazyMotion` (saves roughly 25KB up front), delay hydrating sections below the fold. A test that removed the headline blur made no difference, so the blur stayed.
 
