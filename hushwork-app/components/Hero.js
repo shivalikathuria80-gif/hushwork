@@ -1,26 +1,17 @@
-"use client";
-
 import { Fragment } from "react";
-import { motion } from "motion/react";
-import { Btn, EASE } from "./ui";
+import { Btn } from "./ui";
 import AgentBox from "./AgentBox";
 import WorkflowBand from "./WorkflowBand";
 
 // The headline arrives one word at a time. It is the first thing a visitor reads, so it gets the one rehearsed entrance.
+// The animation is CSS (see .hw-word in globals.css), so this component needs no JavaScript of its own.
 function Words({ text, className = "", delay = 0 }) {
   const words = text.split(" ");
   return (
     <span className={`block ${className}`}>
       {words.map((word, i) => (
         <Fragment key={i}>
-          <motion.span
-            className="inline-block"
-            initial={{ opacity: 0, y: 18, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.8, delay: delay + i * 0.07, ease: EASE }}
-          >
-            {word}
-          </motion.span>
+          <span className="hw-word" style={{ "--d": `${(delay + i * 0.07).toFixed(2)}s` }}>{word}</span>
           {i < words.length - 1 && " "}
         </Fragment>
       ))}
@@ -28,11 +19,7 @@ function Words({ text, className = "", delay = 0 }) {
   );
 }
 
-const rise = (delay) => ({
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.8, delay, ease: EASE },
-});
+const after = (seconds) => ({ "--d": `${seconds}s` });
 
 // The hero shows the product doing its job: the real agent box sits beside the promise.
 export default function Hero() {
@@ -48,15 +35,15 @@ export default function Hero() {
             <Words text="Describe the task." />
             <Words text="Hushwork handles it." className="text-accent-text" delay={0.25} />
           </h1>
-          <motion.p className="mt-5 max-w-md text-lg leading-relaxed text-mute" {...rise(0.5)}>
+          <p className="hw-rise mt-5 max-w-md text-lg leading-relaxed text-mute" style={after(0.5)}>
             Tell Hushwork what you do every week. It builds the workflow, connects your tools and runs it.
-          </motion.p>
-          <motion.div className="mt-8 flex flex-wrap gap-3" {...rise(0.62)}>
+          </p>
+          <div className="hw-rise mt-8 flex flex-wrap gap-3" style={after(0.62)}>
             <Btn href="#wait" size="lg" iconRight="ArrowRight">Join the waitlist</Btn>
             <Btn href="#how" size="lg" variant="secondary">See how it works</Btn>
-          </motion.div>
+          </div>
         </div>
-        <motion.div {...rise(0.4)}><AgentBox /></motion.div>
+        <div className="hw-rise" style={after(0.4)}><AgentBox /></div>
       </div>
       <WorkflowBand />
     </section>

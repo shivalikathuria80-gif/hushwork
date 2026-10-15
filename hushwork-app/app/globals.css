@@ -77,6 +77,18 @@
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
   50% { transform: translate3d(48px, 28px, 0) scale(1.12); }
 }
+/* The hero's entrance is pure CSS on purpose: it starts as soon as the stylesheet loads, without waiting for
+   JavaScript, so the headline appears quickly even on a slow phone. Each element sets its own delay with --d. */
+@keyframes hw-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hw-word {
+  from { opacity: 0; transform: translateY(18px); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+.hw-rise { animation: hw-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
+.hw-word { display: inline-block; animation: hw-word 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
 @keyframes hw-spin { to { transform: rotate(360deg); } }
 @keyframes hw-blink { 50% { opacity: 0; } }
 .hw-float { animation: hw-float 12s ease-in-out infinite; }

@@ -14,6 +14,29 @@ Written 2026-10-14. Based on reading every file in `hushwork/`, running the UI/U
 
 ---
 
+## Phase 2 status (updated 2026-10-15)
+
+**The site now lives in `hushwork-app/` (Next.js 16, Tailwind 4, React 19).** The no-build prototype in `hushwork/` is kept for reference.
+
+| Item | Status | Notes |
+|---|---|---|
+| Scaffold and port of every section | Done | Same design, same copy. Fonts now come from `next/font` (self-hosted). |
+| Icons Lucide to Phosphor | Done | One map in `components/icons.js`. |
+| Geist | **Decided: keep** | Owner decision 2026-10-15. Impeccable's detector calls it "overused"; accepted. |
+| Motion restored | Done | Owner request. Dial raised from 4 to about 6. Headline word reveal, drifting glow, 3D workflow band (real components, pauses offscreen, Pause button), scroll-filled timeline rail, sliding tab indicator, run log that completes step by step, approval pop, switch spring, footer wordmark wipe. |
+| Reduce motion | Done | Movement removed, fades kept, spinners kept, band static, Pause button hidden. Checked in a real browser. |
+| Link preview picture | Done | Generated at build time by `app/opengraph-image.js`. |
+| Waitlist through the new form | Done | Real signup tested; test row deleted. |
+| Lint and production build | Pass | All routes are static. |
+| Real-browser checks | Pass | Motion runs, Pause works, 0 contrast failures (dark and light), console clean, no sideways scroll from 320px to 1024px. |
+| Lighthouse, desktop | 100 / 100 / 100 / 100 | Performance, accessibility, best practices, SEO. LCP 0.7s, CLS 0. |
+| Lighthouse, phone | 80 / 100 / 100 / 100 | Lighthouse simulates a slow 4G connection and a CPU four times slower. It estimates LCP 3.0s (target was 2.5s); CLS 0. Measured in real time, the headline appears in about 0.5s. |
+| Deploy to Vercel | **Not done** | Needs your go-ahead: it makes the site public. |
+
+**Phone performance, for later (optional):** the page ships about 215KB of compressed JavaScript (React and Next.js, then the motion library at about 46KB, then icons at about 28KB). Ways to trim if it ever matters: load `motion` through `LazyMotion` (saves roughly 25KB up front), delay hydrating sections below the fold. A test that removed the headline blur made no difference, so the blur stayed.
+
+---
+
 ## Progress (updated 2026-10-14)
 
 **Phase 0 and Phase 1 are done.** Each step is its own Git commit, so any one can be undone (`git log --oneline` lists them).
@@ -36,9 +59,9 @@ Written 2026-10-14. Based on reading every file in `hushwork/`, running the UI/U
 **Still open before launch:**
 
 - Review `privacy.html` and confirm `hello@hushwork.co` is a real mailbox.
-- Decide on Geist versus another face.
-- Add a social preview image (`og:image`); none exists yet and none was invented.
-- Look at the finished page yourself in light and dark at phone width. The in-app browser pane was hidden during testing, so my checks were measurements, not eyeballed screenshots.
+- ~~Decide on Geist versus another face.~~ Decided: keep Geist.
+- ~~Add a social preview image.~~ Done in Phase 2 (generated, not invented).
+- Look at the finished page yourself in light and dark at phone width. My Phase 2 checks used a real headless browser (screenshots and measurements), but a quick look from you is still worth it.
 
 **Shipped values that differ from the plan below:** the radius scale is 12 / 16 / 24px (controls / cards / panels), not 14 / 20 / 28. Impeccable's floor says card radii stay at 12 to 16px.
 
@@ -87,7 +110,7 @@ Do Track A first, in full. Start Track B only after the waitlist has told you so
 | Dial | Current site (my estimate) | Target | Why |
 |---|---|---|---|
 | DESIGN_VARIANCE | ~6 | **6** | Offset, asymmetric hero, but not chaotic. Matches "balanced / modern". |
-| MOTION_INTENSITY | ~8 (things move constantly) | **4** | The brand is "hush". Taste's table puts "calm / minimal" at 3-4. Motion is kept only where it explains something. |
+| MOTION_INTENSITY | ~8 (things move constantly) | **4**, then **raised to about 6 on 2026-10-15 at the owner's request** | The brand is "hush", so the first target was 4. The owner asked for the motion back, so it returned in Phase 2, each piece with a reason, a reduced-motion path and (for anything that runs on its own) a Pause control. |
 | VISUAL_DENSITY | ~4 | **3** | Spacious, one idea per section. |
 
 Impeccable mode: the landing page is **Persuade**. The future logged-in app is **Operate** (scanability and consistency beat expression). They get different rules, which is why the sidebar belongs in the app and not on the landing page.

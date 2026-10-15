@@ -34,7 +34,7 @@ Jobs the page leads with: invoice chasing, weekly client report, inbox triage, l
 - The agent box on the page is a simulation (keyword matching in `hushwork/AgentBox.jsx`), clearly labelled as a preview. No AI model is called.
 - Login, "Continue with Google" and "Save workflow" were simulated. The public site no longer shows them (`Login.jsx` is kept, not loaded, for the real product).
 - **Waitlist storage: Supabase** (confirmed and live, 2026-10-14). Project `hushwork`, region ap-south-1, table `waitlist`. The public can add an email and cannot read, change or delete rows. Setup is recorded in `supabase/waitlist.sql`. Supabase is also intended as the base for login and data when the product is built.
-- Current stack: React 18 with in-browser Babel and Tailwind from a CDN, no build step. A move to a built project is proposed in `PLAN.md` (Phase 2) and is not yet confirmed.
+- Current stack (confirmed, 2026-10-15): Next.js 16 (App Router), React 19, Tailwind 4, `motion`, Phosphor icons, in `hushwork-app/`. The earlier no-build prototype is kept in `hushwork/` for reference. Hosting is not decided (Vercel is proposed in `PLAN.md`).
 - Undecided: the first product slice to build (the Invoice Chaser is proposed, not confirmed); the framework for Phase 2; whether Gmail access is feasible, because Google's app-review requirements have not been checked.
 
 ## Brand Commitments
@@ -45,6 +45,8 @@ Observed on the current site, not declared binding by the owner:
 - Voice lines: "Describe the task. Hushwork handles it." and "Quiet work, done."
 - The dot-matrix "hushwork" wordmark in the footer.
 - A violet accent, with dark as the default theme and a working light theme.
+- Geist (with Geist Mono) as the typeface. Confirmed by the owner on 2026-10-15, so it is binding.
+- Motion is welcome on the landing page (owner request, 2026-10-15), but every piece must have a reason, stop under "reduce motion", and anything that runs on its own needs a visible Pause control.
 
 ## Evidence on Hand
 

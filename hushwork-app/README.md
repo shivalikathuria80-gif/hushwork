@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Hushwork site (Next.js)
 
-## Getting Started
+The Hushwork landing page. Next.js 16 (App Router), React 19, Tailwind 4, `motion` for animation, Phosphor icons. The earlier no-build prototype lives in `../hushwork/` for reference.
 
-First, run the development server:
+## Run it
+
+Install the packages once (this reads `package.json` and downloads what the project needs):
+
+```bash
+npm install
+```
+
+Start the development server, then open http://localhost:3000. Edits show up as soon as you save:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Other commands:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`lint` checks the code for mistakes without running it.
 
-## Learn More
+```bash
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+`build` makes the optimized version visitors would get. It fails loudly if something is wrong. `npm run start` then serves that build.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Settings (environment variables)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+An environment variable is a value kept outside the code. Copy `.env.example` to `.env.local` and fill it in. `.env.local` is never committed.
 
-## Deploy on Vercel
+| Name | What it is | Secret? |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Address of the Supabase project that stores waitlist emails | No, public |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Key that may only add a waitlist email (database rules, see `../supabase/waitlist.sql`) | No, public by design |
+| `NEXT_PUBLIC_SITE_URL` | The site's own address once it has a domain (used for link previews). Optional | No |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`NEXT_PUBLIC_` means the value is sent to the browser. Never put a secret or `service_role` key in one. After changing `.env.local`, restart `npm run dev`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Where things are
+
+- `app/layout.js`: fonts (Geist), page metadata, saved light/dark theme, motion settings.
+- `app/globals.css`: colour tokens (light and dark), spacing and shape rules, the CSS animations.
+- `app/page.js`: the home page, built from the sections in `components/`.
+- `app/privacy/page.js`: the privacy page (draft, review before launch).
+- `app/opengraph-image.js`: the picture shown when the link is shared.
+- `components/`: one file per section (`Hero`, `AgentBox`, `HowItWorks`, `Automations`, `Features`, `Waitlist`, `Footer`), plus shared pieces (`ui.js`, `icons.js`) and helpers (`MotionProvider`, `useTheme`, `usePrefersReducedMotion`).
+- `lib/waitlist.js`: saves an email to Supabase.
+
+## How the motion works
+
+- The headline entrance is plain CSS, so it starts without waiting for JavaScript.
+- Scroll reveals, the folder-tab indicator, the run log and the footer wordmark use the `motion` library.
+- The glow and the workflow band move on their own. They stop when scrolled offscreen, when the visitor presses **Pause motion**, or when their system asks for reduced motion (then movement is removed and only fades remain).
