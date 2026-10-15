@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { motion, useAnimationFrame, useInView, useMotionValue, useTransform } from "motion/react";
 import { Icon } from "./icons";
+import { PauseButton } from "./ui";
 import { useMotionPause } from "./MotionProvider";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -67,9 +68,7 @@ export default function WorkflowBand() {
       </div>
       {!reduce && (
         <div className="mx-auto flex max-w-6xl justify-end px-5">
-          <button onClick={toggle} className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm text-mute transition-colors hover:bg-raised hover:text-ink">
-            <Icon name={paused ? "Play" : "Pause"} size={14} />{paused ? "Play motion" : "Pause motion"}
-          </button>
+          <PauseButton paused={paused} onToggle={toggle} />
         </div>
       )}
     </div>

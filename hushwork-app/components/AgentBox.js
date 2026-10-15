@@ -13,12 +13,17 @@ const SUGGEST = [
 ];
 
 // Preview only: this matches keywords and returns canned steps. No AI model is called yet.
-function planFor(task, modes) {
+// The order matters: the first pattern that matches wins, so the narrow ones (lead, admin) come first and the
+// broad "client" pattern (report) comes late. Exported so the workspace composer can use the same planner.
+export function planFor(task, modes) {
   const t = task.toLowerCase();
+  const approve = ["ShieldCheck", "Ask you to approve", "Nothing is sent until you say yes"];
   let s;
-  if (/invoice|pay|overdue|stripe/.test(t)) s = [["Clock", "Run every morning", "8:00 am, weekdays"], ["CreditCard", "Find overdue invoices", "Stripe · older than 7 days"], ["PenLine", "Draft a polite reminder", "Uses your tone of voice"], ["Send", "Send from Gmail", "Stops once the invoice is paid"]];
-  else if (/report|friday|summar|client/.test(t)) s = [["Clock", "Run every Friday", "4:00 pm"], ["Table", "Pull closed tasks", "Linear · this week"], ["FileText", "Write a plain summary", "Grouped by client"], ["Mail", "Email each client", "PDF attached"]];
-  else if (/inbox|email|newsletter|gmail/.test(t)) s = [["Mail", "When an email arrives", "Gmail · inbox"], ["Tags", "Classify it", "Client, newsletter, receipt"], ["FolderInput", "File or star it", "Reading, Expenses, Starred"], ["Bell", "Send one digest", "8:00 am daily"]];
+  if (/lead|enquir|prospect/.test(t)) s = [["UserPlus", "When a new lead arrives", "Contact form or email"], ["PenLine", "Draft a friendly reply", "Uses your tone of voice"], approve, ["Bell", "Remind you in 3 days", "If they have not replied"]];
+  else if (/receipt|contract|calendar|admin|expense/.test(t)) s = [["Clock", "Run on the 1st of each month", "9:00 am"], ["Receipt", "Collect receipts and contracts", "From your inbox"], ["FolderInput", "File them by client", "One folder each"], ["Calendar", "Add deadlines to your calendar", "Only dates found in contracts"]];
+  else if (/invoice|pay|overdue|stripe/.test(t)) s = [["Clock", "Run every morning", "8:00 am, weekdays"], ["CreditCard", "Find overdue invoices", "Stripe · older than 7 days"], ["PenLine", "Draft a polite reminder", "Uses your tone of voice"], approve, ["Send", "Send from Gmail", "Stops once the invoice is paid"]];
+  else if (/inbox|newsletter|gmail/.test(t)) s = [["Mail", "When an email arrives", "Gmail · inbox"], ["Tags", "Classify it", "Client, newsletter, receipt"], ["FolderInput", "File or star it", "Reading, Expenses, Starred"], ["Bell", "Send one digest", "8:00 am daily"]];
+  else if (/report|friday|summar|client/.test(t)) s = [["Clock", "Run every Friday", "4:00 pm"], ["Table", "Pull closed tasks", "Linear · this week"], ["FileText", "Write a plain summary", "Grouped by client"], approve, ["Mail", "Email each client", "PDF attached"]];
   else s = [["Zap", "Start when you say so", "Or on a schedule, you pick"], ["Search", "Gather what’s needed", "From your connected apps"], ["Sparkles", "Do the task", task.length > 48 ? task.slice(0, 48) + "…" : task], ["CircleCheck", "Report back", "One short summary"]];
   s = [...s];
   if (modes.includes("Search")) s.splice(1, 0, ["Search", "Look up details", "In your connected apps"]);

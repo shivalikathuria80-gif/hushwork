@@ -30,11 +30,24 @@ export function Btn({ variant = "primary", size = "md", loading, icon, iconRight
   return <button {...props} type={type} aria-busy={loading || undefined} disabled={props.disabled || loading} className={classes}>{content}</button>;
 }
 
-export function Logo({ className = "" }) {
-  return (
-    <a href="#top" className={`inline-flex min-h-11 items-center gap-2 font-semibold tracking-tight text-ink ${className}`}>
+// href defaults to "#top" (the landing page). The app passes "/app" and the sign-in page passes "/".
+export function Logo({ className = "", href = "#top" }) {
+  const classes = `inline-flex min-h-11 items-center gap-2 font-semibold tracking-tight text-ink ${className}`;
+  const content = (
+    <>
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-[15px] font-bold text-white">H</span>Hushwork
-    </a>
+    </>
+  );
+  if (href.startsWith("/")) return <Link href={href} className={classes}>{content}</Link>;
+  return <a href={href} className={classes}>{content}</a>;
+}
+
+// The "Pause motion" / "Play motion" button. Used by the landing workflow band and the sign-in sculpture.
+export function PauseButton({ paused, onToggle }) {
+  return (
+    <button onClick={onToggle} className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm text-mute transition-colors hover:bg-raised hover:text-ink">
+      <Icon name={paused ? "Play" : "Pause"} size={14} />{paused ? "Play motion" : "Pause motion"}
+    </button>
   );
 }
 

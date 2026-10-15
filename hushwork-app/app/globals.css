@@ -66,6 +66,9 @@
   h1, h2, h3 { text-wrap: balance; }
   p { text-wrap: pretty; }
   a { color: var(--accent-text); text-underline-offset: 3px; }
+  /* Plain links inside sentences have no styling class. Colour alone must not mark a link (WCAG 1.4.1), so they are
+     underlined. Nav links, logos, buttons, tiles and footer links all carry classes, so this rule skips them. */
+  a:not([class]) { text-decoration: underline; text-decoration-thickness: 1px; }
   ::selection { background: color-mix(in oklab, var(--accent) 35%, transparent); }
   input, textarea { caret-color: var(--accent-text); }
   :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
@@ -90,6 +93,8 @@
 .hw-rise { animation: hw-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
 .hw-word { display: inline-block; animation: hw-word 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
 @keyframes hw-spin { to { transform: rotate(360deg); } }
+@keyframes hw-fade { from { opacity: 0; } to { opacity: 1; } }
+.hw-fade { animation: hw-fade 0.4s ease-out both; }
 @keyframes hw-blink { 50% { opacity: 0; } }
 .hw-float { animation: hw-float 12s ease-in-out infinite; }
 .hw-spin { animation: hw-spin 1s linear infinite; }
@@ -113,3 +118,20 @@
 @media (prefers-reduced-transparency: reduce) {
   .hw-nav { backdrop-filter: none !important; background: var(--surface) !important; }
 }
+
+/* Login sculpture panel. The component file is untouched; these rules only adjust it. */
+.login-art .sh-aside { display: none; }                    /* empty block (no body, no buttons) */
+.login-art .sh-content { padding-bottom: 72px; }           /* room for the credit and Pause row */
+.login-art .sh-h1 { font-size: clamp(40px, 6cqw, 72px); }  /* quieter than the component's default */
+.login-art .sh-hint { opacity: 1; color: var(--mute); font-size: 12px; letter-spacing: 0.08em; } /* still fades out after the first move */
+:root:not(.dark) .login-art .sh-stage { filter: hue-rotate(235deg); }  /* light: beige to violet-grey (canvas and fallback) */
+.dark .login-art .sh-fallback { filter: hue-rotate(235deg); }          /* dark: the live canvas is already violet, only the raw fallback needs it */
+/* The raw images carry their own flat background, a slightly different tone from the page. A radial fade (not a glow)
+   dissolves the picture into the page so no rectangle shows. Delete this and the two hue-shift rules when an owned
+   violet image with a matching background replaces the placeholders. */
+.login-art .sh-fallback, .login-still {
+  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 58%, transparent 100%);
+  mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 58%, transparent 100%);
+}
+.login-still { filter: hue-rotate(235deg); }
+

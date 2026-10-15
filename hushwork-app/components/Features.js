@@ -29,12 +29,18 @@ function RunLogSample() {
   );
 }
 
-function ApprovalSample() {
+// The defaults are the landing page's wording. The runs page passes its own, clearly labelled, sample wording.
+export function ApprovalSample({
+  heading = "Send 3 payment reminders?",
+  body = "Orbit Labs, Lumen Studio and Fern & Co are overdue by 3 to 14 days.",
+  approvedText = "Approved. They send at 9:00.",
+  skippedText = "Skipped. Nothing was sent.",
+}) {
   const [state, setState] = useState("pending");
   return (
     <div className="rounded-xl border border-field bg-surface p-4">
-      <p className="text-sm font-medium">Send 3 payment reminders?</p>
-      <p className="mt-1 text-sm text-mute">Orbit Labs, Lumen Studio and Fern &amp; Co are overdue by 3 to 14 days.</p>
+      <p className="text-sm font-medium">{heading}</p>
+      <p className="mt-1 text-sm text-mute">{body}</p>
       <AnimatePresence mode="wait" initial={false}>
         {state === "pending" ? (
           <motion.div key="actions" className="mt-3 flex gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
@@ -46,7 +52,7 @@ function ApprovalSample() {
             <motion.span className="shrink-0 text-accent-text" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 20 }}>
               <Icon name={state === "approved" ? "CircleCheck" : "CircleX"} />
             </motion.span>
-            {state === "approved" ? "Approved. They send at 9:00." : "Skipped. Nothing was sent."}
+            {state === "approved" ? approvedText : skippedText}
             <button onClick={() => setState("pending")} className="ml-auto h-8 rounded-lg px-2 text-accent-text underline underline-offset-4 hover:bg-raised">Undo</button>
           </motion.p>
         )}
@@ -55,12 +61,17 @@ function ApprovalSample() {
   );
 }
 
-function PauseSample() {
+export function PauseSample({
+  name = "Invoice chaser",
+  label = "Invoice chaser is running",
+  runningText = "Running. Next run at 9:00.",
+  pausedText = "Paused. Nothing will run.",
+}) {
   const [on, setOn] = useState(true);
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3">
-      <div className="text-sm"><b className="font-medium">Invoice chaser</b><p className="text-mute">{on ? "Running. Next run at 9:00." : "Paused. Nothing will run."}</p></div>
-      <button role="switch" aria-checked={on} aria-label="Invoice chaser is running" onClick={() => setOn(!on)}
+      <div className="text-sm"><b className="font-medium">{name}</b><p className="text-mute">{on ? runningText : pausedText}</p></div>
+      <button role="switch" aria-checked={on} aria-label={label} onClick={() => setOn(!on)}
         className={`relative h-8 w-14 shrink-0 rounded-full border transition-colors before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] ${on ? "border-accent bg-accent" : "border-field bg-raised"}`}>
         <motion.span className="absolute left-0 top-0.5 h-6 w-6 rounded-full bg-white shadow-sm" animate={{ x: on ? 28 : 2 }} transition={{ type: "spring", stiffness: 500, damping: 32 }} />
       </button>
