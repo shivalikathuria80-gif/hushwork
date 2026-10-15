@@ -37,7 +37,8 @@ export default function Nav() {
             <span className="hidden dark:block"><Icon name="Sun" size={18} /></span>
             <span className="dark:hidden"><Icon name="Moon" size={18} /></span>
           </motion.button>
-          <Btn href="#wait" size="sm" className="hidden sm:inline-flex">Join the waitlist</Btn>
+          {/* Wrapped so "hidden on phones" cannot be overridden by the button's own display style. */}
+          <div className="hidden sm:block"><Btn href="#wait" size="sm">Join the waitlist</Btn></div>
           <button
             className="grid h-11 w-11 place-items-center rounded-xl text-mute hover:bg-raised hover:text-ink md:hidden"
             aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}

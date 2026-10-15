@@ -39,15 +39,16 @@ export default function Automations() {
       <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">What it automates</h2>
       <p className="mt-3 max-w-xl text-[17px] text-mute">Pick a folder to see the workflows inside.</p>
       <div className="mt-10">
+        {/* On phones the three tabs share the row evenly (icons hidden) so they never run off the screen. */}
         <div role="tablist" aria-label="Workflow folders" onKeyDown={onKeyDown} className="flex gap-1">
           {FOLDERS.map(([name, items], i) => (
             <button
               key={name} ref={(el) => (tabs.current[i] = el)} role="tab" id={`folder-tab-${i}`}
               aria-selected={selected === i} aria-controls="folder-panel" tabIndex={selected === i ? 0 : -1} onClick={() => setSelected(i)}
-              className={`relative -mb-px inline-flex h-11 items-center gap-2 rounded-t-xl border px-4 text-sm font-medium transition-colors ${selected === i ? "border-line border-b-surface bg-surface text-ink" : "border-transparent bg-raised/70 text-mute hover:text-ink"}`}
+              className={`relative -mb-px inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-t-xl border px-2 text-sm font-medium transition-colors sm:flex-none sm:justify-start sm:gap-2 sm:px-4 ${selected === i ? "border-line border-b-surface bg-surface text-ink" : "border-transparent bg-raised/70 text-mute hover:text-ink"}`}
             >
               {selected === i && <motion.span layoutId="folder-indicator" className="absolute inset-x-3 -top-px h-0.5 rounded-full bg-accent" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
-              <Icon name={selected === i ? "FolderOpen" : "Folder"} size={16} />{name}<span className="font-normal text-mute">{items.length}</span>
+              <span className="hidden sm:inline-flex"><Icon name={selected === i ? "FolderOpen" : "Folder"} size={16} /></span>{name}<span className="font-normal text-mute">{items.length}</span>
             </button>
           ))}
         </div>
