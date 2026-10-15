@@ -10,6 +10,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party component copied in as published (by guglielmogiannattasio.it). Kept untouched so it can be
+    // updated from the source; it writes to refs while rendering, which our stricter React rules flag.
+    "components/ui/liquid-sculpture-hero.tsx",
   ]),
 ]);
 
