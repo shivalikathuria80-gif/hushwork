@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/* Dark mode is switched by a "dark" class on <html> (set by the script in layout.js and the theme button). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Colour tokens. Text-on-surface pairs are >= 4.5:1, field borders and icons >= 3:1, in both themes. */
+:root {
+  color-scheme: light;
+  --bg: #f7f6fc;
+  --surface: #ffffff;
+  --raised: #efecfa;
+  --ink: #181428;
+  --mute: #625c78;
+  --line: #e2def0;
+  --field: #8b84a3;
+  --hint: #6f6989;
+  --accent: #7c3aed;
+  --accent-text: #6d28d9;
+}
+.dark {
+  color-scheme: dark;
+  --bg: #0b0a12;
+  --surface: #15121f;
+  --raised: #201a38;
+  --ink: #f4f2fb;
+  --mute: #b9b4cc;
+  --line: #241e38;
+  --field: #6b6485;
+  --hint: #a8a3bc;
+  --accent: #7c3aed;
+  --accent-text: #c4b5fd;
+}
+
+/* Makes the tokens available as Tailwind classes: bg-surface, text-mute, border-field, rounded-2xl ... */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-line: var(--line);
+  --color-field: var(--field);
+  --color-hint: var(--hint);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Shape rule: controls 12px, cards 16px, big panels 24px. */
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 88px;
+    scrollbar-color: var(--field) transparent;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.25s, color 0.25s;
+  }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  a { color: var(--accent-text); text-underline-offset: 3px; }
+  ::selection { background: color-mix(in oklab, var(--accent) 35%, transparent); }
+  input, textarea { caret-color: var(--accent-text); }
+  :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+  .on-accent :focus-visible { outline-color: #fff; }
+}
+
+/* Motion that runs on its own. Each one is stopped by "reduce motion" and paused by the page's Pause button. */
+@keyframes hw-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(48px, 28px, 0) scale(1.12); }
+}
+@keyframes hw-spin { to { transform: rotate(360deg); } }
+@keyframes hw-blink { 50% { opacity: 0; } }
+.hw-float { animation: hw-float 12s ease-in-out infinite; }
+.hw-spin { animation: hw-spin 1s linear infinite; }
+.hw-caret { animation: hw-blink 1s steps(1) infinite; }
+[data-motion="paused"] .hw-float,
+[data-motion="paused"] .hw-caret { animation-play-state: paused; }
+
+/* Reduce motion, in tiers: remove movement, keep fades and colour changes, keep loading spinners (essential feedback). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .hw-float { animation: none !important; }
+  .hw-spin { animation-duration: 1s !important; animation-iteration-count: infinite !important; }
+}
+
+/* The nav blurs the page behind it. Without that, use a solid fill. */
+@media (prefers-reduced-transparency: reduce) {
+  .hw-nav { backdrop-filter: none !important; background: var(--surface) !important; }
+}

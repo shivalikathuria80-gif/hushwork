@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": [".claude/serve.py"],
       "port": 5174
+    },
+    {
+      "name": "hushwork-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "hushwork-app"],
+      "port": 3000
     }
   ]
 }
