@@ -41,18 +41,18 @@ export default function Workspace({ children }) {
       <Composer seed={seed} />
 
       <section aria-labelledby="when-heading" className="mt-10">
-        <h2 id="when-heading" className="text-lg font-semibold tracking-tight">When should it happen?</h2>
+        <h2 id="when-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">When should it happen?</h2>
         <ul className="mt-3 grid gap-3 sm:grid-cols-3">
           {STARTERS.map(([icon, title, line, start]) => (
             <li key={title}>
               <button
                 type="button" onClick={() => fill(start)}
-                className="flex h-full w-full items-start gap-3 rounded-2xl border border-line bg-surface p-4 text-left transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-raised sm:flex-col"
+                className="flex h-full w-full items-start gap-3 rounded-2xl border border-line bg-surface p-4 text-left shadow-sm transition-[background-color,border-color,box-shadow] duration-120 ease-standard hover:border-line-strong hover:shadow-md active:bg-raised sm:flex-col"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-raised text-accent-text"><Icon name={icon} size={18} /></span>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name={icon} size={18} /></span>
                 <span>
                   <span className="block font-medium">{title}</span>
-                  <span className="mt-0.5 block text-sm text-mute">{line}</span>
+                  <span className="mt-1 block text-sm text-mute">{line}</span>
                 </span>
               </button>
             </li>
@@ -61,18 +61,18 @@ export default function Workspace({ children }) {
       </section>
 
       <section aria-labelledby="recipes-heading" className="mt-10">
-        <h2 id="recipes-heading" className="text-lg font-semibold tracking-tight">Recipes</h2>
+        <h2 id="recipes-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Recipes</h2>
         <p className="mt-1 text-[15px] text-mute">Common weekly jobs. Pick one to fill the box, change the words, then preview the plan.</p>
         <ul className="mt-3 grid gap-3 md:grid-cols-6">
           {RECIPES.map((recipe) => (
             <li key={recipe.title} className={recipe.large ? "md:col-span-3" : "md:col-span-2"}>
               <button
                 type="button" onClick={() => fill(recipe.text)}
-                className={`flex h-full w-full flex-col rounded-2xl border border-line bg-surface p-4 text-left transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-raised ${recipe.large ? "min-h-44" : "min-h-30"}`}
+                className={`flex h-full w-full flex-col rounded-2xl border border-line bg-surface p-4 text-left shadow-sm transition-[background-color,border-color,box-shadow] duration-120 ease-standard hover:border-line-strong hover:shadow-md active:bg-raised ${recipe.large ? "min-h-44" : "min-h-30"}`}
               >
-                <span className="grid h-9 w-9 place-items-center rounded-lg bg-raised text-accent-text"><Icon name={recipe.icon} size={18} /></span>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name={recipe.icon} size={18} /></span>
                 <span className="mt-3 block font-medium">{recipe.title}</span>
-                <span className="mt-0.5 block text-sm text-mute">{recipe.body}</span>
+                <span className="mt-1 block text-sm text-mute">{recipe.body}</span>
                 <span className="mt-auto flex items-end justify-between gap-3 pt-3">
                   <span className="font-mono text-xs text-mute">{recipe.meta}</span>
                   <Icon name="ArrowRight" size={18} className="ml-auto shrink-0 text-mute" />

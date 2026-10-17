@@ -13,7 +13,7 @@ const COPY = {
   create: { title: "Create your account", sub: "Save your plans as drafts and come back to them.", button: "Create account", working: "Creating your account..." },
 };
 const OFFLINE = "Cannot reach Hushwork. Check your internet connection and try again.";
-const inputClass = "h-12 w-full rounded-xl border bg-surface px-4 text-[15px] text-ink placeholder:text-hint";
+const inputClass = "h-12 w-full rounded-xl border bg-surface px-4 text-[15px] text-ink placeholder:text-hint focus-visible:border-accent";
 
 // The sign-in / create-account form. How it works:
 // 1. The person fills in the fields and presses the button.
@@ -69,8 +69,8 @@ export default function LoginForm() {
 
   return (
     <div className="w-full">
-      <div key={confirming ? "confirm" : mode} className="animate-[hw-fade_0.15s_ease-out_both]">
-        <h1 className="text-[length:clamp(1.75rem,3vw,2.25rem)] font-semibold leading-[1.1] tracking-tight">{confirming ? "Check your email" : copy.title}</h1>
+      <div key={confirming ? "confirm" : mode} className="animate-[hw-fade_120ms_var(--ease)_both]">
+        <h1 className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em]">{confirming ? "Check your email" : copy.title}</h1>
         {!confirming && <p className="mt-2 text-[15px] text-mute">{copy.sub}</p>}
       </div>
 
@@ -90,7 +90,7 @@ export default function LoginForm() {
               {[["signin", "Sign in"], ["create", "Create account"]].map(([value, label]) => (
                 <label key={value} className="relative block">
                   <input type="radio" name="how" value={value} checked={mode === value} onChange={() => switchTo(value)} className="peer sr-only" />
-                  <span className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-[15px] font-medium text-mute transition-colors peer-checked:bg-accent peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-text md:h-10">
+                  <span className="flex h-11 cursor-pointer items-center justify-center rounded-md text-[15px] font-medium text-mute transition-colors duration-120 ease-standard hover:bg-raised peer-checked:bg-accent peer-checked:text-on-accent peer-checked:hover:bg-accent-hover peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus peer-focus-visible:shadow-[var(--ring)] md:h-10">
                     {label}
                   </span>
                 </label>
@@ -102,44 +102,44 @@ export default function LoginForm() {
             <input type="hidden" name="mode" value={mode} />
 
             <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium">Email address</label>
+              <label htmlFor="email" className="mb-2 block text-sm font-medium">Email address</label>
               <input
                 id="email" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
                 ref={emailRef} value={email} onChange={(event) => setEmail(event.target.value)} maxLength={LIMITS.emailMax}
                 placeholder="you@company.com"
                 aria-invalid={emailError ? true : undefined} aria-describedby={emailError ? "email-error" : undefined}
-                className={`${inputClass} ${emailError ? "border-ink" : "border-field"}`}
+                className={`${inputClass} ${emailError ? "border-error" : "border-field"}`}
               />
-              {emailError && <p id="email-error" className="mt-1.5 flex items-start gap-1.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-accent-text" />{emailError}</p>}
+              {emailError && <p id="email-error" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{emailError}</p>}
             </div>
 
             <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium">Password</label>
+              <label htmlFor="password" className="mb-2 block text-sm font-medium">Password</label>
               <div className="relative">
                 <input
                   id="password" name="password" type={showPassword ? "text" : "password"}
                   autoComplete={creating ? "new-password" : "current-password"} autoCapitalize="none" spellCheck={false}
                   ref={passwordRef}
                   aria-invalid={passwordError ? true : undefined} aria-describedby={creating || passwordError ? "password-note" : undefined}
-                  className={`${inputClass} pr-14 ${passwordError ? "border-ink" : "border-field"}`}
+                  className={`${inputClass} pr-14 ${passwordError ? "border-error" : "border-field"}`}
                 />
                 <button
                   type="button" onClick={() => setShowPassword(!showPassword)} aria-pressed={showPassword} aria-label="Show password"
-                  className="absolute right-0 top-0 grid h-12 w-12 place-items-center rounded-xl text-mute transition-colors hover:text-ink"
+                  className="absolute right-0 top-0 grid h-12 w-12 place-items-center rounded-xl text-mute transition-colors duration-120 ease-standard hover:text-ink"
                 >
                   <Icon name={showPassword ? "EyeOff" : "Eye"} size={20} />
                 </button>
               </div>
               {passwordError ? (
-                <p id="password-note" className="mt-1.5 flex items-start gap-1.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-accent-text" />{passwordError}</p>
+                <p id="password-note" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{passwordError}</p>
               ) : creating ? (
-                <p id="password-note" className="mt-1.5 text-sm text-mute">At least {LIMITS.passwordMin} characters.</p>
+                <p id="password-note" className="mt-2 text-sm text-mute">At least {LIMITS.passwordMin} characters.</p>
               ) : null}
             </div>
 
             {formError && (
-              <div role="alert" className="flex items-start gap-2 rounded-xl border border-field bg-raised px-3 py-2.5 text-sm">
-                <Icon name="CircleAlert" className="mt-0.5 shrink-0 text-accent-text" />
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-error bg-raised px-3 py-3 text-sm">
+                <Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />
                 <div>
                   <p>{formError.error}</p>
                   {formError.kind === "credentials" && (

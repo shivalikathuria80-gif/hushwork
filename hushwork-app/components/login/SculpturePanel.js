@@ -13,9 +13,10 @@ import { useTheme } from "../useTheme";
 const SculptureHero = dynamic(() => import("../ui/liquid-sculpture-hero"), { ssr: false });
 
 // The sculpture reads its colours in JavaScript, so it needs hex values. They mirror globals.css:
-// panel = --raised (light) / --bg (dark); text = --ink.
-const PANEL = { light: "#efecfa", dark: "#0b0a12" };
-const INK = { light: "#181428", dark: "#f4f2fb" };
+// panel = --sunken (light and dark); text = --ink. The four sculpture images are drawn on exactly the panel colour
+// (scripts/sculpture-config.json), and lib/sculpture.test.js fails if the three ever drift apart.
+const PANEL = { light: "#eeecf2", dark: "#0c0a10" };
+const INK = { light: "#1c1926", dark: "#f7f6f9" };
 const FONT = "var(--font-geist-sans), system-ui, sans-serif";
 
 // Can this browser draw WebGL2 at all? Asked once, then remembered. The test context is released straight away
@@ -65,25 +66,24 @@ export default function SculpturePanel() {
         headingFont={FONT} bodyFont={FONT} accentFont={FONT}
         hint={canDrawWebGL ? "Move your cursor over it" : ""} hintTouch=""
         height="100%" interactive={live} intro={false} ambient={false}
-        sculptureScale={0.8}
+        sculptureScale={0.785} mobileSculptureScale={1}
       />
     </div>
   );
 }
 
-// Credit and Pause button, along the bottom of the panel. It is the last thing in the page's HTML so keyboard users
-// reach the form first. The row ignores the mouse (pointer-events-none) so the sculpture still feels it;
-// only the link and button themselves can be clicked.
+// Credit and Pause button: two small glass pills over the bottom corners of the panel (16px in from its edges; the panel
+// is inset 12px). It is the last thing in the page's HTML so keyboard users reach the form first.
 export function PanelFooter() {
   const reduceMotion = usePrefersReducedMotion();
   const { paused, toggle } = useMotionPause();
   return (
-    <footer className="pointer-events-none fixed bottom-5 left-0 z-10 hidden w-1/2 items-center justify-between gap-4 px-6 lg:flex">
-      <a href="https://guglielmogiannattasio.it" target="_blank" rel="noopener" className="pointer-events-auto inline-flex min-h-6 items-center text-xs text-mute underline underline-offset-2 hover:text-ink">
+    <footer className="hidden lg:block">
+      <a href="https://guglielmogiannattasio.it" target="_blank" rel="noopener" className="hw-glass fixed bottom-6 left-7 z-10 inline-flex h-11 items-center rounded-full px-3 text-xs text-ink underline underline-offset-2 transition-colors duration-120 ease-standard hover:bg-raised">
         Sculpture component by guglielmogiannattasio.it
       </a>
       {/* Same rule as the landing page: no Pause button when the visitor already asked for reduced motion. */}
-      {!reduceMotion && <span className="pointer-events-auto"><PauseButton paused={paused} onToggle={toggle} /></span>}
+      {!reduceMotion && <span className="fixed bottom-6 right-[calc(50%+1.75rem)] z-10"><PauseButton glass paused={paused} onToggle={toggle} /></span>}
     </footer>
   );
 }

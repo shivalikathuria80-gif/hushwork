@@ -1,0 +1,37 @@
+{
+  "note": "One source of truth for the four login sculpture images. scripts/make-sculpture.mjs reads it and lib/sculpture.test.js checks it. Each theme's 'bg' must equal --sunken in app/globals.css and PANEL in components/login/SculpturePanel.js.",
+  "seed": 20261016,
+  "supersample": 3,
+  "budgetBytes": 250000,
+  "minKeyDistance": 0.08,
+  "borderPixels": 32,
+  "rules": {
+    "coverage": [0.10, 0.45],
+    "particles": { "landscape": [80000, 140000], "portrait": [190000, 340000] },
+    "margins": { "landscape": [0.05, 0.08], "portrait": [0.06, 0.08] },
+    "paletteMaxDistance": 0.06,
+    "paletteMaxOffShare": 0.01
+  },
+  "sizes": {
+    "landscape": { "width": 1983, "height": 793 },
+    "portrait": { "width": 1024, "height": 1300 }
+  },
+  "files": {
+    "light.webp": { "theme": "light", "shape": "landscape" },
+    "dark.webp": { "theme": "dark", "shape": "landscape" },
+    "mobile-light.webp": { "theme": "light", "shape": "portrait" },
+    "mobile-dark.webp": { "theme": "dark", "shape": "portrait" }
+  },
+  "themes": {
+    "light": {
+      "bg": "#eeecf2",
+      "ramp": ["#4c1d78", "#5b21b6", "#6d28d9", "#7c3aed", "#8b5cf6", "#a476ff", "#c3a5ff", "#dac9ff"],
+      "neutrals": ["#635e73", "#847f96"]
+    },
+    "dark": {
+      "bg": "#0c0a10",
+      "ramp": ["#5b21b6", "#6d28d9", "#7c3aed", "#8b5cf6", "#a476ff", "#c3a5ff", "#dac9ff", "#f5f0ff"],
+      "neutrals": ["#cac6d6", "#a8a3b8"]
+    }
+  }
+}

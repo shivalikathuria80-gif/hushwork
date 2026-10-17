@@ -6,7 +6,7 @@ export const metadata = { title: "Runs - Hushwork", robots: { index: false, foll
 export default function RunsPage() {
   return (
     <main id="main" className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
-      <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,3vw,2.25rem)] font-semibold leading-[1.1] tracking-tight outline-offset-4">Runs</h1>
+      <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Runs</h1>
       <RunsViewer />
     </main>
   );

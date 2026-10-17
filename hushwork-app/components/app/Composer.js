@@ -117,7 +117,7 @@ export default function Composer({ seed }) {
 
   return (
     <div>
-      <div className="rounded-2xl border border-field bg-surface p-4 transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25">
+      <div className="field-focus rounded-3xl border border-field bg-surface p-4 shadow-sm">
         <label htmlFor="task" className="sr-only">Describe the work you want off your plate</label>
         <textarea
           id="task" ref={taRef} rows={3} value={text} disabled={busy} maxLength={LIMITS.promptMax}
@@ -127,39 +127,38 @@ export default function Composer({ seed }) {
           className="w-full resize-none bg-transparent text-[15px] leading-relaxed outline-hidden placeholder:text-hint disabled:opacity-60"
         />
         <div className="mt-1 flex justify-end">
-          <motion.button
+          <button
             type="button" onClick={preview} disabled={busy} aria-label="Preview plan"
-            whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-50 md:h-9 md:w-9"
+            className="grid h-11 w-11 place-items-center rounded-full bg-accent text-on-accent transition-colors duration-120 ease-standard hover:bg-accent-hover active:bg-accent-active disabled:opacity-50 md:h-9 md:w-9"
           >
             <Icon name={busy ? "Loader2" : "ArrowUp"} className={busy ? "hw-spin" : ""} />
-          </motion.button>
+          </button>
         </div>
       </div>
       <p className="mt-2 px-1 text-sm text-mute">This is a preview. It drafts a plan and sends nothing. Do not put passwords or card numbers in a task.</p>
 
       {phase !== "idle" && (
         <motion.div
-          className="mt-4 rounded-2xl border border-line bg-surface p-4" aria-live="polite"
-          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+          className="mt-4 rounded-2xl border border-line bg-surface p-4 shadow-sm" aria-live="polite"
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: EASE }}
         >
           {phase === "thinking" ? (
             <div className="flex items-center gap-2 px-2 text-sm text-mute">
-              <Icon name="Loader2" className="hw-spin" />Reading your request<span className="hw-caret ml-0.5 inline-block h-4 w-0.5 translate-y-0.5 bg-current" aria-hidden="true"></span>
+              <Icon name="Loader2" className="hw-spin" />Reading your request<span className="hw-caret ml-1 inline-block h-4 w-0.5 translate-y-0.5 bg-current" aria-hidden="true"></span>
             </div>
           ) : (
             <h2 ref={planHeadingRef} tabIndex={-1} className="flex items-center gap-2 px-2 text-sm font-medium outline-offset-4">
               <Icon name="Workflow" className="text-accent-text" />Preview plan. Nothing will run.
             </h2>
           )}
-          <ol className="mt-2 space-y-0.5">
+          <ol className="mt-2 space-y-1">
             {plan.slice(0, shown).map(([icon, title, detail], index) => (
               <StepRow key={title + index} delay={0} icon={icon} title={`${index + 1}. ${title}`} sub={detail}
-                right={<motion.span className="shrink-0 text-accent-text" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 22, delay: 0.15 }}><Icon name="Check" size={16} /></motion.span>} />
+                right={<motion.span className="shrink-0 text-accent-text" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: EASE, delay: 0.1 }}><Icon name="Check" size={16} /></motion.span>} />
             ))}
           </ol>
           {phase === "ready" && (
-            <motion.div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <motion.div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
               {saveState.status !== "saved" && (
                 <Btn size="sm" icon="Save" loading={saving} onClick={save}>{saving ? "Saving..." : saveState.status === "error" ? "Try again" : "Save as draft"}</Btn>
               )}
@@ -167,10 +166,10 @@ export default function Composer({ seed }) {
               <Btn size="sm" variant="ghost" icon="RotateCcw" onClick={startOver}>Start over</Btn>
               <p role="status" className="w-full text-sm text-mute">
                 {saveState.status === "saved" ? (
-                  <span className="flex flex-wrap items-center gap-x-2"><Icon name="CircleCheck" className="shrink-0 text-accent-text" />Saved to your drafts. It will not run. <a href="#drafts-heading">See your drafts</a></span>
+                  <span className="flex flex-wrap items-center gap-x-2"><Icon name="CircleCheck" className="shrink-0 text-success" />Saved to your drafts. It will not run. <a href="#drafts-heading">See your drafts</a></span>
                 ) : "Not saved yet."}
               </p>
-              {saveState.status === "error" && <p role="alert" className="flex w-full items-start gap-1.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-accent-text" />{saveState.message}</p>}
+              {saveState.status === "error" && <p role="alert" className="flex w-full items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{saveState.message}</p>}
             </motion.div>
           )}
         </motion.div>

@@ -15,7 +15,7 @@ export default function AppLayout({ children }) {
       </a>
       <AppNav
         userBadge={
-          <Suspense fallback={<span aria-hidden="true" className="block h-5 w-36 rounded bg-raised" />}>
+          <Suspense fallback={<span aria-hidden="true" className="block h-8 w-44 rounded-full bg-raised" />}>
             <UserBadge />
           </Suspense>
         }

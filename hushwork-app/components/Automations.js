@@ -11,8 +11,8 @@ const FOLDERS = [
   ["Finance", [["Chase invoices", "Weekly"], ["File receipts", "On email"], ["Monthly summary", "1st"]]],
 ];
 
-const listVariants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } }, exit: { opacity: 0, transition: { duration: 0.12 } } };
-const rowVariants = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE } } };
+const listVariants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } }, exit: { opacity: 0, transition: { duration: 0.12, ease: EASE } } };
+const rowVariants = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: EASE } } };
 
 // Folder tabs: a real tablist, so each folder is a button and the arrow keys move between them.
 // The accent line slides from tab to tab, which shows that it is the same panel with different contents.
@@ -45,18 +45,18 @@ export default function Automations() {
             <button
               key={name} ref={(el) => (tabs.current[i] = el)} role="tab" id={`folder-tab-${i}`}
               aria-selected={selected === i} aria-controls="folder-panel" tabIndex={selected === i ? 0 : -1} onClick={() => setSelected(i)}
-              className={`relative -mb-px inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-t-xl border px-2 text-sm font-medium transition-colors sm:flex-none sm:justify-start sm:gap-2 sm:px-4 ${selected === i ? "border-line border-b-surface bg-surface text-ink" : "border-transparent bg-raised/70 text-mute hover:text-ink"}`}
+              className={`relative -mb-px inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-t-xl border px-2 text-sm font-medium transition-colors duration-120 ease-standard sm:flex-none sm:justify-start sm:px-4 ${selected === i ? "border-line border-b-surface bg-surface text-ink" : "border-transparent bg-raised/70 text-mute hover:text-ink"}`}
             >
-              {selected === i && <motion.span layoutId="folder-indicator" className="absolute inset-x-3 -top-px h-0.5 rounded-full bg-accent" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+              {selected === i && <motion.span layoutId="folder-indicator" className="absolute inset-x-3 -top-px h-0.5 rounded-full bg-accent" transition={{ duration: 0.2, ease: EASE }} />}
               <span className="hidden sm:inline-flex"><Icon name={selected === i ? "FolderOpen" : "Folder"} size={16} /></span>{name}<span className="font-normal text-mute">{items.length}</span>
             </button>
           ))}
         </div>
-        <div role="tabpanel" id="folder-panel" aria-labelledby={`folder-tab-${selected}`} tabIndex={0} className="rounded-b-2xl rounded-tr-2xl border border-line bg-surface p-3 sm:p-4">
+        <div role="tabpanel" id="folder-panel" aria-labelledby={`folder-tab-${selected}`} tabIndex={0} className="rounded-b-2xl rounded-tr-2xl border border-line bg-surface p-3 shadow-sm sm:p-4">
           <AnimatePresence mode="wait" initial={false}>
             <motion.ul key={selected} className="space-y-2" variants={listVariants} initial="hidden" animate="show" exit="exit">
               {files.map(([name, when]) => (
-                <motion.li key={name} variants={rowVariants} className="flex items-center gap-3 rounded-xl border border-line bg-bg px-4 py-3.5">
+                <motion.li key={name} variants={rowVariants} className="flex items-center gap-3 rounded-xl border border-line bg-bg px-4 py-3">
                   <Icon name="FileText" className="shrink-0 text-mute" /><span className="font-medium">{name}</span><span className="ml-auto text-sm text-mute">{when}</span>
                 </motion.li>
               ))}

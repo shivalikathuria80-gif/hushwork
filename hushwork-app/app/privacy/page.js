@@ -7,14 +7,14 @@ export const metadata = {
 };
 
 const h2 = "mt-10 text-xl font-semibold tracking-tight";
-const p = "mt-2 max-w-[65ch] leading-relaxed text-mute";
-const ul = "mt-2 max-w-[65ch] list-disc space-y-1 pl-5 leading-relaxed text-mute";
+const p = "mt-2 max-w-[65ch] text-[15px] leading-relaxed text-mute";
+const ul = "mt-2 max-w-[65ch] list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-mute";
 
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-5 pb-20 pt-12">
       <Link href="/" className="inline-flex min-h-11 items-center gap-2 text-[15px]"><Icon name="ArrowLeft" size={16} />Back to Hushwork</Link>
-      <h1 className="mt-6 text-[length:clamp(2rem,5vw,2.5rem)] font-semibold leading-[1.1] tracking-tight">Privacy</h1>
+      <h1 className="mt-6 text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em]">Privacy</h1>
       <p className={p}>Last updated 15 October 2026.</p>
 
       <h2 className={h2}>What we store</h2>

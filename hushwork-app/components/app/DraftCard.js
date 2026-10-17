@@ -24,7 +24,7 @@ function useSavedTime(updatedAt) {
     () => "",
   );
 }
-const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-mute transition-colors hover:bg-raised hover:text-ink";
+const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-mute transition-colors duration-120 ease-standard hover:bg-raised hover:text-ink active:bg-line";
 
 // Calls a Server Action. A failed request (offline, server down) becomes a plain sentence instead of a crash.
 // A redirect (signed out) is let through: Next.js delivers it as an error that must not be swallowed.
@@ -86,7 +86,7 @@ export default function DraftCard({ draft, onDeleted }) {
 
   return (
     <div
-      className="rounded-2xl border border-line bg-surface p-3"
+      className="rounded-2xl border border-line bg-surface p-3 shadow-sm"
       onKeyDown={(event) => { if (event.key === "Escape" && mode !== "view") back(mode === "rename" ? "rename" : "delete"); }}
     >
       {mode === "delete" ? (
@@ -96,32 +96,32 @@ export default function DraftCard({ draft, onDeleted }) {
             <Btn variant="dark" size="sm" loading={pending} onClick={confirmDelete}>Delete draft</Btn>
             <Btn variant="secondary" size="sm" ref={keepRef} disabled={pending} onClick={() => back("delete")}>Keep draft</Btn>
           </div>
-          {error && <p role="alert" className="mt-2 px-1 text-sm">{error}</p>}
+          {error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-raised text-accent-text"><Icon name="Workflow" size={18} /></span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name="Workflow" size={18} /></span>
           {mode === "rename" ? (
             <div className="min-w-0 flex-1">
               <input
                 ref={inputRef} value={name} onChange={(event) => setName(event.target.value)} aria-label="Draft name"
                 onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); saveName(); } }}
                 aria-invalid={error ? true : undefined} aria-describedby={error ? `rename-error-${draft.id}` : undefined}
-                className={`h-11 w-full rounded-xl border bg-surface px-3 text-[15px] ${error ? "border-ink" : "border-field"}`}
+                className={`h-11 w-full rounded-xl border bg-surface px-3 text-[15px] focus-visible:border-accent ${error ? "border-error" : "border-field"}`}
               />
-              {error && <p id={`rename-error-${draft.id}`} role="alert" className="mt-1 text-sm">{error}</p>}
+              {error && <p id={`rename-error-${draft.id}`} role="alert" className="mt-1 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
             </div>
           ) : (
             <div className="min-w-0 flex-1">
               <button
                 id={`draft-open-${draft.id}`} type="button" onClick={() => fill(draft.prompt, draft.plan)} aria-label={`Open draft: ${draft.name}`}
-                className="relative -my-2.5 block min-h-11 max-w-full truncate rounded text-left font-medium hover:underline md:my-0 md:min-h-6"
+                className="relative -my-2.5 block min-h-11 max-w-full truncate rounded-md text-left font-medium hover:underline md:my-0 md:min-h-6"
               >
                 {draft.name}
               </button>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-mute">
                 <span>{savedText && <>Saved <time dateTime={draft.updatedAt}>{savedText}</time> · </>}{steps}</span>
-                <span className="rounded-md border border-line bg-raised px-1.5 text-xs uppercase tracking-wide">Draft</span>
+                <span className="rounded-md border border-line bg-raised px-2 text-xs font-medium text-ink">Draft</span>
               </p>
             </div>
           )}

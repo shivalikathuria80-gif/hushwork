@@ -12,7 +12,7 @@ const intro = "Drafts are saved plans. They never run, send or connect to anythi
 export function DraftsFallback() {
   return (
     <div aria-busy="true">
-      <h2 id="drafts-heading" tabIndex={-1} className="text-lg font-semibold tracking-tight outline-offset-4">Your drafts</h2>
+      <h2 id="drafts-heading" tabIndex={-1} className="text-xl font-semibold leading-[1.35] tracking-tight outline-offset-4">Your drafts</h2>
       <p className="mt-1 text-[15px] text-mute">{intro}</p>
       <p role="status" className="sr-only">Loading your drafts</p>
       <div aria-hidden="true" className="mt-3 space-y-3">
@@ -60,7 +60,7 @@ export default async function Drafts() {
 
   return (
     <div>
-      <h2 id="drafts-heading" tabIndex={-1} className="text-lg font-semibold tracking-tight outline-offset-4">
+      <h2 id="drafts-heading" tabIndex={-1} className="text-xl font-semibold leading-[1.35] tracking-tight outline-offset-4">
         Your drafts{!loadFailed && drafts.length > 0 && <span className="ml-1 font-normal text-mute">({drafts.length})</span>}
       </h2>
       <p className="mt-1 text-[15px] text-mute">{intro}</p>

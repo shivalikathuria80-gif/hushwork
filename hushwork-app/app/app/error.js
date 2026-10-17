@@ -7,7 +7,7 @@ import { Btn } from "@/components/ui";
 export default function AppError({ retry }) {
   return (
     <main id="main" className="mx-auto max-w-xl px-5 py-16 sm:px-8">
-      <h1 className="text-[length:clamp(1.75rem,3vw,2.25rem)] font-semibold leading-[1.1] tracking-tight">Something went wrong</h1>
+      <h1 className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em]">Something went wrong</h1>
       <p className="mt-3 text-[15px] text-mute">This page could not load. Try again in a moment.</p>
       <Btn className="mt-6" icon="RotateCcw" onClick={() => retry()}>Try again</Btn>
     </main>

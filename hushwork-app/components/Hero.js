@@ -11,7 +11,7 @@ function Words({ text, className = "", delay = 0 }) {
     <span className={`block ${className}`}>
       {words.map((word, i) => (
         <Fragment key={i}>
-          <span className="hw-word" style={{ "--d": `${(delay + i * 0.07).toFixed(2)}s` }}>{word}</span>
+          <span className="hw-word" style={{ "--d": `${(delay + i * 0.04).toFixed(2)}s` }}>{word}</span>
           {i < words.length - 1 && " "}
         </Fragment>
       ))}
@@ -33,17 +33,17 @@ export default function Hero() {
         <div className="lg:pt-8">
           <h1 className="text-[length:clamp(2.25rem,4vw,3rem)] font-semibold leading-[1.05] tracking-[-0.03em]">
             <Words text="Describe the task." />
-            <Words text="Hushwork handles it." className="text-accent-text" delay={0.25} />
+            <Words text="Hushwork handles it." className="text-accent-text" delay={0.12} />
           </h1>
-          <p className="hw-rise mt-5 max-w-md text-lg leading-relaxed text-mute" style={after(0.5)}>
+          <p className="hw-rise mt-5 max-w-md text-lg leading-relaxed text-mute" style={after(0.2)}>
             Tell Hushwork what you do every week. It builds the workflow, connects your tools and runs it.
           </p>
-          <div className="hw-rise mt-8 flex flex-wrap gap-3" style={after(0.62)}>
+          <div className="hw-rise mt-8 flex flex-wrap gap-3" style={after(0.3)}>
             <Btn href="#wait" size="lg" iconRight="ArrowRight">Join the waitlist</Btn>
             <Btn href="#how" size="lg" variant="secondary">See how it works</Btn>
           </div>
         </div>
-        <div className="hw-rise" style={after(0.4)}><AgentBox /></div>
+        <div className="hw-rise" style={after(0.25)}><AgentBox /></div>
       </div>
       <WorkflowBand />
     </section>

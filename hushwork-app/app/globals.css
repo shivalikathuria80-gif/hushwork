@@ -1,34 +1,40 @@
 @import "tailwindcss";
 
+/* If the dev server ever shows old colours after an edit here (dark text on purple buttons), restart `npm run dev`. */
+
 /* Dark mode is switched by a "dark" class on <html> (set by the script in layout.js and the theme button). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Colour tokens. Text-on-surface pairs are >= 4.5:1, field borders and icons >= 3:1, in both themes. */
+/* Colour tokens: the Arjun AI design system (docs/arjun-ai-design-system.md), with the font kept as Geist.
+   Where Arjun's raw value fails WCAG AA the value here is adapted (docs/design-next.md section 1.3).
+   Text-on-surface pairs are >= 4.5:1, field borders, focus lines and icons >= 3:1, in both themes.
+   --raised is for hover, tiles and chips. --sunken is for recessed panels (it is also the login sculpture's ground). */
 :root {
   color-scheme: light;
-  --bg: #f7f6fc;
-  --surface: #ffffff;
-  --raised: #efecfa;
-  --ink: #181428;
-  --mute: #625c78;
-  --line: #e2def0;
-  --field: #8b84a3;
-  --hint: #6f6989;
-  --accent: #7c3aed;
-  --accent-text: #6d28d9;
+  --bg: #f7f6f9;  --surface: #ffffff;  --raised: #eeecf2;  --sunken: #eeecf2;
+  --ink: #1c1926;  --mute: #635e73;  --hint: #635e73;
+  --line: #e2dfea;  --line-strong: #cac6d6;  --field: #847f96;  /* --field is the only border that carries the 3:1 rule */
+  --accent: #7c3aed;  --accent-hover: #6d28d9;  --accent-active: #5b21b6;  --accent-text: #6d28d9;
+  --accent-subtle: #f5f0ff;  --accent-subtle-border: #dac9ff;  --on-accent: #ffffff;  --focus: #7c3aed;
+  --success: #15803d;  --warning: #b45309;  --error: #b91c1c;  --info: #1d4ed8;  /* the 600 values: safe as text. Never success or warning text on --raised */
+  --r-sm: 6px;  --r-md: 10px;  --r-lg: 16px;  --r-xl: 22px;
+  --elev-sm: 0 1px 2px rgba(28, 25, 38, 0.06);
+  --elev-md: 0 4px 12px rgba(28, 25, 38, 0.08), 0 1px 2px rgba(28, 25, 38, 0.04);
+  --elev-lg: 0 16px 40px rgba(28, 25, 38, 0.12), 0 2px 8px rgba(28, 25, 38, 0.06);
+  --ring: 0 0 0 7px var(--accent-subtle-border);  /* a 3px soft halo outside the 2px outline (2px offset) */
+  --glass-bg: rgba(255, 255, 255, 0.85);  --glass-border: #e2dfea;  --glass-solid: #ffffff;  --glass-blur: blur(16px) saturate(160%);
+  --dur-fast: 120ms;  --dur-base: 200ms;  --dur-slow: 340ms;  --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 .dark {
   color-scheme: dark;
-  --bg: #0b0a12;
-  --surface: #15121f;
-  --raised: #201a38;
-  --ink: #f4f2fb;
-  --mute: #b9b4cc;
-  --line: #241e38;
-  --field: #6b6485;
-  --hint: #a8a3bc;
-  --accent: #7c3aed;
-  --accent-text: #c4b5fd;
+  --bg: #121018;  --surface: #1c1926;  --raised: #2e2a3a;  --sunken: #0c0a10;
+  --ink: #f7f6f9;  --mute: #a8a3b8;  --hint: #a8a3b8;
+  --line: rgba(255, 255, 255, 0.1);  --line-strong: rgba(255, 255, 255, 0.18);  --field: rgba(255, 255, 255, 0.38);
+  --accent: #7c3aed;  --accent-hover: #844bf2;  --accent-active: #6d28d9;  --accent-text: #c3a5ff;
+  --accent-subtle: rgba(139, 92, 246, 0.14);  --accent-subtle-border: rgba(139, 92, 246, 0.35);  --focus: #a476ff;
+  --success: #4ade80;  --warning: #fbbf24;  --error: #f87171;  --info: #60a5fa;
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.3);  --elev-md: 0 4px 16px rgba(0, 0, 0, 0.4);  --elev-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
+  --glass-bg: rgba(28, 25, 38, 0.78);  --glass-border: rgba(255, 255, 255, 0.08);  --glass-solid: #1c1926;
 }
 
 /* Makes the tokens available as Tailwind classes: bg-surface, text-mute, border-field, rounded-2xl ... */
@@ -36,19 +42,37 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
   --color-ink: var(--ink);
   --color-mute: var(--mute);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-field: var(--field);
   --color-hint: var(--hint);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
   --color-accent-text: var(--accent-text);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-edge: var(--accent-subtle-border);
+  --color-on-accent: var(--on-accent);
+  --color-focus: var(--focus);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  /* Shape rule: controls 12px, cards 16px, big panels 24px. */
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-3xl: 24px;
+  /* Shape rule: rounded-md chips 6, rounded-xl controls and tiles 10, rounded-2xl cards 16, rounded-3xl hero panels 22,
+     rounded-full switches and round buttons. Do not use rounded-lg. */
+  --radius-md: var(--r-sm);
+  --radius-xl: var(--r-md);
+  --radius-2xl: var(--r-lg);
+  --radius-3xl: var(--r-xl);
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
+  --ease-standard: var(--ease); /* class: ease-standard. Durations: duration-120, duration-200, duration-340 */
 }
 
 @layer base {
@@ -71,8 +95,26 @@
   a:not([class]) { text-decoration: underline; text-decoration-thickness: 1px; }
   ::selection { background: color-mix(in oklab, var(--accent) 35%, transparent); }
   input, textarea { caret-color: var(--accent-text); }
-  :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
-  .on-accent :focus-visible { outline-color: #fff; }
+  /* The 2px outline carries the 3:1 contrast; the soft halo (below, unlayered) is Arjun's look. */
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .on-accent :focus-visible { outline-color: var(--on-accent); }
+}
+
+/* Unlayered on purpose: it must beat shadow utilities such as shadow-sm. Textareas are left out because their wrapper
+   (.field-focus) draws the ring instead. */
+:where(button, input, select, summary, [role="switch"], a[class]):focus-visible { box-shadow: var(--ring); }
+.field-focus:focus-within { border-color: var(--accent); outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: var(--ring); }
+
+/* Glass: blur and translucency, used in exactly four places (landing nav, landing mobile menu, app phone menu, the two
+   login panel pills). Text on glass is always --ink. Solid fallback first; the blurred look only where it is supported and wanted. */
+@layer components {
+  .hw-glass { background: var(--glass-solid); border: 1px solid var(--line); box-shadow: var(--elev-md); }
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .hw-glass { background: var(--glass-bg); border-color: var(--glass-border); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .hw-glass { background: var(--glass-solid) !important; border-color: var(--line) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  }
 }
 
 /* Motion that runs on its own. Each one is stopped by "reduce motion" and paused by the page's Pause button. */
@@ -83,18 +125,18 @@
 /* The hero's entrance is pure CSS on purpose: it starts as soon as the stylesheet loads, without waiting for
    JavaScript, so the headline appears quickly even on a slow phone. Each element sets its own delay with --d. */
 @keyframes hw-rise {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes hw-word {
-  from { opacity: 0; transform: translateY(18px); filter: blur(8px); }
-  to { opacity: 1; transform: none; filter: blur(0); }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
 }
-.hw-rise { animation: hw-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
-.hw-word { display: inline-block; animation: hw-word 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
+.hw-rise { animation: hw-rise var(--dur-slow) var(--ease) both; animation-delay: var(--d, 0s); }
+.hw-word { display: inline-block; animation: hw-word var(--dur-slow) var(--ease) both; animation-delay: var(--d, 0s); }
 @keyframes hw-spin { to { transform: rotate(360deg); } }
 @keyframes hw-fade { from { opacity: 0; } to { opacity: 1; } }
-.hw-fade { animation: hw-fade 0.4s ease-out both; }
+.hw-fade { animation: hw-fade var(--dur-slow) var(--ease) both; }
 @keyframes hw-blink { 50% { opacity: 0; } }
 .hw-float { animation: hw-float 12s ease-in-out infinite; }
 .hw-spin { animation: hw-spin 1s linear infinite; }
@@ -114,24 +156,9 @@
   .hw-spin { animation-duration: 1s !important; animation-iteration-count: infinite !important; }
 }
 
-/* The nav blurs the page behind it. Without that, use a solid fill. */
-@media (prefers-reduced-transparency: reduce) {
-  .hw-nav { backdrop-filter: none !important; background: var(--surface) !important; }
-}
-
-/* Login sculpture panel. The component file is untouched; these rules only adjust it. */
+/* Login sculpture panel. The component file is untouched; these rules only adjust it. The four images are drawn by
+   scripts/make-sculpture.mjs on exactly the panel colour (--sunken), so they need no recolouring and no edge fade. */
 .login-art .sh-aside { display: none; }                    /* empty block (no body, no buttons) */
-.login-art .sh-content { padding-bottom: 72px; }           /* room for the credit and Pause row */
-.login-art .sh-h1 { font-size: clamp(40px, 6cqw, 72px); }  /* quieter than the component's default */
-.login-art .sh-hint { opacity: 1; color: var(--mute); font-size: 12px; letter-spacing: 0.08em; } /* still fades out after the first move */
-:root:not(.dark) .login-art .sh-stage { filter: hue-rotate(235deg); }  /* light: beige to violet-grey (canvas and fallback) */
-.dark .login-art .sh-fallback { filter: hue-rotate(235deg); }          /* dark: the live canvas is already violet, only the raw fallback needs it */
-/* The raw images carry their own flat background, a slightly different tone from the page. A radial fade (not a glow)
-   dissolves the picture into the page so no rectangle shows. Delete this and the two hue-shift rules when an owned
-   violet image with a matching background replaces the placeholders. */
-.login-art .sh-fallback, .login-still {
-  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 58%, transparent 100%);
-  mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 58%, transparent 100%);
-}
-.login-still { filter: hue-rotate(235deg); }
-
+.login-art .sh-content { padding-bottom: 72px; }           /* room for the two glass pills along the bottom */
+.login-art .sh-h1 { font-size: clamp(2.5rem, 4vw, 3.5rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; } /* Arjun "display" */
+.login-art .sh-hint { opacity: 1; color: var(--mute); font-size: 0.8125rem; letter-spacing: 0; text-transform: none; } /* still fades out after the first move */

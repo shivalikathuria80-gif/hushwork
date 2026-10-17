@@ -27,7 +27,7 @@ function Step({ title, body, icon, index, isLast }) {
           <motion.span className="absolute bottom-0 left-5 top-12 w-px origin-top bg-accent" style={{ scaleY: reduce ? 1 : scrollYProgress }} aria-hidden="true" />
         </>
       )}
-      <span className={`absolute left-0 top-0 grid h-10 w-10 place-items-center rounded-xl border transition-colors duration-500 ${reached ? "border-accent bg-accent text-white" : "border-line bg-surface text-accent-text"}`}>
+      <span className={`absolute left-0 top-0 grid h-10 w-10 place-items-center rounded-xl border transition-colors duration-340 ease-standard ${reached ? "border-accent bg-accent text-on-accent" : "border-line bg-surface text-accent-text"}`}>
         <Icon name={icon} size={18} />
       </span>
       <Reveal delay={index * 0.05}>

@@ -6,7 +6,9 @@
     "dev": "next dev -p 3100",
     "build": "next build",
     "start": "next start -p 3100",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test \"lib/**/*.test.js\"",
+    "make:sculpture": "node scripts/make-sculpture.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

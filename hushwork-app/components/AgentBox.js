@@ -70,7 +70,7 @@ export default function AgentBox() {
 
   return (
     <div id="agent">
-      <div className="rounded-2xl border border-field bg-surface p-4 transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25">
+      <div className="field-focus rounded-3xl border border-field bg-surface p-4 shadow-sm">
         <label htmlFor="task" className="mb-2 block text-sm font-medium">What should Hushwork take off your plate?</label>
         <textarea
           id="task" ref={taRef} rows={3} value={text} disabled={busy}
@@ -80,11 +80,11 @@ export default function AgentBox() {
           className="w-full resize-none bg-transparent text-[15px] leading-relaxed outline-hidden placeholder:text-hint disabled:opacity-60"
         />
         {files.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="mb-2 flex flex-wrap gap-2">
             {files.map((f) => (
-              <span key={f} className="inline-flex items-center gap-1.5 rounded-lg bg-raised px-2 py-1 text-xs">
+              <span key={f} className="inline-flex items-center gap-2 rounded-md bg-raised px-2 py-1 text-xs">
                 <Icon name="Paperclip" size={12} />{f}
-                <button aria-label={`Remove ${f}`} onClick={() => setFiles((x) => x.filter((i) => i !== f))} className="grid h-5 w-5 place-items-center rounded hover:bg-line"><Icon name="X" size={12} /></button>
+                <button aria-label={`Remove ${f}`} onClick={() => setFiles((x) => x.filter((i) => i !== f))} className="grid h-5 w-5 place-items-center rounded-md hover:bg-line"><Icon name="X" size={12} /></button>
               </span>
             ))}
           </div>
@@ -94,20 +94,19 @@ export default function AgentBox() {
             const on = modes.includes(k);
             return (
               <button key={k} title={tip} aria-pressed={on} onClick={() => toggle(k)}
-                className={`inline-flex h-11 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors md:h-8 ${on ? "border-accent bg-accent/10 text-accent-text" : "border-transparent bg-raised text-mute hover:text-ink"}`}>
+                className={`inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm transition-colors duration-120 ease-standard md:h-8 ${on ? "border-accent bg-accent-subtle text-accent-text" : "border-transparent bg-raised text-mute hover:text-ink"}`}>
                 <Icon name={ic} size={14} />{k === "DeepResearch" ? "Deep research" : k}
               </button>
             );
           })}
           <Btn size="sm" variant="ghost" className="ml-auto" icon="Paperclip" onClick={() => fileRef.current.click()}>Attach files</Btn>
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => setFiles((x) => [...x, ...[...e.target.files].map((f) => f.name)])} />
-          <motion.button
+          <button
             onClick={() => run()} disabled={busy} aria-label="Build workflow"
-            whileTap={{ scale: 0.92 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-50 md:h-9 md:w-9"
+            className="grid h-11 w-11 place-items-center rounded-full bg-accent text-on-accent transition-colors duration-120 ease-standard hover:bg-accent-hover active:bg-accent-active disabled:opacity-50 md:h-9 md:w-9"
           >
             <Icon name={busy ? "Loader2" : "ArrowUp"} className={busy ? "hw-spin" : ""} />
-          </motion.button>
+          </button>
         </div>
       </div>
       <p className="mt-2 px-1 text-sm text-mute">This is a preview. It drafts a plan and sends nothing.</p>
@@ -117,7 +116,7 @@ export default function AgentBox() {
           <span className="text-sm text-mute">Try one:</span>
           {SUGGEST.map(([ic, t, p]) => (
             <button key={t} onClick={() => { setText(p); run(p); }}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-raised md:h-9">
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm transition-colors duration-120 ease-standard hover:bg-raised active:bg-line md:h-9">
               <Icon name={ic} size={14} className="text-mute" />{t}
             </button>
           ))}
@@ -126,24 +125,24 @@ export default function AgentBox() {
 
       {phase !== "idle" && (
         <motion.div
-          className="mt-4 rounded-2xl border border-line bg-surface p-4" aria-live="polite"
-          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
+          className="mt-4 rounded-2xl border border-line bg-surface p-4 shadow-sm" aria-live="polite"
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: EASE }}
         >
           <div className="flex items-center gap-2 px-2 text-sm text-mute">
             {phase === "thinking" ? (
-              <><Icon name="Loader2" className="hw-spin" />Reading your request<span className="hw-caret ml-0.5 inline-block h-4 w-0.5 translate-y-0.5 bg-current" aria-hidden="true"></span></>
+              <><Icon name="Loader2" className="hw-spin" />Reading your request<span className="hw-caret ml-1 inline-block h-4 w-0.5 translate-y-0.5 bg-current" aria-hidden="true"></span></>
             ) : (
               <><Icon name="Workflow" className="text-accent-text" />{phase === "ready" ? "Workflow ready" : "Building your workflow"}</>
             )}
           </div>
-          <ol className="mt-2 space-y-0.5">
+          <ol className="mt-2 space-y-1">
             {plan.slice(0, shown).map(([ic, a, b], i) => (
               <StepRow key={a + i} delay={0} icon={ic} title={`${i + 1}. ${a}`} sub={b}
-                right={<motion.span className="shrink-0 text-accent-text" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 22, delay: 0.15 }}><Icon name="Check" size={16} /></motion.span>} />
+                right={<motion.span className="shrink-0 text-accent-text" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: EASE, delay: 0.1 }}><Icon name="Check" size={16} /></motion.span>} />
             ))}
           </ol>
           {phase === "ready" && (
-            <motion.div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <motion.div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
               <Btn href="#wait" size="sm" iconRight="ArrowRight">Join the waitlist</Btn>
               <Btn size="sm" variant="secondary" icon="Pencil" onClick={() => { setPhase("idle"); setPlan([]); }}>Edit request</Btn>
               <Btn size="sm" variant="ghost" icon="RotateCcw" onClick={reset}>Start over</Btn>

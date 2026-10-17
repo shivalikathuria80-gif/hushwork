@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, useInView } from "motion/react";
 import { Icon } from "./icons";
-import { Logo } from "./ui";
+import { EASE, Logo } from "./ui";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 // Draws the word as a field of dots on a canvas. The dot colour comes from the --mute token and is
@@ -70,7 +70,7 @@ const COLUMNS = [
   ["Company", [["Privacy", "/privacy"]]],
   ["Contact", [["hello@hushwork.co", "mailto:hello@hushwork.co"]]],
 ];
-const linkClass = "inline-flex min-h-11 items-center text-mute transition-colors hover:text-ink";
+const linkClass = "inline-flex min-h-11 items-center text-mute transition-colors duration-120 ease-standard hover:text-ink";
 
 export default function Footer() {
   const reduce = usePrefersReducedMotion();
@@ -93,17 +93,17 @@ export default function Footer() {
       </div>
       <div className="mx-auto mt-12 flex max-w-6xl items-center justify-between border-t border-line pt-4 text-mute">
         <span>© 2026 Hushwork</span>
-        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition-colors hover:text-ink">
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition-colors duration-120 ease-standard hover:text-ink">
           Back to top<Icon name="ArrowUp" size={14} />
         </button>
       </div>
-      {/* The closing moment: the wordmark is wiped into view, left to right, when the footer reaches the screen.
-          The outer box watches for that moment; the inner box does the wiping (watching an element that is itself clipped away is unreliable). */}
+      {/* The closing moment: the wordmark fades in when the footer reaches the screen.
+          The outer box watches for that moment; the inner box does the fading (watching an element that is itself hidden is unreliable). */}
       <div ref={watchRef} className="mx-auto mt-10 max-w-[1500px] md:mt-16">
         <motion.div
-          initial={{ clipPath: "inset(0 100% 0 0)" }}
-          animate={{ clipPath: seen ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)" }}
-          transition={{ duration: reduce ? 0 : 1.4, ease: [0.16, 1, 0.3, 1] }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: seen ? 1 : 0 }}
+          transition={{ duration: reduce ? 0 : 0.34, ease: EASE }}
         >
           <DotWord />
         </motion.div>

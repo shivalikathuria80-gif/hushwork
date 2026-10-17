@@ -27,7 +27,7 @@ export const metadata = {
   twitter: { card: "summary_large_image", title, description: "Describe a weekly task in plain English. Hushwork builds the workflow and runs it for you." },
 };
 
-export const viewport = { themeColor: "#0b0a12", colorScheme: "dark light" };
+export const viewport = { themeColor: "#121018", colorScheme: "dark light" };
 
 // Runs before the page paints so the saved theme shows immediately (no light flash). Dark is the default.
 const themeScript = `try{var t=localStorage.getItem('hw-theme');if(t!=='light')document.documentElement.classList.add('dark')}catch(e){}`;

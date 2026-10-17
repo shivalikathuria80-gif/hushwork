@@ -18,8 +18,9 @@ function NavLink({ href, icon, children, onNavigate }) {
   return (
     <Link
       href={href} onClick={onNavigate} aria-current={active ? "page" : undefined}
-      className={`relative flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors ${active ? "bg-raised font-medium text-ink before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-accent-text" : "text-mute hover:bg-raised hover:text-ink"}`}
+      className={`flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors duration-120 ease-standard ${active ? "bg-accent-subtle font-medium text-ink" : "text-mute hover:bg-raised hover:text-ink active:bg-line"}`}
     >
+      {active && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-text" />}
       <Icon name={icon} size={18} />{children}
     </Link>
   );
@@ -62,20 +63,20 @@ export default function AppNav({ userBadge }) {
         <Logo href="/app" />
         <button
           type="button" ref={menuButtonRef} onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="app-menu" aria-label={open ? "Close menu" : "Open menu"}
-          className="grid h-11 w-11 place-items-center rounded-xl text-mute hover:bg-raised hover:text-ink lg:hidden"
+          className="grid h-11 w-11 place-items-center rounded-xl text-mute transition-colors duration-120 ease-standard hover:bg-raised hover:text-ink active:bg-line lg:hidden"
         >
           <Icon name={open ? "X" : "Menu"} size={18} />
         </button>
       </div>
 
-      <div id="app-menu" className={`${open ? "hw-fade flex" : "hidden"} absolute inset-x-0 top-full flex-col gap-6 border-b border-line bg-surface p-3 sm:px-6 lg:static lg:flex lg:flex-1 lg:justify-between lg:border-0 lg:p-4`}>
+      <div id="app-menu" className={`${open ? "flex animate-[hw-fade_200ms_var(--ease)_both]" : "hidden"} hw-glass absolute inset-x-0 top-full flex-col gap-6 rounded-b-2xl border-t-0 p-3 shadow-lg sm:px-6 lg:static lg:flex lg:flex-1 lg:justify-between lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none lg:backdrop-blur-none`}>
         <nav aria-label="Workspace" className="flex flex-col gap-1">
           <Btn href="/app" icon="Plus" onClick={newWorkflow} className="mb-2 w-full">New workflow</Btn>
           <NavLink href="/app/runs" icon="History" onNavigate={close}>Runs</NavLink>
         </nav>
         <div className="flex flex-col gap-1">
           <div className="min-w-0 px-3 pb-2">
-            <p className="text-xs text-mute">Signed in as</p>
+            <p className="sr-only">Signed in as</p>
             {userBadge}
           </div>
           <ThemeToggle withLabel className="w-full justify-start!" />

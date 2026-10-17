@@ -29,12 +29,12 @@ export default function DraftList({ drafts, loadFailed }) {
     <>
       <p role="status" className="mt-2 min-h-5 text-sm text-mute">{notice}</p>
       {loadFailed ? (
-        <div className="mt-1 rounded-2xl border border-line bg-surface p-4">
-          <p className="flex items-center gap-2 text-[15px]"><Icon name="CircleAlert" className="shrink-0 text-accent-text" />Could not load your drafts. Check your connection and try again.</p>
+        <div className="mt-1 rounded-2xl border border-error bg-surface p-4 shadow-sm">
+          <p className="flex items-center gap-2 text-[15px]"><Icon name="CircleAlert" className="shrink-0 text-error" />Could not load your drafts. Check your connection and try again.</p>
           <Btn className="mt-3" size="sm" variant="secondary" icon="RotateCcw" onClick={() => router.refresh()}>Try again</Btn>
         </div>
       ) : drafts.length === 0 ? (
-        <div className="mt-1 rounded-2xl border border-line bg-surface p-4">
+        <div className="mt-1 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <p className="font-medium">No drafts yet.</p>
           <p className="mt-1 text-[15px] text-mute">Preview a plan above, then choose Save as draft.</p>
           <Btn className="mt-3" size="sm" variant="ghost" icon="Pencil" onClick={() => document.getElementById("task")?.focus()}>Write a request</Btn>
