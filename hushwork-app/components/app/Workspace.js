@@ -31,14 +31,16 @@ const RECIPES = [
     text: "Every month, gather my receipts and contracts into one folder and add upcoming deadlines to my calendar." },
 ];
 
-export default function Workspace({ children }) {
+// `ai` is { enabled, limit } from the server (AiWorkspace.js): is AI planning available, and how many AI plans a person gets a day.
+// It never holds the key.
+export default function Workspace({ children, ai }) {
   const [seed, setSeed] = useState(null);
   // Every call gets a higher id, so clicking the same tile twice still counts as a new request.
   const fill = (text, plan) => setSeed((previous) => ({ id: (previous?.id ?? 0) + 1, text, plan }));
 
   return (
     <FillContext value={fill}>
-      <Composer seed={seed} />
+      <Composer seed={seed} ai={ai} />
 
       <section aria-labelledby="when-heading" className="mt-10">
         <h2 id="when-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">When should it happen?</h2>

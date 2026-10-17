@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# a throwaway copy of the project used to test `next build` safely
+/.build-check/
+
 # vercel
 .vercel
 

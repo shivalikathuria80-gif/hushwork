@@ -27,7 +27,7 @@ export default function Hero() {
     <section id="hero" className="relative isolate">
       {/* A soft violet light that drifts slowly behind the hero. Stops when paused or when reduced motion is on. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex h-[640px] justify-center overflow-hidden">
-        <div className="hw-float mt-16 h-[360px] w-[620px] max-w-full rounded-full bg-accent/20 blur-[110px] dark:bg-accent/30" />
+        <div className="hw-float mt-16 h-[360px] w-[620px] max-w-full rounded-full bg-accent/14 blur-[110px] dark:bg-accent/30" />
       </div>
       <div className="mx-auto grid max-w-6xl items-start gap-12 px-5 pb-12 pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,500px)] lg:gap-12">
         <div className="lg:pt-8">

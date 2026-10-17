@@ -2,7 +2,7 @@
 // (Node may print a harmless "module type not specified" warning. Do not add "type": "module" to package.json.)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { LIMITS, PASSWORD_BYTES_RULE, checkEmail, checkPassword, checkId, cleanName, cleanDraft, defaultName } from "./validate.js";
+import { LIMITS, PASSWORD_BYTES_RULE, checkEmail, checkPassword, checkId, checkPrompt, cleanName, cleanPlan, cleanDraft, defaultName } from "./validate.js";
 
 const goodPlan = JSON.stringify([{ icon: "Clock", title: "Run every morning", detail: "8:00 am, weekdays" }]);
 
@@ -81,4 +81,27 @@ test("draft: bad input is refused", () => {
   assert.ok(cleanDraft({ prompt: "p", plan: JSON.stringify(["text"]) }).error, "step not an object");
   assert.ok(cleanDraft({ prompt: "p", name: "n".repeat(81), plan: goodPlan }).error, "name too long");
   assert.ok(cleanDraft(null).error, "null input");
+});
+
+test("prompt: trimmed, 1 to 2000 characters, with a code the screen can use", () => {
+  assert.equal(checkPrompt("  Chase invoices ").value, "Chase invoices");
+  assert.equal(checkPrompt("a".repeat(LIMITS.promptMax)).value.length, LIMITS.promptMax);
+  for (const empty of ["", "   ", null, 5, {}]) assert.equal(checkPrompt(empty).code, "empty");
+  const long = checkPrompt("a".repeat(LIMITS.promptMax + 1));
+  assert.equal(long.code, "too_long");
+  assert.equal(long.error, `Use ${LIMITS.promptMax} characters or fewer.`);
+  assert.equal(cleanDraft({ prompt: "   ", plan: goodPlan }).error, "Write a request first.", "saving a draft says the same as before");
+});
+
+test("plan: cleanPlan is the strict gate (exported for the AI)", () => {
+  assert.deepEqual(cleanPlan(goodPlan).value, [{ icon: "Clock", title: "Run every morning", detail: "8:00 am, weekdays" }]);
+  assert.ok(cleanPlan("[]").error);
+  assert.ok(cleanPlan(JSON.stringify(Array(13).fill({ icon: "Clock", title: "a", detail: "b" }))).error);
+  assert.ok(cleanPlan(JSON.stringify([{ icon: "Clock", title: "a".repeat(201), detail: "b" }])).error);
+});
+
+test("prompt: text made only of zero-width characters counts as empty (it cannot spend an AI plan)", () => {
+  for (const hidden of ["\u{200b}", "\u{200b}\u{200c}\u{200d}", "\u{feff}", "  \u{200b} \u{feff} "]) assert.equal(checkPrompt(hidden).code, "empty", JSON.stringify(hidden));
+  assert.equal(checkPrompt("\u{feff}  Chase\u{200b} invoices ").value, "Chase invoices");
+  assert.equal(cleanDraft({ prompt: "\u{200b}\u{200b}", plan: goodPlan }).error, "Write a request first.");
 });

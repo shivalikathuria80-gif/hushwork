@@ -31,7 +31,7 @@ Jobs the page leads with: invoice chasing, weekly client report, inbox triage, l
 ## Capabilities and Constraints
 
 - **Status: pre-launch, waitlist only.** Nobody is using the product. No workflow runs for anyone. This is confirmed, so the page must not claim a private beta or active users.
-- The agent box on the page is a simulation (keyword matching in `hushwork/AgentBox.jsx`), clearly labelled as a preview. No AI model is called.
+- The agent box on the page is a simulation (keyword matching in `hushwork/AgentBox.jsx`), clearly labelled as a preview. The landing box uses no AI model. The app's Preview plan uses an AI model (run by Groq) only when a key is set and the person leaves "Write with AI" on; otherwise it is keyword matching too. Nothing it writes ever runs.
 - Login, "Continue with Google" and "Save workflow" were simulated. The public site no longer shows them (`Login.jsx` is kept, not loaded, for the real product).
 - **Waitlist storage: Supabase** (confirmed and live, 2026-10-14). Project `hushwork`, region ap-south-1, table `waitlist`. The public can add an email and cannot read, change or delete rows. Setup is recorded in `supabase/waitlist.sql`. Supabase is also intended as the base for login and data when the product is built.
 - Current stack (confirmed, 2026-10-15): Next.js 16 (App Router), React 19, Tailwind 4, `motion`, Phosphor icons, in `hushwork-app/`. The earlier no-build prototype is kept in `hushwork/` for reference. Hosting: none. The owner decided on 2026-10-15 to keep the site running locally and not deploy it. It runs on http://localhost:3100; port 3000 is kept free for the owner's other app.

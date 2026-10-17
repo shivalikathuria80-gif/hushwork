@@ -20,7 +20,8 @@ export default function LoginPage() {
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-xl focus:bg-ink focus:px-4 focus:py-3 focus:text-bg">
         Skip to content
       </a>
-      <header>
+      {/* The header is taken out of the grid (absolute): as a normal block it would be the first grid cell and push the picture to the right and the form down. */}
+      <header className="absolute inset-x-0 top-0 z-10">
         <Logo href="/" className="absolute left-5 top-1 z-10 sm:left-8 lg:left-7 lg:top-5" />
         <div className="absolute right-3 top-2 z-10 sm:right-6"><ThemeToggle /></div>
       </header>

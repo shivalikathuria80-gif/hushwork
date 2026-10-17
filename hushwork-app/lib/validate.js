@@ -65,9 +65,20 @@ export function defaultName(prompt) {
   return (lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd() + "...";
 }
 
-// The plan arrives as a JSON string from a hidden form field. Never trust its shape: parse it safely and rebuild
-// every step from scratch so nothing extra gets through.
-function cleanPlan(raw) {
+// The task text typed in the box. Used by saving a draft and by the AI "Preview plan". Over-long text is refused with a
+// sentence, never cut silently. `code` lets the screen pick its own wording; `error` is the plain sentence.
+export function checkPrompt(raw) {
+  // Zero-width characters (U+200B to U+200D, U+FEFF) are invisible: text made only of them counts as empty.
+  const value = typeof raw === "string" ? raw.replace(/[\u200b-\u200d\ufeff]/g, "").trim() : "";
+  if (!value) return { error: "Write a request first.", code: "empty" };
+  if (value.length > LIMITS.promptMax) return { error: `Use ${LIMITS.promptMax} characters or fewer.`, code: "too_long" };
+  return { value };
+}
+
+// A plan arrives as a JSON string (a hidden form field, or the AI's answer turned back into text). Never trust its
+// shape: parse it safely and rebuild every step from scratch so nothing extra gets through. This is the strict gate
+// both saved drafts and AI plans must pass.
+export function cleanPlan(raw) {
   let parsed;
   try {
     parsed = JSON.parse(typeof raw === "string" ? raw : "");
@@ -92,9 +103,9 @@ function cleanPlan(raw) {
 
 // Checks a whole new draft: { prompt, name (optional), plan (JSON string) }.
 export function cleanDraft(input) {
-  const prompt = typeof input?.prompt === "string" ? input.prompt.trim() : "";
-  if (!prompt) return { error: "Write a request first." };
-  if (prompt.length > LIMITS.promptMax) return { error: `Use ${LIMITS.promptMax} characters or fewer.` };
+  const checked = checkPrompt(input?.prompt);
+  if (checked.error) return { error: checked.error };
+  const prompt = checked.value;
 
   const rawName = typeof input?.name === "string" ? input.name.trim() : "";
   const name = rawName ? cleanName(rawName) : { value: defaultName(prompt) };

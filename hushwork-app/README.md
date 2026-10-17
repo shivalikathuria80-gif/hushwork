@@ -27,10 +27,16 @@ npm run lint
 `lint` checks the code for mistakes without running it.
 
 ```bash
-node --test lib/validate.test.js
+npm test
 ```
 
-This runs the one automated check: it tests the input rules (emails, passwords, drafts) in `lib/validate.js`. Node may print a harmless "module type not specified" warning; do not add `"type": "module"` to `package.json`.
+This runs all the automated checks (Node's built-in test runner, nothing to install): the input rules in `lib/validate.js`, the AI planning code in `lib/ai/` (with a pretend `fetch`: no test ever calls a real AI service), a scan that makes sure the AI key is only ever read in one file, and a check of the four login sculpture images. Node may print a harmless "module type not specified" warning; do not add `"type": "module"` to `package.json`.
+
+```bash
+npm run make:sculpture
+```
+
+This re-draws the four login sculpture images in `public/sculpture/` from `scripts/make-sculpture.mjs` (add `-- --verify` to only check that the files on disk match the script). You only need it if you change the sculpture colours.
 
 ```bash
 npx tsc --noEmit
@@ -64,24 +70,36 @@ An environment variable is a value kept outside the code. Copy `.env.example` to
 | `NEXT_PUBLIC_SUPABASE_URL` | Address of the Supabase project (waitlist emails, accounts, drafts) | No, public |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Identifies the project; it grants no power by itself. The database rules decide what a visitor or a signed-in person may do (`../supabase/waitlist.sql`, `../supabase/workflows.sql`) | No, public by design |
 | `NEXT_PUBLIC_SITE_URL` | The site's own address once it has a domain (used for link previews). Optional | No |
+| `GROQ_API_KEY` | Lets "Preview plan" use an AI model run by Groq to write the plan. Optional | **Yes: secret, server only, never `NEXT_PUBLIC_`** |
 
 `NEXT_PUBLIC_` means the value is sent to the browser. Never put a secret or `service_role` key in one (this app never needs one). After changing `.env.local`, restart `npm run dev`.
+
+## AI plans (optional)
+
+"Preview plan" can ask an AI to write the plan instead of matching keywords. It is **off unless `GROQ_API_KEY` is set** in `.env.local`; without it the page says "AI planning is off" and nothing is sent anywhere. An API key is a secret password for a service: get one at https://console.groq.com/keys (it starts with `gsk_`), paste it as one line (`GROQ_API_KEY=gsk_...`, no quotes), never share it, and restart `npm run dev`. The key is read in one file only, `lib/ai/key.js`, on the server.
+
+- **What is sent:** only the task text from the box, through the server, to Groq (never your email, id or other drafts). Text that looks like a card number or a secret key is refused before sending. Plans are shown as text; nothing runs.
+- **Limits** (in `lib/ai/plan.js`): 2 AI plans a minute and 20 a day per person, 3 a minute and 60 a day for everyone together, so this app alone should not overrun the free Groq plan (the Groq limits are shared by your whole Groq organisation and the numbers in our plan are estimates). The counters live in the server's memory and start again when it restarts. **Before any real deployment** replace them with a database table (`../docs/plan-next.md` section 3), and update `/privacy`.
+- **If the AI fails** (busy, slow, rate-limited, unusable answer) the page shows the keyword preview and says why. Next.js runs Server Actions one at a time, so a slow AI answer (up to 15 seconds) can delay a Save, rename or delete pressed meanwhile.
+- **Swap the model** by editing `GROQ_MODEL` in `lib/ai/groq.js` (and the model name on `/privacy`). If the terminal prints `ai-plan failed why=model_missing`, Groq has retired the model: pick the replacement named at https://console.groq.com/docs/deprecations.
+- The terminal prints one line per plan with numbers only (`ai-plan ok in=... out=... reasoning=... ms=...`), never the text, the answer or the key.
 
 ## Where things are
 
 - `app/layout.js`: fonts (Geist), page metadata, saved light/dark theme, motion settings.
 - `app/globals.css`: colour tokens (light and dark), spacing and shape rules, the CSS animations.
 - `app/page.js`: the home page, built from the sections in `components/`.
-- `app/privacy/page.js`: the privacy page (draft, review before launch).
+- `app/privacy/page.js`: the privacy page (draft, review before launch). It describes what is sent to Groq when AI plans are on; change it whenever the AI setup changes.
 - `app/login/page.js`: sign in / create account. On desktop the left half holds the liquid sculpture (`components/login/`).
 - `app/app/`: the signed-in workspace (`/app`) and runs page (`/app/runs`), inside a shared shell (`layout.js`).
 - `proxy.js`: runs before `/app/*` and `/login`: checks the sign-in cookie, renews it, redirects signed-out visitors to `/login`. (Next.js 16 name for what used to be "middleware".)
 - `app/opengraph-image.js`: the picture shown when the link is shared.
 - `components/`: one file per section (`Hero`, `AgentBox`, `HowItWorks`, `Automations`, `Features`, `Waitlist`, `Footer`), plus shared pieces (`ui.js`, `icons.js`) and helpers (`MotionProvider`, `useTheme`, `usePrefersReducedMotion`).
-- `components/app/`: the workspace pieces (`Composer`, `Workspace`, `Drafts`, `DraftCard`, `DraftList`, `RunsViewer`, `AppNav`, `UserBadge`, `ThemeToggle`). `components/login/`: the sign-in form and sculpture panel. `components/ui/liquid-sculpture-hero.tsx` is third-party code, see `../docs/sculpture-assets.md`.
+- `components/app/`: the workspace pieces (`Composer`, `Workspace`, `AiWorkspace` (asks the server whether AI planning is on), `Drafts`, `DraftCard`, `DraftList`, `RunsViewer`, `AppNav`, `UserBadge`, `ThemeToggle`). `components/login/`: the sign-in form and sculpture panel. `components/ui/liquid-sculpture-hero.tsx` is third-party code, see `../docs/sculpture-assets.md`.
 - `lib/waitlist.js`: saves an email to Supabase.
 - `lib/supabase/`: the two Supabase clients (`server.js` for pages and actions, `proxy.js` for the doorman). There is no browser client: the browser never talks to Supabase.
-- `lib/auth.js`: `requireUser()`, the one place that asks "who is this?". `lib/actions/`: Server Actions for sign in/out and drafts. `lib/validate.js` (+ `validate.test.js`): input rules.
+- `lib/auth.js`: `requireUser()`, the one place that asks "who is this?". `lib/actions/`: Server Actions for sign in/out, drafts and `plan.js` (the AI "Preview plan"). `lib/validate.js` (+ `validate.test.js`): input rules.
+- `lib/ai/`: AI planning, in plain JavaScript with no Next.js imports so the tests can run it. `key.js` (the only file that reads the key), `groq.js` (the one web request to Groq), `provider.js` (the door that hides which company answers), `plan.js` (instructions, answer shape, cleaning, the card-number guard, the limits), `limits.js` (the counters), `preview.js` (the order of the checks), `icon-names.js`, and `*.test.js`.
 
 Signed-in data is protected three times: the proxy, `requireUser()` next to the data, and the database rules (Row Level Security).
 

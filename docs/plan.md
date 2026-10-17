@@ -341,6 +341,7 @@ Run section 8 completely, then delete the disposable accounts, commit if the own
 - While Confirm email is off, sign-up reveals whether an address already has an account.
 - `getClaims()` does not notice a revoked session until the pass expires (up to 1 hour).
 - Replace the placeholder sculpture images (no stated licence).
+- A few accounts can use the whole shared AI allowance (the global daily cap) because sign-up is open and Confirm email is off: add a per-IP limit or require confirmed emails.
 
 ## 8. Test plan
 
