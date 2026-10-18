@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { io } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 // Because this reads cookies, call it only inside a <Suspense> boundary (the project uses Cache Components).
 // cache() makes it run once per request, however many components ask.
 const getUser = cache(async () => {
+  await io(); // wait for a real request first: checking the pass uses the clock (Date.now)
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;
