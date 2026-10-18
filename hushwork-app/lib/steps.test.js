@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, blankFields, describeStep, isTypedKind, planToSteps, readSavedStep, stepsToPlan } from "./steps.js";
-import { newRow, rowForKind, toWorking } from "./step-rows.js";
+import { DRAG_KIND, DRAG_ROW, insertRow, moveRow, newRow, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
 import { plainSteps } from "./update-plan.js";
 import { LIMITS, checkSteps, cleanPlan, sameSteps } from "./validate.js";
 import { ICON_NAMES } from "./ai/icon-names.js";
@@ -313,4 +313,48 @@ test("toWorking: keys are 1, 2, 3 in order every time (so the server and the bro
   assert.equal("kind" in newRow(), false, "a plain new row is free text");
   assert.deepEqual(toWorking([["Mail", "only", ""]]).map((row) => row.key), [1], "a shorter plan starts at 1 again");
   assert.deepEqual(toWorking([]), []);
+});
+
+test("moveRow: a row goes BEFORE the chosen position; its own spot changes nothing; the input is never changed", () => {
+  const rows = [1, 2, 3, 4].map((key) => ({ key }));
+  const keys = (list) => list.map((row) => row.key);
+  assert.deepEqual(keys(moveRow(rows, 1, 3)), [2, 3, 1, 4], "first row dropped before the last");
+  assert.deepEqual(keys(moveRow(rows, 1, 4)), [2, 3, 4, 1], "dropped at the very end");
+  assert.deepEqual(keys(moveRow(rows, 4, 0)), [4, 1, 2, 3], "last row dropped at the very start");
+  assert.deepEqual(keys(moveRow(rows, 3, 1)), [1, 3, 2, 4]);
+  assert.deepEqual(keys(moveRow(rows, 2, 4)), [1, 3, 4, 2]);
+  // dropped on its own spot (before itself, or right after itself): the very same list comes back
+  for (const own of [[1, 0], [1, 1], [2, 1], [2, 2], [4, 3], [4, 4]]) assert.equal(moveRow(rows, own[0], own[1]), rows, `key ${own[0]} at ${own[1]}`);
+  // anything wrong: the very same list comes back
+  for (const bad of [-1, 5, 1.5, NaN, Infinity, "1", null, undefined]) assert.equal(moveRow(rows, 2, bad), rows, String(bad));
+  assert.equal(moveRow(rows, 99, 1), rows, "unknown key");
+  assert.deepEqual(keys(rows), [1, 2, 3, 4], "the list that was passed in is untouched");
+});
+
+test("moveRow: any sequence of moves keeps exactly the same rows (nothing lost, nothing doubled)", () => {
+  let seed = 7;
+  const random = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+  let rows = Array.from({ length: 9 }, (_, i) => ({ key: i + 1 }));
+  for (let round = 0; round < 500; round++) {
+    rows = moveRow(rows, 1 + Math.floor(random() * 9), Math.floor(random() * (rows.length + 1)));
+    assert.deepEqual(rows.map((row) => row.key).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  }
+});
+
+test("insertRow: puts a row at a position, or at the end for a bad one, and never changes the input", () => {
+  const rows = [{ key: 1 }, { key: 2 }];
+  const fresh = { key: 9 };
+  const keys = (list) => list.map((row) => row.key);
+  assert.deepEqual(keys(insertRow(rows, fresh, 0)), [9, 1, 2]);
+  assert.deepEqual(keys(insertRow(rows, fresh, 1)), [1, 9, 2]);
+  assert.deepEqual(keys(insertRow(rows, fresh, 2)), [1, 2, 9]);
+  for (const bad of [-1, 3, 0.5, NaN, "1", null, undefined]) assert.deepEqual(keys(insertRow(rows, fresh, bad)), [1, 2, 9], String(bad));
+  assert.deepEqual(keys(insertRow([], fresh, 0)), [9]);
+  assert.deepEqual(keys(rows), [1, 2], "the list that was passed in is untouched");
+});
+
+test("parseDragKind: only free text or a real kind is accepted from a drag", () => {
+  for (const good of ["note", "trigger", "find", "write", "approve", "send", "row"]) assert.equal(parseDragKind(good), good);
+  for (const bad of ["", "teleport", "constructor", "__proto__", "toString", "Send", 5, null, undefined, {}, ["send"]]) assert.equal(parseDragKind(bad), null, String(bad));
+  assert.ok(DRAG_KIND.startsWith("application/x-hushwork-") && DRAG_ROW.startsWith("application/x-hushwork-") && DRAG_KIND !== DRAG_ROW);
 });

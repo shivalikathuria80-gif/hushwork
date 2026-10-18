@@ -44,3 +44,36 @@ export function rowForKind(row, kind) {
   // A new kind starts with blank fields (the old ones belong to another kind) and its own icon.
   return { ...row, kind, fields: blankFields(kind), icon: STEP_KINDS[kind].icon };
 }
+
+// ---- drag and drop (the browser's own dragging; the screens call these when something is dropped) ----
+
+// What a drag carries. The palette drags a KIND (the value is a kind name, or "note" for free text); the list drags a ROW
+// (the value is the row's key). The names are ours, so a drag that comes from anywhere else is ignored.
+export const DRAG_KIND = "application/x-hushwork-kind";
+export const DRAG_ROW = "application/x-hushwork-row";
+
+// A dragged kind is only used if it names a real kind (or free text). Anything else is ignored.
+export const parseDragKind = (value) => (value === NOTE || isTypedKind(value) ? value : null);
+
+// Moves the row with `key` so it ends up BEFORE position `index` of the current list (0 = first, rows.length = last).
+// Returns the new list, or the very same list when nothing would change (unknown key, a bad position, or dropped on its own
+// spot). Never changes the list it is given.
+export function moveRow(rows, key, index) {
+  const from = rows.findIndex((row) => row.key === key);
+  if (from < 0 || !Number.isInteger(index) || index < 0 || index > rows.length) return rows;
+  const target = from < index ? index - 1 : index; // taking the row out first shifts every later position up by one
+  if (target === from) return rows;
+  const next = [...rows];
+  const [moved] = next.splice(from, 1);
+  next.splice(target, 0, moved);
+  return next;
+}
+
+// Puts `row` into the list so it ends up at position `index` (0..rows.length). A position outside that adds it at the end.
+// Returns a new list.
+export function insertRow(rows, row, index) {
+  const at = Number.isInteger(index) && index >= 0 && index <= rows.length ? index : rows.length;
+  const next = [...rows];
+  next.splice(at, 0, row);
+  return next;
+}

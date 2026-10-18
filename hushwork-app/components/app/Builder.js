@@ -9,6 +9,7 @@ import StepEditor, { ADD_ID, fieldId, firstPart, newRow, problemPart, toWorking 
 import { saveDraft, updateDraft, renameDraft } from "@/lib/actions/drafts";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, stepsToPlan } from "@/lib/steps";
+import { DRAG_KIND } from "@/lib/step-rows";
 
 // The Builder: build a workflow by hand from a palette of step kinds. It reuses the step editor (the same rows, the same
 // checks) and adds a name, a palette and Save. It saves the same kind of draft as the workspace does, and it still runs
@@ -200,10 +201,17 @@ export default function Builder({ initial }) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside aria-labelledby="palette-heading" className="lg:sticky lg:top-6 lg:self-start">
           <h2 id="palette-heading" className="text-sm font-medium">Step kinds</h2>
-          <p className="mt-1 text-sm text-mute">Press Add to put a step at the end. This only describes the step: nothing is connected.</p>
+          <p className="mt-1 text-sm text-mute">Drag a kind into the steps, or press it to add it at the end. This only describes the step: nothing is connected.</p>
           <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
             {PALETTE.map((item) => (
-              <li key={item.kind}>
+              <li
+                key={item.kind}
+                // Dragging a card carries its kind (see StepEditor's drop code). Pressing the card still adds it at the end,
+                // which is the way for keyboards and touch screens.
+                draggable={!atMax && !saving}
+                onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData(DRAG_KIND, item.kind); }}
+                className="cursor-grab active:cursor-grabbing"
+              >
                 <button
                   type="button" onClick={() => addKind(item.kind, item.label)} aria-disabled={atMax || saving || undefined}
                   className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-line bg-surface p-2 text-left transition-[background-color,border-color] duration-120 ease-standard hover:border-line-strong hover:bg-raised active:bg-line aria-disabled:opacity-50"
@@ -224,7 +232,7 @@ export default function Builder({ initial }) {
         <section aria-labelledby="builder-steps-heading" className="min-w-0">
           <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
             <StepEditor
-              steps={working} onChange={setWorking} announce={announce} showErrors={showErrors} busy={saving} focusOnOpen={false}
+              steps={working} onChange={setWorking} announce={announce} showErrors={showErrors} busy={saving} focusOnOpen={false} dnd
               heading={<span id="builder-steps-heading">Steps</span>}
               subheading={draft ? "Changes are saved only when you choose Save changes." : "This workflow is not saved yet. Choose Save as draft when you are ready."}
             />

@@ -8,7 +8,7 @@ import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { ICON_LABELS, ICON_NAMES } from "@/lib/ai/icon-names";
 import { LIMITS, checkSteps, tidyText } from "@/lib/validate";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, isTypedKind } from "@/lib/steps";
-import { newRow, rowForKind, toWorking } from "@/lib/step-rows";
+import { DRAG_KIND, DRAG_ROW, insertRow, moveRow, newRow, parseDragKind, rowForKind, toWorking } from "@/lib/step-rows";
 
 // The step editor: change the kind, title, detail and icon of each step, add, delete and move steps. A step is either free
 // text (a title and a detail) or one of the typed kinds in lib/steps.js (named fields to fill in: for example "Send a
@@ -26,6 +26,8 @@ import { newRow, rowForKind, toWorking } from "@/lib/step-rows";
 //   showErrors  true after a failed "Done": then empty titles show their error even if the person never touched them
 //   busy        true while saving: fields are read-only and buttons do nothing
 //   heading, subheading   the words above the list (they differ for a preview and for a saved draft)
+//   dnd         true turns on drag and drop (the Builder does): drag a step by its handle to move it, or drop a step kind
+//               dragged from the palette into the list. The arrow and Add buttons always work too: dragging needs a mouse.
 
 // The rows are built by lib/step-rows.js (pure code, tested). They are re-exported so the Composer and the Builder import them from here.
 export { newRow, toWorking };
@@ -48,7 +50,7 @@ const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-m
 const inputBase = "h-11 w-full rounded-xl border bg-surface px-3 text-[15px] placeholder:text-hint focus-visible:border-accent read-only:opacity-90";
 const COUNTER_FROM = 160; // the character counter appears from here
 
-export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true }) {
+export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false }) {
   const reduce = usePrefersReducedMotion();
   const [openIcon, setOpenIcon] = useState(null); // key of the step whose icon panel is open (only one at a time)
   const [touched, setTouched] = useState(() => new Set()); // keys of titles the person has already left
@@ -132,6 +134,74 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
   const closePicker = (key) => { focusLater.current = fieldId(key, "icon"); setOpenIcon(null); };
   const leaveTitle = (key) => setTouched((seen) => new Set(seen).add(key));
 
+  // ---- Drag and drop (only when the parent turns `dnd` on) ----
+  // Two things can be dragged here: a step by its handle (it moves), or a step kind from the Builder's palette (it is added).
+  // `dropAt` is where a drop would land (0 = first ... count = last) and draws a line there. A drop only counts if it carries
+  // one of OUR two drag types, so a file or a piece of text dragged in from elsewhere does nothing.
+  const [dropAt, setDropAt] = useState(null);
+  const [draggingKey, setDraggingKey] = useState(null);
+  const draggingRow = useRef(false); // true while one of the rows (not a palette card) is being dragged
+  // Where a drop would land, kept in a plain variable as well: a drop that follows a drag-over very quickly must not read an
+  // old value from state (state is only updated after the next render). The state above is for drawing the line.
+  const dropAtRef = useRef(null);
+  const showDropAt = (at) => { dropAtRef.current = at; setDropAt(at); };
+  const ours = (event) => dnd && !busy && [...event.dataTransfer.types].some((type) => type === DRAG_ROW || type === DRAG_KIND);
+
+  function startRowDrag(event, row) {
+    if (busy) { event.preventDefault(); return; }
+    draggingRow.current = true;
+    setDraggingKey(row.key);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(DRAG_ROW, String(row.key));
+    const li = event.currentTarget.closest("li");
+    if (li) event.dataTransfer.setDragImage(li, 20, 20); // the whole step follows the pointer, not just the small handle
+  }
+  function endDrag() { draggingRow.current = false; setDraggingKey(null); showDropAt(null); }
+
+  // Over a step: the drop lands before it (pointer in its top half) or after it (bottom half). preventDefault() is how a
+  // page tells the browser "yes, a drop is allowed here".
+  function overRow(event, index) {
+    if (!ours(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = draggingRow.current ? "move" : "copy";
+    const box = event.currentTarget.getBoundingClientRect();
+    showDropAt(index + (event.clientY > box.top + box.height / 2 ? 1 : 0));
+  }
+  function overEnd(event) {
+    if (!ours(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = draggingRow.current ? "move" : "copy";
+    showDropAt(count);
+  }
+  // The line goes away when the drag leaves the whole list (not when it only crosses from one child to another).
+  function leaveList(event) { if (!event.currentTarget.contains(event.relatedTarget)) showDropAt(null); }
+
+  function drop(event) {
+    if (!ours(event)) return;
+    event.preventDefault();
+    const at = dropAtRef.current ?? count;
+    const draggedKey = event.dataTransfer.getData(DRAG_ROW);
+    const kind = parseDragKind(event.dataTransfer.getData(DRAG_KIND));
+    endDrag();
+
+    if (draggedKey) { // a step was moved
+      const key = Number(draggedKey);
+      const from = steps.findIndex((row) => row.key === key);
+      const next = moveRow(steps, key, at);
+      if (next === steps) return; // dropped on its own spot
+      const to = from < at ? at - 1 : at;
+      focusLater.current = fieldId(key, firstPart(steps[from]));
+      change(next);
+      announce(`Step ${from + 1} moved to position ${to + 1} of ${count}.`);
+    } else if (kind) { // a step kind was dropped in
+      if (atMax) { announce(`A plan can have up to ${LIMITS.planSteps} steps. Delete one to add another.`); return; }
+      const row = newRow(kind);
+      focusLater.current = fieldId(row.key, firstPart(row));
+      change(insertRow(steps, row, at));
+      announce(`${kind === NOTE ? "Free text" : STEP_KINDS[kind].label} step added as step ${at + 1} of ${LIMITS.planSteps}.`);
+    }
+  }
+
   const exit = reduce
     ? { opacity: 0, transition: { duration: 0.12 } }
     : { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, borderTopWidth: 0, overflow: "hidden", transition: { duration: 0.2, ease: EASE } };
@@ -145,11 +215,17 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
         <p className="text-sm text-mute">{count} of {LIMITS.planSteps} steps</p>
       </div>
       <p className="mt-1 px-2 text-sm text-mute">{subheading}</p>
+      {dnd && <p className="mt-1 px-2 text-sm text-mute">Drag a step by its handle to move it, or use the arrows. Dragging needs a mouse.</p>}
 
+      {/* Drops are received here (they bubble up from the steps and the end zone). Nothing happens unless `dnd` is on. */}
+      <div onDrop={dnd ? drop : undefined} onDragLeave={dnd ? leaveList : undefined}>
       {count === 0 && (
-        <div className="mt-3 rounded-xl bg-raised px-3 py-3 text-sm">
+        <div
+          onDragOver={dnd ? overEnd : undefined}
+          className={`mt-3 rounded-xl bg-raised px-3 py-3 text-sm ${dnd && dropAt === 0 ? "outline-2 outline-offset-2 outline-accent" : ""}`}
+        >
           <p className="font-medium">This plan has no steps.</p>
-          <p className="text-mute">Add a step to build it.</p>
+          <p className="text-mute">{dnd ? "Drag a step kind here, or press one in the list." : "Add a step to build it."}</p>
         </div>
       )}
 
@@ -176,10 +252,21 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                 layout={reduce ? false : "position"}
                 initial={{ opacity: 0, y: reduce ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} exit={exit}
                 transition={{ duration: 0.2, ease: EASE }}
-                className="border-t border-line py-4 first:border-t-0 first:pt-0"
+                onDragOver={dnd ? (event) => overRow(event, index) : undefined}
+                className={`relative border-t border-line py-4 first:border-t-0 first:pt-0 ${draggingKey === row.key ? "opacity-50" : ""}`}
               >
+                {dnd && dropAt === index && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 -top-px z-10 h-0.5 rounded-full bg-accent" />}
                 <div role="group" aria-labelledby={labelId}>
                   <div className="flex items-center gap-2">
+                    {dnd && (
+                      <span
+                        draggable={!busy} onDragStart={(event) => startRowDrag(event, row)} onDragEnd={endDrag}
+                        title="Drag to move this step" aria-hidden="true"
+                        className="-mr-1 grid h-11 w-6 shrink-0 cursor-grab place-items-center rounded-md text-mute hover:bg-raised hover:text-ink active:cursor-grabbing"
+                      >
+                        <Icon name="GripVertical" size={18} />
+                      </span>
+                    )}
                     <span id={labelId} className="grid h-7 min-w-7 shrink-0 place-items-center rounded-md bg-raised px-1 text-sm font-medium">
                       <span><span className="sr-only">Step </span>{number}</span>
                     </span>
@@ -330,6 +417,14 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
           })}
         </AnimatePresence>
       </ol>
+
+      {/* The strip below the last step: dropping here puts the step at the end. */}
+      {dnd && count > 0 && (
+        <div onDragOver={overEnd} className="relative mx-2 flex h-8 items-center justify-center">
+          {dropAt === count && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-accent" />}
+        </div>
+      )}
+      </div>
 
       <div className="mt-1 space-y-3 px-2">
         {undo && (
