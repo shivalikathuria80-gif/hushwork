@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import Composer from "./Composer";
 import { Icon } from "../icons";
 
@@ -35,12 +35,18 @@ const RECIPES = [
 // It never holds the key.
 export default function Workspace({ children, ai }) {
   const [seed, setSeed] = useState(null);
+  const composer = useRef(null); // gives us the composer's guard: "are there unsaved step edits? ask first"
   // Every call gets a higher id, so clicking the same tile twice still counts as a new request.
-  const fill = (text, plan) => setSeed((previous) => ({ id: (previous?.id ?? 0) + 1, text, plan }));
+  // `draft` ({ id, name, version }) is set when a saved draft is opened, so the composer can change that draft in place.
+  const fill = (text, plan, draft) => {
+    const apply = () => setSeed((previous) => ({ id: (previous?.id ?? 0) + 1, text, plan, draft }));
+    if (composer.current) composer.current.guard(apply);
+    else apply();
+  };
 
   return (
     <FillContext value={fill}>
-      <Composer seed={seed} ai={ai} />
+      <Composer ref={composer} seed={seed} ai={ai} />
 
       <section aria-labelledby="when-heading" className="mt-10">
         <h2 id="when-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">When should it happen?</h2>

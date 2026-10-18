@@ -15,7 +15,7 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-5 pb-20 pt-12">
       <Link href="/" className="inline-flex min-h-11 items-center gap-2 text-[15px]"><Icon name="ArrowLeft" size={16} />Back to Hushwork</Link>
       <h1 className="mt-6 text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em]">Privacy</h1>
-      <p className={p}>Last updated 17 October 2026.</p>
+      <p className={p}>Last updated 18 October 2026.</p>
 
       <h2 className={h2}>What we store</h2>
       <ul className={ul}>
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
 
       <h2 className={h2}>AI plans</h2>
       <ul className={ul}>
-        <li>AI planning is optional. It is off unless the person who runs Hushwork has switched it on, and the note under the task box always says which it is. When it is off, or when you turn the <b className="font-medium text-ink">Write with AI</b> switch off, the plan is made by simple keyword matching in your browser and your task text goes to no AI service. It reaches our server only if you press Save as draft.</li>
+        <li>AI planning is optional. It is off unless the person who runs Hushwork has switched it on, and the note under the task box always says which it is. When it is off, or when you turn the <b className="font-medium text-ink">Write with AI</b> switch off, the plan is made by simple keyword matching in your browser and your task text goes to no AI service. Your task text and the steps of the plan reach our server only when you press Save as draft or Save as new draft, and the steps you change in a draft you already saved reach it when you press Save changes.</li>
         <li>When AI planning is on and you press the arrow, only the task text you typed is sent, through our server, to Groq, a company that runs AI models. Groq runs an AI model (currently <span className="font-mono text-ink">openai/gpt-oss-20b</span>, an open-weight model from OpenAI) to write the plan. Your email address, name, account id and other drafts are not sent. Our server also refuses to send text that looks like a card number or a secret key.</li>
         <li>Groq says it does not keep inference requests by default. It may log inputs and outputs for up to 30 days, only to fix errors or investigate abuse, and it keeps any data it retains in the United States (<a href="https://console.groq.com/docs/your-data" rel="noopener">Groq{"’"}s data page</a>, read 17 October 2026).</li>
         <li>Groq{"’"}s Services Agreement says Groq may not use inputs or outputs to train or fine-tune models unless the customer allows it, and we do not allow it (<a href="https://console.groq.com/docs/legal/services-agreement" rel="noopener">Services Agreement</a>, modified 22 June 2026). Groq handles your text under its own terms.</li>

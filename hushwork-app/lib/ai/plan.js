@@ -2,7 +2,7 @@
 // the shape we ask for, and the checks every AI answer must pass before a person sees it. No imports from Next.js, so
 // `node --test` can load this file.
 import { ICON_NAMES } from "./icon-names.js";
-import { LIMITS, cleanPlan } from "../validate.js";
+import { LIMITS, cleanPlan, tidyText } from "../validate.js";
 
 // How many AI plans are allowed. They keep one person (or one bug) from running up the bill, and they stay well under
 // Groq's free-plan budget (8,000 tokens a minute and 200,000 a day for the whole account). The count is in memory:
@@ -71,10 +71,10 @@ export function looksSensitive(text) {
 
 // Lenient first pass over what the AI sent: keep what can be kept. An unknown icon becomes Sparkles, text is trimmed
 // and cut to 200 characters, a step without a title is dropped, and only the first 12 steps stay. Returns the steps,
-// or null when nothing usable is left. `tidy` also drops the invisible characters that flip text direction (U+202A to
-// U+202E and U+2066 to U+2069): they can make text read differently from how it is stored.
-const tidy = (value) =>
-  typeof value === "string" ? value.replace(/[\u{202a}-\u{202e}\u{2066}-\u{2069}]/gu, "").replace(/[\u0000-\u001f\u007f\s]+/g, " ").trim().slice(0, LIMITS.stepText) : "";
+// or null when nothing usable is left. `tidy` is the shared tidyText (it also drops invisible characters that flip text
+// direction or have no width, which can make text read differently from how it is stored), then cuts to 200 characters:
+// the cut is for AI answers only, a person's own step text is never cut silently.
+const tidy = (value) => (typeof value === "string" ? tidyText(value).slice(0, LIMITS.stepText) : "");
 export function cleanAiSteps(parsed) {
   const list = Array.isArray(parsed?.steps) ? parsed.steps : null;
   if (!list) return null;

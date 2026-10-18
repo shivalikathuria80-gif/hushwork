@@ -114,13 +114,13 @@ export default function DraftCard({ draft, onDeleted }) {
           ) : (
             <div className="min-w-0 flex-1">
               <button
-                id={`draft-open-${draft.id}`} type="button" onClick={() => fill(draft.prompt, draft.plan)} aria-label={`Open draft: ${draft.name}`}
+                id={`draft-open-${draft.id}`} type="button" onClick={() => fill(draft.prompt, draft.plan, { id: draft.id, name: draft.name, version: draft.updatedAt })} aria-label={`Open draft: ${draft.name}`}
                 className="relative -my-2.5 block min-h-11 max-w-full truncate rounded-md text-left font-medium hover:underline md:my-0 md:min-h-6"
               >
                 {draft.name}
               </button>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-mute">
-                <span>{savedText && <>Saved <time dateTime={draft.updatedAt}>{savedText}</time> · </>}{steps}</span>
+                <span>{savedText && <>Updated <time dateTime={draft.updatedAt}>{savedText}</time> · </>}{steps}</span>
                 <span className="rounded-md border border-line bg-raised px-2 text-xs font-medium text-ink">Draft</span>
               </p>
             </div>
