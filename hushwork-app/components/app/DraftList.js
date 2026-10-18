@@ -8,7 +8,7 @@ import { Icon } from "../icons";
 import DraftCard from "./DraftCard";
 
 // The list part of "Your drafts": the three states (could not load, empty, list) plus the "Draft deleted." notice.
-export default function DraftList({ drafts, loadFailed }) {
+export default function DraftList({ drafts, loadFailed, openBase }) {
   const router = useRouter();
   const [notice, setNotice] = useState("");
 
@@ -33,6 +33,15 @@ export default function DraftList({ drafts, loadFailed }) {
           <p className="flex items-center gap-2 text-[15px]"><Icon name="CircleAlert" className="shrink-0 text-error" />Could not load your drafts. Check your connection and try again.</p>
           <Btn className="mt-3" size="sm" variant="secondary" icon="RotateCcw" onClick={() => router.refresh()}>Try again</Btn>
         </div>
+      ) : drafts.length === 0 && openBase ? (
+        <div className="mt-1 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="font-medium">No workflows yet.</p>
+          <p className="mt-1 text-[15px] text-mute">Start from a template, build one by hand, or describe a task in the workspace and save its plan.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Btn href="/app/templates" size="sm" variant="secondary" icon="ListTodo">Browse templates</Btn>
+            <Btn href="/app/builder" size="sm" icon="Plus">Open the Builder</Btn>
+          </div>
+        </div>
       ) : drafts.length === 0 ? (
         <div className="mt-1 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <p className="font-medium">No drafts yet.</p>
@@ -47,7 +56,7 @@ export default function DraftList({ drafts, loadFailed }) {
                 key={draft.id} className="overflow-hidden pb-3"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0, paddingBottom: 0 }} transition={{ duration: 0.2 }}
               >
-                <DraftCard draft={draft} onDeleted={onDeleted} />
+                <DraftCard draft={draft} onDeleted={onDeleted} openBase={openBase} />
               </motion.li>
             ))}
           </AnimatePresence>

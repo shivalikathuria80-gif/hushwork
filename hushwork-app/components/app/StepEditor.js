@@ -7,13 +7,17 @@ import { Icon } from "../icons";
 import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { ICON_LABELS, ICON_NAMES } from "@/lib/ai/icon-names";
 import { LIMITS, checkSteps, tidyText } from "@/lib/validate";
+import { NOTE, STEP_KINDS, STEP_KIND_ORDER, isTypedKind } from "@/lib/steps";
+import { newRow, rowForKind, toWorking } from "@/lib/step-rows";
 
-// The step editor: change the title, detail and icon of each step, add, delete and move steps. It edits a working copy
-// held by its parent (`steps`), and tells the parent about every change through `onChange`. It never saves anything
-// and nothing it edits ever runs. The parent decides when the copy is checked and used (Done or Save changes).
+// The step editor: change the kind, title, detail and icon of each step, add, delete and move steps. A step is either free
+// text (a title and a detail) or one of the typed kinds in lib/steps.js (named fields to fill in: for example "Send a
+// message" has how, to whom and about). It edits a working copy held by its parent (`steps`), and tells the parent about
+// every change through `onChange`. It never saves anything and nothing it edits ever runs. The parent decides when the
+// copy is checked and used (Done or Save changes).
 //
-// A "working copy" is a list of rows: { key, icon, title, detail }. `key` is a private number that follows a row
-// around, so when rows move, React keeps each text box with its own step.
+// A "working copy" is a list of rows: { key, icon, title, detail } for free text, plus { kind, fields } for a typed step.
+// `key` is a private number that follows a row around, so when rows move, React keeps each text box with its own step.
 //
 // Props:
 //   steps       the working copy
@@ -23,37 +27,41 @@ import { LIMITS, checkSteps, tidyText } from "@/lib/validate";
 //   busy        true while saving: fields are read-only and buttons do nothing
 //   heading, subheading   the words above the list (they differ for a preview and for a saved draft)
 
-let counter = 0;
-const newKey = () => ++counter;
-
-// Turns a plan ([icon, title, detail] lists) into a working copy. An old icon name we no longer offer shows as Sparkles.
-export function toWorking(plan) {
-  return plan.map(([icon, title, detail]) => ({ key: newKey(), icon: ICON_NAMES.includes(icon) ? icon : "Sparkles", title, detail }));
-}
+// The rows are built by lib/step-rows.js (pure code, tested). They are re-exported so the Composer and the Builder import them from here.
+export { newRow, toWorking };
 
 // The id of one control of one step, so the parent (and our own focus code) can find it.
 export const fieldId = (key, part) => `step-${key}-${part}`;
+// Which control of a step a problem belongs to, from the problem's `field` name (see checkSteps): "title", "detail",
+// "kind", a typed field ("fields.to" -> the box with id part "f-to"), or anything else -> the icon button.
+export const problemPart = (field) => {
+  if (field === "title" || field === "detail" || field === "kind") return field;
+  if (field === "fields") return "kind"; // the whole set of fields is unreadable: the kind picker is the way to start over
+  return field.startsWith("fields.") ? `f-${field.slice(7)}` : "icon";
+};
 const panelId = (key) => `step-${key}-icons`;
 export const ADD_ID = "step-editor-add";
+// The first control of a step, where the cursor lands: the kind picker for a typed step, the title for free text.
+export const firstPart = (row) => (isTypedKind(row.kind) ? "kind" : "title");
 
 const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-mute transition-colors duration-120 ease-standard hover:bg-raised hover:text-ink active:bg-line aria-disabled:opacity-50";
 const inputBase = "h-11 w-full rounded-xl border bg-surface px-3 text-[15px] placeholder:text-hint focus-visible:border-accent read-only:opacity-90";
 const COUNTER_FROM = 160; // the character counter appears from here
 
-export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading }) {
+export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true }) {
   const reduce = usePrefersReducedMotion();
   const [openIcon, setOpenIcon] = useState(null); // key of the step whose icon panel is open (only one at a time)
   const [touched, setTouched] = useState(() => new Set()); // keys of titles the person has already left
   const [undo, setUndo] = useState(null); // after a delete: { row, index }
   const focusLater = useRef(null); // the id to focus once the next render is on screen
-  const [firstId] = useState(() => (steps[0] ? fieldId(steps[0].key, "title") : ADD_ID));
+  const [firstId] = useState(() => (steps[0] ? fieldId(steps[0].key, firstPart(steps[0])) : ADD_ID));
   const count = steps.length;
   const atMax = count >= LIMITS.planSteps;
   const problems = checkSteps(steps).problems ?? [];
 
   // Focus: on opening, the first title; after a move, add or delete, the control named in `focusLater`.
   // (React may re-create a moved row's HTML, which drops focus, so it is put back by id.)
-  useEffect(() => { document.getElementById(firstId)?.focus(); }, [firstId]);
+  useEffect(() => { if (focusOnOpen) document.getElementById(firstId)?.focus(); }, [firstId, focusOnOpen]);
   useEffect(() => {
     if (!focusLater.current) return;
     document.getElementById(focusLater.current)?.focus();
@@ -73,7 +81,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
   function add() {
     if (busy) return;
     if (atMax) { announce(`A plan can have up to ${LIMITS.planSteps} steps. Delete one to add another.`); return; }
-    const row = { key: newKey(), icon: "Workflow", title: "", detail: "" };
+    const row = newRow();
     focusLater.current = fieldId(row.key, "title");
     change([...steps, row]);
     announce(`Step ${count + 1} added. ${count + 1} of ${LIMITS.planSteps} steps.`);
@@ -95,7 +103,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
     if (busy) return;
     const next = steps.filter((_, at) => at !== index);
     const landing = next[index] ?? next[index - 1]; // the step now in this place, else the one before
-    focusLater.current = landing ? fieldId(landing.key, "title") : ADD_ID;
+    focusLater.current = landing ? fieldId(landing.key, firstPart(landing)) : ADD_ID;
     if (openIcon === steps[index].key) setOpenIcon(null); // an Undo must not bring a closed picker back open
     onChange(next);
     setUndo({ row: steps[index], index });
@@ -106,10 +114,19 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
     if (!undo || busy) return;
     const next = [...steps];
     next.splice(Math.min(undo.index, next.length), 0, undo.row);
-    focusLater.current = fieldId(undo.row.key, "title");
+    focusLater.current = fieldId(undo.row.key, firstPart(undo.row));
     onChange(next);
     announce(`Step ${undo.index + 1} restored.`);
     setUndo(null);
+  }
+
+  // The person picked another kind for a step: the row is rebuilt for that kind (lib/step-rows.js) and the icon panel closes.
+  function changeKind(row, number, kind) {
+    if (busy) return;
+    if (openIcon === row.key) setOpenIcon(null);
+    change(steps.map((other) => (other.key === row.key ? rowForKind(other, kind) : other)));
+    const spec = STEP_KINDS[kind];
+    announce(kind === NOTE ? `Step ${number} is now free text.` : `Step ${number} is now "${spec.label}". ${spec.fields.length} ${spec.fields.length === 1 ? "field" : "fields"} to fill in.`);
   }
 
   const closePicker = (key) => { focusLater.current = fieldId(key, "icon"); setOpenIcon(null); };
@@ -140,7 +157,10 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
         <AnimatePresence initial={false}>
           {steps.map((row, index) => {
             const number = index + 1;
-            const open = openIcon === row.key;
+            const typed = isTypedKind(row.kind);
+            const spec = typed ? STEP_KINDS[row.kind] : null;
+            const open = openIcon === row.key && !typed; // only a free-text step has an icon to choose
+            const shownAs = typed ? checkSteps([row]).value?.[0] : null; // how a typed step will read, once its blanks are filled in
             const titleProblem = problems.find((p) => p.index === index && p.field === "title");
             const detailProblem = problems.find((p) => p.index === index && p.field === "detail");
             const titleEmpty = titleProblem?.kind === "empty" && (showErrors || touched.has(row.key));
@@ -163,6 +183,12 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     <span id={labelId} className="grid h-7 min-w-7 shrink-0 place-items-center rounded-md bg-raised px-1 text-sm font-medium">
                       <span><span className="sr-only">Step </span>{number}</span>
                     </span>
+                    {typed ? (
+                      <span className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-2 sm:px-3" aria-hidden="true">
+                        <Icon name={spec.icon} size={20} className="text-accent-text" />
+                        <span className="hidden text-sm sm:inline">{spec.label}</span>
+                      </span>
+                    ) : (
                     <button
                       type="button" id={fieldId(row.key, "icon")} aria-label={`Icon for step ${number}: ${iconLabel}`}
                       aria-expanded={open} aria-controls={panelId(row.key)}
@@ -173,6 +199,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                       <span className="hidden text-sm sm:inline">{iconLabel}</span>
                       <Icon name="ChevronDown" size={14} className={`text-mute transition-transform duration-120 ${open ? "rotate-180" : ""}`} />
                     </button>
+                    )}
                     <span className="min-w-0 flex-1" />
                     <button type="button" id={fieldId(row.key, "up")} aria-label={`Move step ${number} up`} title={`Move step ${number} up`} aria-disabled={index === 0 || busy || undefined} onClick={() => move(index, -1)} className={iconButton}><Icon name="ArrowUp" size={18} /></button>
                     <button type="button" id={fieldId(row.key, "down")} aria-label={`Move step ${number} down`} title={`Move step ${number} down`} aria-disabled={index === count - 1 || busy || undefined} onClick={() => move(index, 1)} className={iconButton}><Icon name="ArrowDown" size={18} /></button>
@@ -208,6 +235,20 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     </motion.div>
                   )}
 
+                  <div className="mt-3 md:max-w-xs">
+                    <label htmlFor={fieldId(row.key, "kind")} className="text-sm font-medium">Kind of step<span className="sr-only"> for step {number}</span></label>
+                    <select
+                      id={fieldId(row.key, "kind")} value={typed ? row.kind : NOTE} disabled={busy}
+                      onChange={(event) => changeKind(row, number, event.target.value)}
+                      className={`mt-1 ${inputBase} border-field`}
+                    >
+                      <option value={NOTE}>Free text</option>
+                      {STEP_KIND_ORDER.map((kind) => <option key={kind} value={kind}>{STEP_KINDS[kind].label}</option>)}
+                    </select>
+                    <p className="mt-1 text-sm text-mute">{typed ? `${spec.help} This only describes the step: nothing is connected.` : "Your own words. Or pick a kind of step to fill in named blanks."}</p>
+                  </div>
+
+                  {!typed && (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <div>
                       <label htmlFor={fieldId(row.key, "title")} className="text-sm font-medium">Title<span className="sr-only"> of step {number}</span></label>
@@ -236,6 +277,53 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                       <Note id={fieldId(row.key, "detail-note")} length={detailLength} problem={detailProblem} />
                     </div>
                   </div>
+                  )}
+
+                  {typed && (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {spec.fields.map((field) => {
+                        const id = fieldId(row.key, `f-${field.key}`);
+                        const noteId = `${id}-note`;
+                        const value = row.fields?.[field.key] ?? "";
+                        const problem = problems.find((p) => p.index === index && p.field === `fields.${field.key}`);
+                        const seen = showErrors || touched.has(`${row.key}.${field.key}`); // the person has been here, or tried Done
+                        const bad = Boolean(problem) && (problem.kind === "long" || seen);
+                        const length = tidyText(value).length;
+                        const describedBy = bad || (field.type === "text" && length >= field.max - 20) ? noteId : undefined;
+                        return (
+                          <div key={field.key}>
+                            <label htmlFor={id} className="text-sm font-medium">{field.label}{field.optional ? " (optional)" : ""}<span className="sr-only"> of step {number}</span></label>
+                            {field.type === "choice" ? (
+                              <select
+                                id={id} value={value} disabled={busy}
+                                onChange={(event) => edit(row.key, { fields: { ...row.fields, [field.key]: event.target.value } })}
+                                aria-invalid={bad || undefined} aria-describedby={describedBy}
+                                className={`mt-1 ${inputBase} ${bad ? "border-error" : "border-field"}`}
+                              >
+                                {!Object.hasOwn(field.options, value) && <option value="">Choose...</option>}
+                                {Object.entries(field.options).map(([choice, label]) => <option key={choice} value={choice}>{label}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                id={id} value={value} readOnly={busy}
+                                onChange={(event) => edit(row.key, { fields: { ...row.fields, [field.key]: event.target.value } })}
+                                onBlur={() => leaveTitle(`${row.key}.${field.key}`)}
+                                aria-invalid={bad || undefined} aria-describedby={describedBy}
+                                placeholder={field.hint}
+                                className={`mt-1 ${inputBase} ${bad ? "border-error" : "border-field"}`}
+                              />
+                            )}
+                            <FieldNote id={noteId} length={length} max={field.max} problem={problem} show={seen} isText={field.type === "text"} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {shownAs && (
+                    <p className="mt-3 text-sm text-mute">
+                      Shown in the plan as: <span className="font-medium text-ink">{shownAs.title}</span>{shownAs.detail ? `. ${shownAs.detail}` : ""}
+                    </p>
+                  )}
                 </div>
               </motion.li>
             );
@@ -258,6 +346,18 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
       </div>
     </div>
   );
+}
+
+// The line under a field of a typed step: the limit message, the "fill this in" or "choose" message (once the person has
+// been there or tried Done), or the character counter near the limit. An empty required field keeps its line free
+// beforehand, for the same reason as the title (see Note below).
+function FieldNote({ id, length, max, problem, show, isText }) {
+  const message = (words) => <p id={id} className="mt-1 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{words}</p>;
+  if (problem?.kind === "long") return message(`Use ${max} characters or fewer. Shorten it by ${problem.over}.`);
+  if (problem?.kind === "empty") return show ? message("Fill this in.") : <p aria-hidden="true" className="mt-1 h-5" />;
+  if (problem?.kind === "choice" && show) return message("Choose an option.");
+  if (!isText || length < max - 20) return null;
+  return <p id={id} className="mt-1 text-sm text-mute">{length} of {max}{length >= max ? ". Limit reached." : ""}</p>;
 }
 
 // The line under a field: the character counter (from 160), the limit message, or the empty-title message.

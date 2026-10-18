@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { readSavedStep } from "@/lib/steps";
 import DraftList from "./DraftList";
 
 // "Your drafts". It reads the session and the database, so the page wraps it in <Suspense>: everything above it
@@ -31,11 +32,12 @@ function toDraft(row) {
     name: text(row.name),
     prompt: text(row.prompt),
     updatedAt: text(row.updated_at),
-    plan: plan.map((step) => ({ icon: text(step?.icon), title: text(step?.title), detail: text(step?.detail) })),
+    plan: plan.map(readSavedStep), // a typed step keeps its kind and fields
   };
 }
 
-export default async function Drafts() {
+// `openBase` (the Workflows page sets it) makes each draft open in the Builder instead of in the workspace's box.
+export default async function Drafts({ openBase }) {
   const user = await requireUser(); // outside try/catch on purpose: a signed-out visitor is redirected
 
   let drafts = [];
@@ -64,7 +66,7 @@ export default async function Drafts() {
         Your drafts{!loadFailed && drafts.length > 0 && <span className="ml-1 font-normal text-mute">({drafts.length})</span>}
       </h2>
       <p className="mt-1 text-[15px] text-mute">{intro}</p>
-      <DraftList drafts={drafts} loadFailed={loadFailed} />
+      <DraftList drafts={drafts} loadFailed={loadFailed} openBase={openBase} />
     </div>
   );
 }

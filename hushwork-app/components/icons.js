@@ -2,7 +2,7 @@
 
 import {
   ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Binoculars, Brain, CalendarBlank, CaretDown, ChartBar, Chat, ChatText,
-  Check, CheckCircle, CircleNotch, Info, ClockCounterClockwise, Clock, CreditCard, Envelope, Eye, EyeSlash, FileText, FloppyDisk, FlowArrow, Folder, FolderOpen, FolderSimple, Kanban,
+  Check, CheckCircle, CircleNotch, Info, ClockCounterClockwise, Clock, CreditCard, DotsSixVertical, Envelope, Eye, EyeSlash, FileText, FloppyDisk, FlowArrow, Folder, FolderOpen, FolderSimple, Gear, Kanban,
   Lightning, List, ListChecks, MagnifyingGlass, Moon, Paperclip, PaperPlaneTilt, Pause, PencilLine, PencilSimple, Play, Plug,
   Plus, Receipt, ShieldCheck, SignOut, Sparkle, Sun, Table, Tag, Trash, Tray, UserPlus, WarningCircle, X, XCircle,
 } from "@phosphor-icons/react";
@@ -17,6 +17,7 @@ const ICONS = {
   MessageSquareText: ChatText, ListChecks, Play, Pause, Folder, FolderOpen, CircleAlert: WarningCircle, Calendar: CalendarBlank,
   MessageSquare: Chat, ListTodo: Kanban, CircleX: XCircle, ShieldCheck, Plug, UserPlus,
   Eye, EyeOff: EyeSlash, SignOut, Trash, Plus, Save: FloppyDisk, History: ClockCounterClockwise, Info, ChevronDown: CaretDown,
+  Settings: Gear, GripVertical: DotsSixVertical,
 };
 
 // `fallback` is the icon to show when `name` is not in the list (a saved draft with an icon we no longer have).

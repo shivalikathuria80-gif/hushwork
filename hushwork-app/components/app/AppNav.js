@@ -12,9 +12,10 @@ import { signOut } from "@/lib/actions/auth";
 // opens a dropdown with the same links. It is one block of HTML, restyled by CSS, so the links exist only once.
 // `userBadge` is a server-rendered piece (the signed-in email) handed in by app/app/layout.js.
 
-function NavLink({ href, icon, children, onNavigate }) {
+// `exact`: only the page itself counts as active (the Workspace is /app, and every other page lives under /app too).
+function NavLink({ href, icon, children, onNavigate, exact = false }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(href + "/");
+  const active = pathname === href || (!exact && pathname.startsWith(href + "/"));
   return (
     <Link
       href={href} onClick={onNavigate} aria-current={active ? "page" : undefined}
@@ -69,12 +70,20 @@ export default function AppNav({ userBadge }) {
         </button>
       </div>
 
-      <div id="app-menu" className={`${open ? "flex animate-[hw-fade_200ms_var(--ease)_both]" : "hidden"} hw-glass absolute inset-x-0 top-full flex-col gap-6 rounded-b-2xl border-t-0 p-3 shadow-lg sm:px-6 lg:static lg:flex lg:flex-1 lg:justify-between lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none lg:backdrop-blur-none`}>
+      <div id="app-menu" className={`${open ? "flex animate-[hw-fade_200ms_var(--ease)_both]" : "hidden"} hw-glass absolute inset-x-0 top-full max-h-[calc(100dvh-3.5rem)] flex-col gap-6 overflow-y-auto rounded-b-2xl border-t-0 p-3 shadow-lg sm:px-6 lg:static lg:flex lg:max-h-none lg:flex-1 lg:justify-between lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none lg:backdrop-blur-none`}>
         <nav aria-label="Workspace" className="flex flex-col gap-1">
           <Btn href="/app" icon="Plus" onClick={newWorkflow} className="mb-2 w-full">New workflow</Btn>
+          {/* Build: where workflows are made and kept. Run: what they do and where they could act. */}
+          <NavLink href="/app" icon="Sparkles" onNavigate={close} exact>Workspace</NavLink>
+          <NavLink href="/app/workflows" icon="Folder" onNavigate={close}>Workflows</NavLink>
+          <NavLink href="/app/builder" icon="Workflow" onNavigate={close}>Builder</NavLink>
+          <NavLink href="/app/templates" icon="ListTodo" onNavigate={close}>Templates</NavLink>
+          <div aria-hidden="true" className="my-2 border-t border-line" />
           <NavLink href="/app/runs" icon="History" onNavigate={close}>Runs</NavLink>
+          <NavLink href="/app/connections" icon="Plug" onNavigate={close}>Connections</NavLink>
         </nav>
         <div className="flex flex-col gap-1">
+          <NavLink href="/app/settings" icon="Settings" onNavigate={close}>Settings</NavLink>
           <div className="min-w-0 px-3 pb-2">
             <p className="sr-only">Signed in as</p>
             {userBadge}

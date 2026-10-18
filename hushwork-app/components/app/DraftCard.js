@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
@@ -10,6 +11,8 @@ import { LIMITS } from "@/lib/validate";
 
 // One saved draft: a name you can open, rename or delete. A draft is only a saved preview plan and never runs.
 // Opening it puts its request and steps back into the composer; it does not start anything.
+// On the Workflows page `openBase` is set (for example "/app/builder?draft="): the name is then a link that opens the
+// draft in the Builder instead.
 
 const when = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
 
@@ -37,7 +40,7 @@ async function call(action, input, fallback) {
   }
 }
 
-export default function DraftCard({ draft, onDeleted }) {
+export default function DraftCard({ draft, onDeleted, openBase }) {
   const fill = useFillComposer();
   const [mode, setMode] = useState("view"); // view | rename | delete
   const [name, setName] = useState(draft.name);
@@ -113,12 +116,21 @@ export default function DraftCard({ draft, onDeleted }) {
             </div>
           ) : (
             <div className="min-w-0 flex-1">
-              <button
-                id={`draft-open-${draft.id}`} type="button" onClick={() => fill(draft.prompt, draft.plan, { id: draft.id, name: draft.name, version: draft.updatedAt })} aria-label={`Open draft: ${draft.name}`}
-                className="relative -my-2.5 block min-h-11 max-w-full truncate rounded-md text-left font-medium hover:underline md:my-0 md:min-h-6"
-              >
-                {draft.name}
-              </button>
+              {openBase ? (
+                <Link
+                  id={`draft-open-${draft.id}`} href={`${openBase}${draft.id}`} aria-label={`Open in the Builder: ${draft.name}`}
+                  className="relative -my-2.5 block min-h-11 max-w-full truncate rounded-md text-left font-medium text-ink hover:underline md:my-0 md:min-h-6"
+                >
+                  {draft.name}
+                </Link>
+              ) : (
+                <button
+                  id={`draft-open-${draft.id}`} type="button" onClick={() => fill(draft.prompt, draft.plan, { id: draft.id, name: draft.name, version: draft.updatedAt })} aria-label={`Open draft: ${draft.name}`}
+                  className="relative -my-2.5 block min-h-11 max-w-full truncate rounded-md text-left font-medium hover:underline md:my-0 md:min-h-6"
+                >
+                  {draft.name}
+                </button>
+              )}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-mute">
                 <span>{savedText && <>Updated <time dateTime={draft.updatedAt}>{savedText}</time> · </>}{steps}</span>
                 <span className="rounded-md border border-line bg-raised px-2 text-xs font-medium text-ink">Draft</span>

@@ -6,11 +6,12 @@ import { motion } from "motion/react";
 import { Btn, EASE, StepRow, Switch } from "../ui";
 import { Icon } from "../icons";
 import { planFor } from "../AgentBox";
-import StepEditor, { ADD_ID, fieldId, toWorking } from "./StepEditor";
+import StepEditor, { ADD_ID, fieldId, problemPart, toWorking } from "./StepEditor";
 import useWarnBeforeLeaving from "../useWarnBeforeLeaving";
 import { saveDraft, updateDraft } from "@/lib/actions/drafts";
 import { previewPlan } from "@/lib/actions/plan";
 import { LIMITS, checkSteps, sameSteps } from "@/lib/validate";
+import { planToSteps, stepsToPlan } from "@/lib/steps";
 import { onlyNameMoved } from "@/lib/update-plan";
 
 const SAVE_FAILED = "Could not save your draft. Check your connection and try again.";
@@ -52,9 +53,10 @@ function saveAiChoice(on) {
   listeners.forEach((listener) => listener());
 }
 
-// The plan on screen is a list of [icon, title, detail]. The editor and the saving code use { icon, title, detail }.
-const asSteps = (plan) => plan.map(([icon, title, detail]) => ({ icon, title, detail }));
-const asPlan = (steps) => steps.map((step) => [step.icon, step.title, step.detail]);
+// The plan on screen is a list of [icon, title, detail, kind, fields] (kind and fields only for typed steps). The editor
+// and the saving code use step objects. lib/steps.js converts between the two.
+const asSteps = planToSteps;
+const asPlan = stepsToPlan;
 
 // The workspace's request box. `ai` says whether AI planning is available: { enabled, limit } from the server, which only
 // ever sends "a key exists" and never the key. With AI off, or the switch off, the plan is made by simple keyword matching
@@ -317,8 +319,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
     if (!checked.error) return checked.value;
     const first = checked.problems[0];
     const row = working[first.index];
-    const part = first.field === "title" || first.field === "detail" ? first.field : "icon";
-    document.getElementById(row ? fieldId(row.key, part) : ADD_ID)?.focus();
+    document.getElementById(row ? fieldId(row.key, problemPart(first.field)) : ADD_ID)?.focus();
     setShowErrors(true);
     const count = checked.problems.length;
     setEditError({ message: first.kind === "none" ? first.error : `Fix ${count} ${count === 1 ? "problem" : "problems"} before you continue.`, why: "invalid" });
@@ -563,7 +564,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
                 {draft && conflict && <Btn size="sm" icon="RotateCcw" onClick={loadLatest} className="w-full sm:w-auto">Load latest</Btn>}
                 {draft && !draftGone && !conflict && (
                   <Btn size="sm" icon="Save" loading={saving} disabled={!editorChanged} onClick={saveSteps} className="w-full sm:w-auto">
-                    {saving ? "Saving..." : editError ? "Try again" : "Save changes"}
+                    {saving ? "Saving..." : editError && editError.why !== "invalid" ? "Try again" : "Save changes"}
                   </Btn>
                 )}
                 <Btn size="sm" variant="ghost" disabled={saving} onClick={cancelEditing}>Cancel</Btn>

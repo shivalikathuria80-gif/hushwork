@@ -174,7 +174,7 @@ test("updateDraft: 'use server' is first, and it asks who is calling before anyt
 
 test("updateDraft: refreshes the page only when the save worked, and returns the core's answer as it is", () => {
   const body = functionBody("updateDraft");
-  assert.match(body, /if \(result\.ok\) revalidatePath\("\/app"\)/);
+  assert.match(body, /if \(result\.ok\) revalidatePath\("\/app", "layout"\)/);
   assert.equal(body.match(/revalidatePath\(/g).length, 1);
   assert.match(body, /return result;/);
   assert.equal(body.includes("console."), false, "the action itself logs nothing; the core logs a code only");
@@ -199,7 +199,7 @@ test("drafts.js: only async functions are exported, and no user id is ever writt
 test("update-plan.js: no Next.js, Supabase or server-only imports, and it writes one column", () => {
   const core = fs.readFileSync(path.join(root, "lib/update-plan.js"), "utf8");
   const imports = [...core.matchAll(/^import .* from "(.+)";$/gm)].map((match) => match[1]);
-  assert.deepEqual(imports, ["./validate.js"]);
+  assert.deepEqual(imports, ["./validate.js", "./steps.js"]); // two plain local files, nothing from Next.js or Supabase
   assert.equal([...core.matchAll(/\.update\(/g)].length, 1);
   assert.match(core, /\.update\(\{ plan: steps\.value \}\)/);
 });

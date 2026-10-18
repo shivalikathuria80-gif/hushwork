@@ -13,7 +13,7 @@ import { updatePlan } from "@/lib/update-plan";
 //   1. requireUser()  - who is asking? (signed out -> sent to /login)
 //   2. validate the input ourselves (the browser can send anything)
 //   3. talk to the database; user_id is never sent, the database fills it in from the signed-in person
-//   4. revalidatePath("/app") so the page shows the change, then return a SMALL object: { ok: true } or { error }
+//   4. revalidatePath("/app", "layout") so every page under /app (workspace, workflows, builder) shows the change, then return a SMALL object: { ok: true } or { error }
 // Raw database errors are never returned to the browser; only the error code is logged.
 
 const FAILED = {
@@ -34,7 +34,7 @@ export async function saveDraft(input) {
     console.error("saveDraft failed:", error.code);
     return { error: FAILED.save };
   }
-  revalidatePath("/app");
+  revalidatePath("/app", "layout");
   // The saved draft's id, name and version go back so the screen can change THIS draft later instead of saving a copy.
   const saved = data?.[0];
   return saved ? { ok: true, id: String(saved.id), name: String(saved.name), version: String(saved.updated_at) } : { ok: true };
@@ -47,7 +47,7 @@ export async function updateDraft(input) {
   const user = await requireUser();
   const supabase = await createClient();
   const result = await updatePlan(supabase, { userId: user.id, id: input?.id, version: input?.version, plan: input?.plan });
-  if (result.ok) revalidatePath("/app");
+  if (result.ok) revalidatePath("/app", "layout");
   return result;
 }
 
@@ -59,15 +59,17 @@ export async function renameDraft(input) {
   if (name.error) return { error: name.error };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("workflows").update({ name: name.value }).eq("id", id.value).select("id");
+  const { data, error } = await supabase.from("workflows").update({ name: name.value }).eq("id", id.value).select("id, updated_at");
   if (error) {
     console.error("renameDraft failed:", error.code);
     return { error: FAILED.rename };
   }
   // The database hides other people's rows, so "0 rows changed" means gone or not yours. Same sentence for both.
   if (data.length === 0) return { error: FAILED.gone };
-  revalidatePath("/app");
-  return { ok: true };
+  revalidatePath("/app", "layout");
+  // A rename also moves the draft's version (updated_at). It goes back so the screen can keep saving this draft without
+  // a false "changed somewhere else".
+  return { ok: true, version: String(data[0].updated_at) };
 }
 
 export async function deleteDraft(input) {
@@ -82,6 +84,6 @@ export async function deleteDraft(input) {
     return { error: FAILED.delete };
   }
   if (data.length === 0) return { error: FAILED.gone };
-  revalidatePath("/app");
+  revalidatePath("/app", "layout");
   return { ok: true };
 }

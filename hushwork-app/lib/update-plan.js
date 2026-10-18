@@ -3,6 +3,7 @@
 // pretend one (see update-plan.test.js). The Server Action `updateDraft` in lib/actions/drafts.js calls it after
 // requireUser().
 import { checkId, checkVersion, cleanPlan, sameSteps } from "./validate.js";
+import { readSavedStep } from "./steps.js";
 
 // Plain sentences. Raw database text is never returned; only the error code is logged.
 export const CHANGED = "This draft was changed somewhere else, so your edits were not saved. They are still on screen.";
@@ -11,9 +12,9 @@ export const FAILED = "Could not save your changes. Check your connection and tr
 
 const text = (value) => (typeof value === "string" ? value : "");
 
-// The stored steps as plain strings, so nothing unexpected is handed to the browser.
+// The stored steps as plain strings (a typed step also keeps its kind and fields), so nothing unexpected is handed to the browser.
 export function plainSteps(plan) {
-  return (Array.isArray(plan) ? plan : []).map((step) => ({ icon: text(step?.icon), title: text(step?.title), detail: text(step?.detail) }));
+  return (Array.isArray(plan) ? plan : []).map(readSavedStep);
 }
 
 // A "changed" answer is a FALSE conflict when the steps saved now are still the ones this edit began from: only something

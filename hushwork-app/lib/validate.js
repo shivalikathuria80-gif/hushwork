@@ -3,6 +3,7 @@
 // The database has its own limits too (supabase/workflows.sql); these are the friendly first line.
 // No Next.js or Supabase imports, so `node --test` and the browser can both load this file.
 import { ICON_NAMES } from "./ai/icon-names.js";
+import { STEP_KINDS, describeStep, isTypedKind } from "./steps.js";
 
 export const LIMITS = {
   emailMax: 254,
@@ -16,6 +17,9 @@ export const LIMITS = {
   planSteps: 12,
   stepText: 200,
   iconMax: 40,
+  // The database refuses a plan over 20,000 bytes (its JSON text is a little longer than ours, with spaces after
+  // colons and commas), so a plan is refused here, with a sentence, a good margin before that.
+  planBytes: 19000,
 };
 
 export const EMAIL_RULE = "Enter a valid email address, like you@company.com.";
@@ -101,6 +105,40 @@ export function tidyText(raw) {
 const knownIcon = (icon) => (ICON_NAMES.includes(icon) ? icon : "Sparkles");
 const UNREADABLE = "That plan could not be read.";
 
+// Checks the fields of one TYPED step (see lib/steps.js): every field is rebuilt from scratch, only the fields the kind
+// has are kept, a choice must be one of its options, text is tidied and must fit its limit. Returns
+// { fields, title, detail } (the title and detail are worked out from the fields) or { problems: [...] }, where each
+// problem names its field as "fields.<key>" so the editor can show it under the right box.
+function checkTypedStep(kind, rawFields, number) {
+  const isObject = rawFields !== null && typeof rawFields === "object" && !Array.isArray(rawFields);
+  if (!isObject) return { problems: [{ field: "fields", kind: "unreadable", error: UNREADABLE }] };
+
+  const fields = {};
+  const problems = [];
+  for (const spec of STEP_KINDS[kind].fields) {
+    const field = `fields.${spec.key}`;
+    const raw = Object.hasOwn(rawFields, spec.key) ? rawFields[spec.key] : "";
+    if (typeof raw !== "string") { problems.push({ field, kind: "unreadable", error: UNREADABLE }); continue; }
+    const value = tidyText(raw);
+
+    if (spec.type === "choice") {
+      if (Object.hasOwn(spec.options, value)) fields[spec.key] = value;
+      else problems.push({ field, kind: "choice", error: `Step ${number}: choose an option for "${spec.label}".` });
+    } else if (!value) {
+      if (spec.optional) fields[spec.key] = "";
+      else problems.push({ field, kind: "empty", error: `Step ${number}: fill in "${spec.label}".` });
+    } else if (value.length > spec.max) {
+      problems.push({ field, kind: "long", over: value.length - spec.max, error: `Step ${number}: use ${spec.max} characters or fewer in "${spec.label}".` });
+    } else {
+      fields[spec.key] = value;
+    }
+  }
+  if (problems.length > 0) return { problems };
+
+  const described = describeStep(kind, fields);
+  return { fields, title: tidyText(described.title), detail: tidyText(described.detail) };
+}
+
 // The one set of rules for the steps of a plan. The step editor runs it in the browser and the server runs it again
 // on whatever arrives, so both always agree. `list` is an array of { icon, title, detail } (other keys are ignored).
 // Returns { value: [{ icon, title, detail }] } with every step rebuilt from scratch, or { error, index, field, problems }
@@ -119,6 +157,21 @@ export function checkSteps(list) {
     const number = index + 1;
     const isObject = step !== null && typeof step === "object" && !Array.isArray(step);
     if (!isObject) { problems.push({ index, field: "step", kind: "unreadable", error: UNREADABLE }); continue; }
+
+    // A step with a known kind is TYPED (lib/steps.js): rebuilt from its fields, with its own icon, title and detail.
+    // A step with no kind, "note", or a kind we do not know is a plain note (title, detail, icon), as before phase B.
+    const kind = step.kind;
+    if (kind !== undefined && kind !== null && (typeof kind !== "string" || !/^[a-z_]{1,20}$/.test(kind))) {
+      problems.push({ index, field: "kind", kind: "unreadable", error: UNREADABLE });
+      continue;
+    }
+    if (isTypedKind(kind)) {
+      const typed = checkTypedStep(kind, step.fields, number);
+      if (typed.problems) problems.push(...typed.problems.map((problem) => ({ index, ...problem })));
+      else steps.push({ icon: STEP_KINDS[kind].icon, title: typed.title, detail: typed.detail, kind, fields: typed.fields });
+      continue;
+    }
+
     const { icon, title, detail } = step;
 
     const iconOk = typeof icon === "string" && icon.length <= LIMITS.iconMax && /^[A-Za-z0-9]*$/.test(icon);
@@ -138,14 +191,26 @@ export function checkSteps(list) {
     if (iconOk) steps.push({ icon: knownIcon(icon), title: cleanTitle, detail: cleanDetail });
   }
   if (problems.length > 0) return { error: problems[0].error, index: problems[0].index, field: problems[0].field, problems };
+  // Typed steps keep their fields AND the text worked out from them, so a plan is bigger than it used to be: check the
+  // total, so the database's own size rule can never be the first to say no.
+  if (new TextEncoder().encode(JSON.stringify(steps)).length > LIMITS.planBytes) {
+    return alone({ field: "steps", kind: "big", error: "That plan is too large. Shorten some of the steps." });
+  }
   return { value: steps };
 }
 
-// True when two lists of { icon, title, detail } would be saved as the same steps (so moving a step away and back, or
-// adding a space, is "no change").
+// A typed step's fields as one comparable piece of text: keys in order, text tidied. A plain note has no fields, so it is
+// empty. A typed step and a note that merely read alike therefore differ, and so do two kinds (their field names differ).
+const fieldsKey = (step) => (isTypedKind(step.kind) && step.fields && typeof step.fields === "object"
+  ? JSON.stringify(Object.keys(step.fields).sort().map((key) => [key, tidyText(step.fields[key])]))
+  : "");
+
+// True when two lists of steps would be saved as the same steps (so moving a step away and back, or adding a space, is
+// "no change"). Compares the fields of typed steps as well as the icon, title and detail.
 export function sameSteps(a, b) {
   return a.length === b.length && a.every((step, i) => (
     knownIcon(step.icon) === knownIcon(b[i].icon) && tidyText(step.title) === tidyText(b[i].title) && tidyText(step.detail) === tidyText(b[i].detail)
+    && fieldsKey(step) === fieldsKey(b[i])
   ));
 }
 
