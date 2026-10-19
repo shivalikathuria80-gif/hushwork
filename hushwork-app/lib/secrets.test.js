@@ -40,7 +40,7 @@ test("lib/ai/key.js is marked server-only and is imported only by server code", 
   const key = files.find((file) => file.name === "lib/ai/key.js").text;
   assert.match(key, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/ai\/key|(?:\.\.?\/)+(?:lib\/)?(?:ai\/)?key)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/plan.js", "lib/ai-status.js"]); // the Server Action, and the helper that tells pages only "on or off"
+  assert.deepEqual(importers.sort(), ["lib/actions/plan.js", "lib/actions/runs.js", "lib/ai-status.js"]); // the two Server Actions that call the AI, and the helper that tells pages only "on or off"
   for (const name of importers) {
     const text = files.find((file) => file.name === name).text;
     assert.ok(!/^\s*["']use client["']/m.test(text), `${name} is browser code and must not import the key reader`);
@@ -125,7 +125,7 @@ test("the Linear key is never NEXT_PUBLIC_, no real-looking key is written anywh
 test("approveLinearLookup asks who is calling first, reads the saved step, finds the person's permission, then asks Linear; Linear queries never change data", () => {
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
   const body = action.slice(action.indexOf("export async function approveLinearLookup"));
-  const order = ["requireUser(", "loadPracticeStep(", "loadLinearAccess(", "getLinearKey(", "fetchLinearIssues("].map((call) => body.indexOf(call));
+  const order = ["requireUser(", "loadPracticeStep(", "linearAuthorization(", "fetchLinearIssues("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   const linear = files.find((file) => file.name === "lib/connectors/linear.js").text;
@@ -168,4 +168,17 @@ test("the sign-in routes: signed-in people only, the state is checked before the
   assert.ok(!/redirect\([^)]*(?:token|secret)/i.test(callback), "no token or secret goes into a redirect address");
   const page = files.find((file) => file.name === "app/app/connections/page.js").text;
   assert.ok(/<a href="\/api\/connect\/linear"/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
+});
+
+test("approveAiStep: who is calling, then the saved step, then the secret check, then the AI; and the AI loop offers only tools with no input", () => {
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveAiStep"));
+  const order = ["requireUser(", "getGroqKey(", "loadPracticeStep(", "looksSensitive(", "runAgent("].map((call) => body.indexOf(call));
+  assert.ok(order.every((index) => index > 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  assert.ok(!/runAgent\(\s*\{[^}]*input/.test(body), "the task always comes from the saved step");
+  const agent = files.find((file) => file.name === "lib/ai/agent.js").text;
+  assert.ok(agent.includes("properties: {}, additionalProperties: false"), "a tool takes no input from the model");
+  assert.ok(!/api\.groq\.com/.test(agent), "the AI address comes from groq.js");
+  assert.ok(!/key\.js|getGroqKey/.test(agent.replace(/\/\/.*$/gm, "")), "the agent is handed the key, it never reads it");
 });

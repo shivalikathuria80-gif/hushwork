@@ -5,8 +5,9 @@ import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
+import { aiStatus } from "@/lib/ai-status";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
 // A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A "Real" run is the record of
@@ -75,8 +76,10 @@ export default async function RunsViewer({ searchParams }) {
   const selected = runs.find((run) => run.id === wanted) ?? runs[0];
   const { linear } = await connectorStatus(await createClient(), user.id);
   const linearConnected = linear.usable;
+  const { enabled: aiOn } = await aiStatus();
   const liveLinear = selected.live && isLinearLookup(selected.results[0]);
-  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step));
+  const liveAi = selected.live && isAiStep(selected.results[0]);
+  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step) || isAiStep(step));
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -99,10 +102,10 @@ export default async function RunsViewer({ searchParams }) {
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
           <span className={chip}>{selected.live ? "Real" : "Practice"}</span>
-          <p className="text-sm">{selected.live ? (liveLinear ? "Linear was really asked for your open tasks, after you approved it." : "This web address was really asked, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
+          <p className="text-sm">{selected.live ? (liveAi ? "The AI was really asked, after you approved it." : liveLinear ? "Linear was really asked for your open tasks, after you approved it." : "This web address was really asked, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
         </div>
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
         <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
         <ol className="mt-1 space-y-1">
           {selected.results.map((step, index) => (
@@ -115,8 +118,10 @@ export default async function RunsViewer({ searchParams }) {
         {approvals.map(({ step, index }) => (
           <div key={index} className="mt-6">
             <ApproveSend
-              runId={selected.id} index={index} kind={isLinearLookup(step) ? "linear" : "request"} connected={isLinearLookup(step) ? linearConnected : true}
-              message={isLinearLookup(step) ? linearSummary(step) : requestSummary(step)}
+              runId={selected.id} index={index}
+              kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : "request"}
+              connected={isAiStep(step) ? aiOn : isLinearLookup(step) ? linearConnected : true}
+              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : requestSummary(step)}
             />
           </div>
         ))}

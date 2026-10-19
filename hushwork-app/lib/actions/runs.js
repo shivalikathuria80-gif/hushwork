@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, SETUP_MESSAGE } from "@/lib/run-engine";
-import { fetchPublic } from "@/lib/connectors/http";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
+import { getGroqKey } from "@/lib/ai/key";
+import { runAgent } from "@/lib/ai/agent";
+import { looksSensitive } from "@/lib/ai/plan";
 import { getLinearKey } from "@/lib/connectors/linear-env";
 import { getConnectionsKey, getLinearApp } from "@/lib/connectors/oauth-env";
 import { loadLinearAccess } from "@/lib/connections/linear-store";
@@ -56,6 +59,7 @@ const DAY = 86_400_000;
 const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
+const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
 // Used by the "Approve" action. The browser only says WHICH run and WHICH step; this re-reads the saved practice
 // run from the database (only the person's own, thanks to user_id and the database rules) and returns the saved step.
@@ -119,6 +123,19 @@ export async function approveWebCall(input) {
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 700) });
 }
 
+// Whose Linear? The person's own connection (the Connect button) first; else the personal key from .env.local (the owner
+// testing on their own computer). Returns the Authorization value for Linear, or null when there is neither.
+const LINEAR_OFF = "Linear is not connected yet. Open Connections and press Connect Linear.";
+async function linearAuthorization(supabase, userId) {
+  const secretKey = getConnectionsKey();
+  const app = getLinearApp();
+  if (secretKey && app) {
+    const access = await loadLinearAccess({ supabase, userId, key: secretKey, app });
+    if (access) return `Bearer ${access.token}`;
+  }
+  return getLinearKey();
+}
+
 // The "Approve and ask Linear" button. READ-ONLY: lib/connectors/linear.js can only ask, never change. Only a Look something
 // up step set to Linear qualifies, and the key comes from .env.local on the server.
 export async function approveLinearLookup(input) {
@@ -128,17 +145,8 @@ export async function approveLinearLookup(input) {
   if (loaded.error) return loaded;
   const { run, step } = loaded;
 
-  // Whose Linear? The person's own connection (the Connect button) first; else the personal key from .env.local (the owner
-  // testing on their own computer).
-  let authorization = null;
-  const secretKey = getConnectionsKey();
-  const app = getLinearApp();
-  if (secretKey && app) {
-    const access = await loadLinearAccess({ supabase, userId: user.id, key: secretKey, app });
-    if (access) authorization = `Bearer ${access.token}`;
-  }
-  authorization ??= getLinearKey();
-  if (!authorization) return { error: "Linear is not connected yet. Open Connections and press Connect Linear." };
+  const authorization = await linearAuthorization(supabase, user.id);
+  if (!authorization) return { error: LINEAR_OFF };
 
   const now = Date.now();
   const tooMany = limitError(linearLimits(), user.id, now, "Linear lookups");
@@ -152,4 +160,53 @@ export async function approveLinearLookup(input) {
   const list = answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("; ");
   const outcome = answer.issues.length ? `Asked Linear. You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}: ${list}` : "Asked Linear. You have no open tasks.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
+}
+
+// The "Approve and ask the AI" button. The AI gets ONE read-only tool at most, decided by the saved step (never by the
+// model): "My Linear tasks" or "the web address written in the step". lib/ai/agent.js is the loop; it cannot change anything.
+export async function approveAiStep(input) {
+  const user = await requireUser();
+  const groqKey = getGroqKey();
+  if (!groqKey) return { error: "AI is switched off. Add the Groq key to .env.local first." };
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isAiStep);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const { task, uses, address } = step.fields;
+  if (looksSensitive(task)) return { error: "That request looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
+
+  const tools = {};
+  if (uses === "linear") {
+    const authorization = await linearAuthorization(supabase, user.id);
+    if (!authorization) return { error: LINEAR_OFF };
+    tools.linear_open_tasks = {
+      description: "Lists the person's open Linear tasks (up to 10) with their status.",
+      run: async () => {
+        const answer = await fetchLinearIssues({ authorization });
+        if (!answer.ok) return answer.error;
+        return answer.issues.length ? answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n") : "There are no open tasks.";
+      },
+    };
+  } else if (uses === "web") {
+    const checked = checkRequestUrl(address);
+    if (checked.error) return { error: `This step's web address cannot be used: ${checked.error}` };
+    tools.read_web_page = {
+      description: "Reads the start of the one web page the person chose for this step.",
+      run: async () => {
+        const page = await fetchPublic(checked.value, { excerptChars: 1500 });
+        return page.ok ? `Status ${page.status}. ${page.excerpt || "(no readable text)"}` : page.error;
+      },
+    };
+  }
+
+  const now = Date.now();
+  const tooMany = limitError(aiLimits(), user.id, now, "AI steps");
+  if (tooMany) return { error: tooMany };
+  aiLimits().minute.take(user.id, now);
+  aiLimits().day.take(user.id, now);
+
+  const answer = await runAgent({ task, tools, groqKey });
+  if (!answer.ok) return { error: answer.error };
+  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : "the web address"})` : "";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700) });
 }

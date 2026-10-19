@@ -82,6 +82,12 @@ test("a redirect is reported and not followed; binary answers give no excerpt; h
   assert.ok(big.excerpt.length <= 400 && !big.excerpt.includes("b"));
 });
 
+test("a caller may ask for a longer excerpt (the AI step reads more of a page)", async () => {
+  const f = fakes({ addresses: ["93.184.216.34"], answer: { status: 200, headers: { "content-type": "text/plain" }, body: ["a".repeat(3000)] } });
+  assert.equal((await fetchPublic("https://example.com/", { ...f, excerptChars: 1500 })).excerpt.length, 1500);
+  assert.equal((await fetchPublic("https://example.com/", fakes({ addresses: ["93.184.216.34"], answer: { status: 200, headers: { "content-type": "text/plain" }, body: ["a".repeat(3000)] } }))).excerpt.length, 400);
+});
+
 test("bad input never reaches the network, and a network error becomes a fixed sentence", async () => {
   const never = { lookup: () => assert.fail("looked up"), request: () => assert.fail("requested") };
   assert.equal((await fetchPublic("http://example.com", never)).ok, false);

@@ -90,6 +90,17 @@ export const STEP_KINDS = {
     ],
     describe: (fields) => ({ title: "Call a web address", detail: join(`Get ${fields.url}`, fields.why) }),
   },
+  ai: {
+    label: "Ask the AI",
+    help: "Give the AI a job. It can look at your Linear tasks or one web address first. It can only read. You approve it on the Runs page.",
+    icon: "Sparkles",
+    fields: [
+      text("task", "What should the AI do?", 110, { hint: "For example: Tell me which task to do first" }),
+      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", web: "A web address" }),
+      text("address", "Web address", 100, { optional: true, hint: "Only if you chose A web address. Starts with https://" }),
+    ],
+    describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),
+  },
 };
 
 // The kinds in the order the editor lists them (note, the free-text step, is offered first by the editor itself).

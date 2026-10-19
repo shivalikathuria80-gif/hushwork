@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary } from "./run-engine.js";
+import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isAiStep, aiSummary } from "./run-engine.js";
 import { STEP_KINDS, blankFields, describeStep } from "./steps.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -44,6 +44,18 @@ test("only a Look-something-up step set to Linear can be approved", () => {
   assert.equal(isLinearLookup(find("inbox")), false);
   assert.equal(isLinearLookup(null), false);
   assert.ok(linearSummary(find("linear")).includes("my tasks"));
+});
+
+test("only an Ask-the-AI step with a task can be approved, and the preview says what the AI may look at", () => {
+  const ai = (fields) => practiceStep({ icon: "Sparkles", title: "t", detail: "d", kind: "ai", fields });
+  assert.equal(isAiStep(ai({ task: "Which first?", uses: "linear", address: "" })), true);
+  assert.equal(isAiStep(readSavedResults([ai({ task: "x", uses: "nothing", address: "" })])[0]), true);
+  assert.equal(isAiStep(ai({ task: "  ", uses: "nothing", address: "" })), false);
+  assert.equal(isAiStep(null), false);
+  assert.match(aiSummary(ai({ task: "Which first?", uses: "linear", address: "" })), /your Linear tasks/);
+  assert.match(aiSummary(ai({ task: "x", uses: "web", address: "https://example.com/a" })), /https:\/\/example.com\/a/);
+  assert.match(aiSummary(ai({ task: "x", uses: "nothing", address: "" })), /only think/);
+  assert.match(aiSummary(ai({ task: "x", uses: "nothing", address: "" })), /Groq/);
 });
 
 test("only a web-call step with an address can be approved, and the preview shows the address", () => {

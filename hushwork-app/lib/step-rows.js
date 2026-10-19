@@ -59,6 +59,7 @@ export const BLOCKS = [
   { id: "trigger", label: "Start", help: "How it begins", icon: "Zap" },
   { id: "linear", label: "Linear", help: "Look at your tasks", icon: "ListTodo" },
   { id: "request", label: "Web address", help: "Ask a website", icon: "Plug" },
+  { id: "ai", label: "Ask the AI", help: "Let the AI think or look", icon: "Sparkles" },
   { id: "find", label: "Find something", help: "Search for information", icon: "Search" },
   { id: "write", label: "Write something", help: "Draft a text", icon: "PenLine" },
   { id: "approve", label: "Ask me first", help: "Wait for your yes", icon: "ShieldCheck" },

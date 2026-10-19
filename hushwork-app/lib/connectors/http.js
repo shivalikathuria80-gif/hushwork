@@ -91,7 +91,7 @@ export function isPublicIp(address) {
 // ---- 3. make the call ----
 // `lookup` and `request` can be replaced so tests never touch the network. Returns { ok: true, status, type, excerpt }
 // or { ok: false, error }.
-export function fetchPublic(href, { lookup = dns.lookup, request = https.request, timeoutMs = TIMEOUT_MS } = {}) {
+export function fetchPublic(href, { lookup = dns.lookup, request = https.request, timeoutMs = TIMEOUT_MS, excerptChars = EXCERPT_CHARS } = {}) {
   const checked = checkRequestUrl(href);
   if (checked.error) return Promise.resolve({ ok: false, error: checked.error });
 
@@ -125,7 +125,7 @@ export function fetchPublic(href, { lookup = dns.lookup, request = https.request
         const finish = () => {
           const type = String(res.headers?.["content-type"] ?? "").split(";")[0].trim().slice(0, 60);
           const readable = /^(text\/|application\/(json|xml|[\w.+-]*\+(json|xml)))/.test(type);
-          const excerpt = readable ? Buffer.concat(chunks).toString("utf8").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, EXCERPT_CHARS) : "";
+          const excerpt = readable ? Buffer.concat(chunks).toString("utf8").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, excerptChars) : "";
           done({ ok: true, status: Number(res.statusCode) || 0, type, excerpt });
         };
         res.on("data", (chunk) => {

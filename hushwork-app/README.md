@@ -2,7 +2,7 @@
 
 The Hushwork landing page plus a first app slice: sign in, a workspace where you preview a plan and save drafts, and a runs page. Next.js 16 (App Router), React 19, Tailwind 4, `motion` for animation, Phosphor icons, Supabase for sign-in and the database. The earlier no-build prototype lives in `../hushwork/` for reference.
 
-Almost nothing runs for real yet: the two real actions are a **read-only web call** and a **read-only Linear lookup**, each only when you press Approve on the Runs page (see "Web calls" and "Linear" below). A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
+Almost nothing runs for real yet: the real actions are a **read-only web call**, a **read-only Linear lookup** and an **Ask the AI** step that may use those two read-only tools, each only when you press Approve on the Runs page (see "Web calls", "Linear" and "Ask the AI" below). A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
 
 ## Run it
 
@@ -152,3 +152,9 @@ A **Look something up** step with Where set to **Linear** (the Linear block) can
 The owner can still test without the button: a personal key in `.env.local` as `LINEAR_API_KEY` (Linear, Settings, Security & access, Personal API keys) works on that computer only. Every secret is read only in `lib/connectors/linear-env.js` or `lib/connectors/oauth-env.js` (server only, checked by `lib/secrets.test.js`), never shown or logged. `approveLinearLookup` in `lib/actions/runs.js` uses the person's own connection first, then the personal key, and limits lookups to 5 a minute and 30 a day per person.
 
 Not tested against the real Linear yet: the sign-in, the token swap and the renewal were built from Linear's published docs and tested with a pretend Linear.
+
+## Ask the AI (an AI that can use tools)
+
+The **Ask the AI** block gives the Groq model a job (`task`) and lets it look at ONE read-only thing first: your Linear tasks, a web address written in the step, or nothing. After a practice run, press **Approve and ask the AI** on the Runs page; the answer is saved as a "Real" run. This is "tool calling": the model says "please run this tool", Hushwork runs it, hands the result back and the model writes its answer (`lib/ai/agent.js`, at most 4 rounds).
+
+Safety, all covered by `lib/ai/agent.test.js` and `lib/secrets.test.js`: every tool takes **no input from the model** (so a web page cannot talk the AI into fetching another address or sending your data anywhere); tools are read-only; tool results are wrapped as `<data>` and the model is told to ignore instructions inside; the request is refused if it looks like a card number or secret key; AI steps are limited to 3 a minute and 15 a day per person; the Groq key stays in `lib/ai/key.js`. What goes to Groq (the request and what the tool read) is stated on the approval card and the privacy page.

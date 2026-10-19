@@ -14,6 +14,14 @@ export const isLinearLookup = (step) => step?.kind === "find" && step?.fields?.w
 export const linearSummary = (step) =>
   ["Hushwork will ask Linear for up to 10 open tasks assigned to you (read-only, nothing in Linear is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
+// An "Ask the AI" step can be approved on the Runs page: the AI then does the job, using only the read-only tool the step allows.
+export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
+
+export const aiSummary = (step) => {
+  const uses = { linear: "your Linear tasks", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
+  return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI."].join(String.fromCharCode(10));
+};
+
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.
 export const requestSummary = (step) =>
   ["Hushwork will ask this web address (a read-only GET, nothing is posted):", step?.fields?.url ?? "", step?.fields?.why ? `What it is for: ${step.fields.why}` : ""].filter(Boolean).join(String.fromCharCode(10));
@@ -32,6 +40,7 @@ const WOULD = {
   approve: (f) => `Would stop and wait for your yes${f.what ? ` to: ${f.what}` : ""}. A practice run carries on.`,
   send: (f, label) => `Would send ${label("how").toLowerCase()} to ${f.to}${f.about ? ` about ${f.about}` : ""}. Nothing was sent.`,
   row: (f) => `Would add a row to ${f.to}: ${f.values}. Nothing was added.`,
+  ai: (f, label) => `Would ask the AI: ${f.task}. It could look at: ${label("uses").toLowerCase()}. Nothing was asked.`,
   request: (f) => `Would ask ${f.url} and read the answer${f.why ? ` (${f.why})` : ""}. Nothing was requested.`,
 };
 
