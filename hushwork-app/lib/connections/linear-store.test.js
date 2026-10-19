@@ -19,7 +19,9 @@ function pretendDatabase(rows = []) {
         select() { return builder; },
         eq(column, value) { state.filters[column] = value; return builder; },
         limit() { return Promise.resolve({ data: rows.filter((row) => Object.entries(state.filters).every(([c, v]) => row[c] === v)), error: null }); },
-        upsert(row) { calls.push(["upsert", row]); const at = rows.findIndex((r) => r.user_id === "u1" && r.provider === row.provider); const next = { user_id: "u1", ...row }; if (at >= 0) rows[at] = next; else rows.push(next); return Promise.resolve({ error: null }); },
+        // Like the real table: a person can add a row, but there is no permission to "upsert" (change the provider column).
+        insert(row) { calls.push(["insert", row]); rows.push({ user_id: "u1", ...row }); return Promise.resolve({ error: null }); },
+        upsert() { throw new Error("upsert is not allowed on connections"); },
         update(values) { state.update = values; return builder; },
         delete() { state.delete = true; return builder; },
         then(resolve) {

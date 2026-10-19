@@ -18,8 +18,12 @@ export async function saveLinearConnection({ supabase, key, tokens }) {
     refresh_token_enc: tokens.refreshToken ? encryptText(tokens.refreshToken, key) : null,
     expires_at: tokens.expiresAt ? new Date(tokens.expiresAt).toISOString() : null,
   };
-  // Connecting again replaces the old row: the table allows one per person and app.
-  const { error } = await supabase.from(TABLE).upsert(row, { onConflict: "user_id,provider" });
+  // Connecting again replaces the old row (the table allows one per person and app). This is delete-then-add on purpose, not an
+  // "upsert": an upsert also needs permission to change the provider column, which nobody has (see supabase/connections.sql).
+  // The delete only reaches the signed-in person's own row because of the database rules.
+  const removed = await supabase.from(TABLE).delete().eq("provider", "linear");
+  if (removed.error) return { ok: false, code: removed.error.code ?? "unknown" };
+  const { error } = await supabase.from(TABLE).insert(row);
   return error ? { ok: false, code: error.code ?? "unknown" } : { ok: true };
 }
 
