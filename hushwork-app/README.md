@@ -117,7 +117,7 @@ On a plan preview or an opened draft, **Edit steps** lets you change each step's
 
 ## The Builder and typed steps
 
-The **Builder** (`/app/builder`) builds a workflow by hand. It opens blank, from a **template** (`?template=invoices`, from the Templates page) or from a saved draft (`?draft=<id>`, from the Workflows page). It saves the same kind of draft as the workspace, with the same version check. It still **runs nothing**.
+The **Builder** (`/app/builder`) builds a workflow by hand from a short list of **blocks** (Start, Linear, Web address, Find something, Write something, Ask me first, Send a message, Add a row, Note; defined in `lib/step-rows.js`). Drag a block into the line or press it; each step shows only its name and the blanks to fill in (the workspace's own editor still has the kind and icon pickers). It opens blank, from a **template** (`?template=invoices`, from the Templates page) or from a saved draft (`?draft=<id>`, from the Workflows page). It saves the same kind of draft as the workspace, with the same version check. It still **runs nothing**.
 
 - **Typed steps.** A step is either free text (a title and a detail) or one of six kinds with named blanks: Start (what starts it, when), Look something up (where, what), Draft something (what to write, about), Ask you to approve, Send a message (how, to whom, about) and Add a row (spreadsheet, what to add). A typed step's title and detail are worked out from its fields, so it shows like any other step. Plans saved before typed steps existed are free-text steps and keep working. To add a kind, add an entry in `lib/steps.js` and keep its text fields short (a test checks that the worst case fits).
 - **Drag and drop.** Drag a kind from the list on the left into the steps, or drag a step by its handle (the dotted grip) to move it. A purple line shows where it will land. This uses the browser's own dragging (no extra package), so it needs a mouse. The Add buttons, the arrow buttons and Delete work everywhere, including by keyboard and on phones. A drop only counts if it carries this app's own drag data and names a real kind, so a file or text dragged in from elsewhere does nothing.
@@ -137,6 +137,6 @@ Not built yet: a schedule ("run every day at 9"). It needs the app hosted and a 
 
 ## Linear
 
-A **Look something up** step with Where set to **Linear** can be approved on the Runs page: Hushwork asks Linear for your up to 10 open tasks and saves the list as a "Real" run. It can only READ (`lib/connectors/linear.js` sends one fixed query and has no way to change anything).
+The **Linear** block (a Look something up step with Where set to Linear) can be approved on the Runs page: Hushwork asks Linear for your up to 10 open tasks and saves the list as a "Real" run. It can only READ (`lib/connectors/linear.js` sends one fixed query and has no way to change anything).
 
 Set-up (also on the Connections page): in Linear create a personal API key (Settings, Security & access, Personal API keys), add `LINEAR_API_KEY=your key` to `hushwork-app/.env.local`, and restart `npm run dev`. The key is a secret: it is read only in `lib/connectors/linear-env.js` (server only, checked by `lib/secrets.test.js`), never shown or logged. `approveLinearLookup` in `lib/actions/runs.js` limits lookups to 5 a minute and 30 a day per person.

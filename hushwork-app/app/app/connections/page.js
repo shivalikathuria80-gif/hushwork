@@ -33,7 +33,7 @@ export default function ConnectionsPage() {
             <li>Open <b className="font-medium text-ink">Security &amp; access</b>, then <b className="font-medium text-ink">Personal API keys</b>, then <b className="font-medium text-ink">New API key</b>. Name it Hushwork and copy the key. It is a secret code, so keep it private.</li>
             <li>Open <code>hushwork-app/.env.local</code> and add one line: <code>LINEAR_API_KEY=your key</code></li>
             <li>Stop the app and start it again with <code>npm run dev</code>. This card will then say Connected.</li>
-            <li>In the Builder, add <b className="font-medium text-ink">Look something up</b>, set Where to Linear, save it, press Practice run, then Approve.</li>
+            <li>In the Builder, drag in the <b className="font-medium text-ink">Linear</b> block, save it, press Practice run, then Approve.</li>
           </ol>
         </div>
       </section>

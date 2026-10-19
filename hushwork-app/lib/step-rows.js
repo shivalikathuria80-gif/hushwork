@@ -52,8 +52,40 @@ export function rowForKind(row, kind) {
 export const DRAG_KIND = "application/x-hushwork-kind";
 export const DRAG_ROW = "application/x-hushwork-row";
 
-// A dragged kind is only used if it names a real kind (or free text). Anything else is ignored.
-export const parseDragKind = (value) => (value === NOTE || isTypedKind(value) ? value : null);
+// The BLOCKS are what the Builder offers on its left side: a short list of friendly names. Most blocks are one kind of step.
+// A few are a kind with a ready-made answer already filled in (PRESET_BLOCKS), for example the Linear block is a "look
+// something up" step that already says Linear. What a drag carries is a block id: "note", a kind name, or a preset name.
+export const BLOCKS = [
+  { id: "trigger", label: "Start", help: "How it begins", icon: "Zap" },
+  { id: "linear", label: "Linear", help: "Look at your tasks", icon: "ListTodo" },
+  { id: "request", label: "Web address", help: "Ask a website", icon: "Plug" },
+  { id: "find", label: "Find something", help: "Search for information", icon: "Search" },
+  { id: "write", label: "Write something", help: "Draft a text", icon: "PenLine" },
+  { id: "approve", label: "Ask me first", help: "Wait for your yes", icon: "ShieldCheck" },
+  { id: "send", label: "Send a message", help: "Say who gets it", icon: "Send" },
+  { id: "row", label: "Add a row", help: "Put a line in a sheet", icon: "Table" },
+  { id: NOTE, label: "Note", help: "Your own words", icon: "FileText" },
+];
+export const PRESET_BLOCKS = { linear: { kind: "find", fields: { where: "linear", what: "My open tasks" } } };
+export const blockById = (id) => BLOCKS.find((block) => block.id === id) ?? null;
+
+// A dragged block is only used if it names a real block. Anything else is ignored.
+export const parseDragKind = (value) => (value === NOTE || isTypedKind(value) || (typeof value === "string" && Object.hasOwn(PRESET_BLOCKS, value)) ? value : null);
+
+// A new row for a block id (see above): a note, a typed step, or a typed step with its ready-made answer filled in.
+export function newRowForBlock(id) {
+  if (typeof id !== "string" || !Object.hasOwn(PRESET_BLOCKS, id)) return newRow(id);
+  const preset = PRESET_BLOCKS[id];
+  const row = newRow(preset.kind);
+  return { ...row, fields: { ...row.fields, ...preset.fields } };
+}
+
+// The short name a row shows in the Builder: "Linear" for the Linear lookup, the block's name for other typed steps, "Note".
+export function blockName(row) {
+  if (!isTypedKind(row?.kind)) return "Note";
+  if (row.kind === "find" && row.fields?.where === "linear") return "Linear";
+  return blockById(row.kind)?.label ?? STEP_KINDS[row.kind].label;
+}
 
 // Moves the row with `key` so it ends up BEFORE position `index` of the current list (0 = first, rows.length = last).
 // Returns the new list, or the very same list when nothing would change (unknown key, a bad position, or dropped on its own

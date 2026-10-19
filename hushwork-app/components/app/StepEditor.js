@@ -8,7 +8,7 @@ import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { ICON_LABELS, ICON_NAMES } from "@/lib/ai/icon-names";
 import { LIMITS, checkSteps, tidyText } from "@/lib/validate";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, isTypedKind } from "@/lib/steps";
-import { DRAG_KIND, DRAG_ROW, insertRow, moveRow, newRow, parseDragKind, rowForKind, toWorking } from "@/lib/step-rows";
+import { DRAG_KIND, DRAG_ROW, blockById, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "@/lib/step-rows";
 
 // The step editor: change the kind, title, detail and icon of each step, add, delete and move steps. A step is either free
 // text (a title and a detail) or one of the typed kinds in lib/steps.js (named fields to fill in: for example "Send a
@@ -26,6 +26,8 @@ import { DRAG_KIND, DRAG_ROW, insertRow, moveRow, newRow, parseDragKind, rowForK
 //   showErrors  true after a failed "Done": then empty titles show their error even if the person never touched them
 //   busy        true while saving: fields are read-only and buttons do nothing
 //   heading, subheading   the words above the list (they differ for a preview and for a saved draft)
+//   simple      true is the Builder's calm look: each step shows its name and only the blanks to fill in (no kind picker, no icon
+//               picker, no "shown in the plan as" line, no Add step button: blocks are added from the Builder's list)
 //   dnd         true turns on drag and drop (the Builder does): drag a step by its handle to move it, or drop a step kind
 //               dragged from the palette into the list. The arrow and Add buttons always work too: dragging needs a mouse.
 
@@ -50,7 +52,7 @@ const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-m
 const inputBase = "h-11 w-full rounded-xl border bg-surface px-3 text-[15px] placeholder:text-hint focus-visible:border-accent read-only:opacity-90";
 const COUNTER_FROM = 160; // the character counter appears from here
 
-export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false }) {
+export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false, simple = false }) {
   const reduce = usePrefersReducedMotion();
   const [openIcon, setOpenIcon] = useState(null); // key of the step whose icon panel is open (only one at a time)
   const [touched, setTouched] = useState(() => new Set()); // keys of titles the person has already left
@@ -195,10 +197,10 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
       announce(`Step ${from + 1} moved to position ${to + 1} of ${count}.`);
     } else if (kind) { // a step kind was dropped in
       if (atMax) { announce(`A plan can have up to ${LIMITS.planSteps} steps. Delete one to add another.`); return; }
-      const row = newRow(kind);
+      const row = newRowForBlock(kind);
       focusLater.current = fieldId(row.key, firstPart(row));
       change(insertRow(steps, row, at));
-      announce(`${kind === NOTE ? "Free text" : STEP_KINDS[kind].label} step added as step ${at + 1} of ${LIMITS.planSteps}.`);
+      announce(`${blockName(row)} step added as step ${at + 1} of ${LIMITS.planSteps}.`);
     }
   }
 
@@ -215,7 +217,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
         <p className="text-sm text-mute">{count} of {LIMITS.planSteps} steps</p>
       </div>
       <p className="mt-1 px-2 text-sm text-mute">{subheading}</p>
-      {dnd && <p className="mt-1 px-2 text-sm text-mute">Drag a step by its handle to move it, or use the arrows. Dragging needs a mouse.</p>}
+      {dnd && !simple && <p className="mt-1 px-2 text-sm text-mute">Drag a step by its handle to move it, or use the arrows. Dragging needs a mouse.</p>}
 
       {/* Drops are received here (they bubble up from the steps and the end zone). Nothing happens unless `dnd` is on. */}
       <div onDrop={dnd ? drop : undefined} onDragLeave={dnd ? leaveList : undefined}>
@@ -224,8 +226,8 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
           onDragOver={dnd ? overEnd : undefined}
           className={`mt-3 rounded-xl bg-raised px-3 py-3 text-sm ${dnd && dropAt === 0 ? "outline-2 outline-offset-2 outline-accent" : ""}`}
         >
-          <p className="font-medium">This plan has no steps.</p>
-          <p className="text-mute">{dnd ? "Drag a step kind here, or press one in the list." : "Add a step to build it."}</p>
+          <p className="font-medium">{simple ? "Nothing here yet." : "This plan has no steps."}</p>
+          <p className="text-mute">{simple ? "Drag a block here, or press one on the left." : dnd ? "Drag a step kind here, or press one in the list." : "Add a step to build it."}</p>
         </div>
       )}
 
@@ -272,8 +274,13 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     </span>
                     {typed ? (
                       <span className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-2 sm:px-3" aria-hidden="true">
-                        <Icon name={spec.icon} size={20} className="text-accent-text" />
-                        <span className="hidden text-sm sm:inline">{spec.label}</span>
+                        <Icon name={simple ? (blockById(row.kind === "find" && row.fields?.where === "linear" ? "linear" : row.kind)?.icon ?? spec.icon) : spec.icon} size={20} className="text-accent-text" />
+                        <span className={simple ? "text-sm font-medium" : "hidden text-sm sm:inline"}>{simple ? blockName(row) : spec.label}</span>
+                      </span>
+                    ) : simple ? (
+                      <span className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3" aria-hidden="true">
+                        <Icon name="FileText" size={20} className="text-accent-text" />
+                        <span className="text-sm font-medium">Note</span>
                       </span>
                     ) : (
                     <button
@@ -322,6 +329,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     </motion.div>
                   )}
 
+                  {!simple && (
                   <div className="mt-3 md:max-w-xs">
                     <label htmlFor={fieldId(row.key, "kind")} className="text-sm font-medium">Kind of step<span className="sr-only"> for step {number}</span></label>
                     <select
@@ -334,6 +342,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     </select>
                     <p className="mt-1 text-sm text-mute">{typed ? `${spec.help} This only describes the step.` : "Your own words. Or pick a kind of step to fill in named blanks."}</p>
                   </div>
+                  )}
 
                   {!typed && (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -406,7 +415,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                       })}
                     </div>
                   )}
-                  {shownAs && (
+                  {shownAs && !simple && (
                     <p className="mt-3 text-sm text-mute">
                       Shown in the plan as: <span className="font-medium text-ink">{shownAs.title}</span>{shownAs.detail ? `. ${shownAs.detail}` : ""}
                     </p>
@@ -436,8 +445,8 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
         {atMax && (
           <p className="flex items-start gap-2 text-sm"><Icon name="Info" className="mt-0.5 shrink-0 text-info" />A plan can have up to {LIMITS.planSteps} steps. Delete one to add another.</p>
         )}
-        <Btn id={ADD_ID} size="sm" variant="secondary" icon="Plus" aria-disabled={atMax || busy || undefined} onClick={add} className="aria-disabled:opacity-50">Add step</Btn>
-        <p className="text-sm text-mute">Steps are saved as text. Do not put passwords or card numbers in them.</p>
+        {!simple && <Btn id={ADD_ID} size="sm" variant="secondary" icon="Plus" aria-disabled={atMax || busy || undefined} onClick={add} className="aria-disabled:opacity-50">Add step</Btn>}
+        <p className="text-sm text-mute">Do not put passwords or card numbers in a step.</p>
       </div>
     </div>
   );

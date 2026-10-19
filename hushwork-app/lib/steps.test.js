@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, blankFields, describeStep, isTypedKind, planToSteps, readSavedStep, stepsToPlan } from "./steps.js";
-import { DRAG_KIND, DRAG_ROW, insertRow, moveRow, newRow, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
+import { BLOCKS, DRAG_KIND, DRAG_ROW, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
 import { plainSteps } from "./update-plan.js";
 import { LIMITS, checkSteps, cleanPlan, sameSteps } from "./validate.js";
 import { ICON_NAMES } from "./ai/icon-names.js";
@@ -360,4 +360,23 @@ test("parseDragKind: only free text or a real kind is accepted from a drag", () 
   for (const good of ["note", "trigger", "find", "write", "approve", "send", "row"]) assert.equal(parseDragKind(good), good);
   for (const bad of ["", "teleport", "constructor", "__proto__", "toString", "Send", 5, null, undefined, {}, ["send"]]) assert.equal(parseDragKind(bad), null, String(bad));
   assert.ok(DRAG_KIND.startsWith("application/x-hushwork-") && DRAG_ROW.startsWith("application/x-hushwork-") && DRAG_KIND !== DRAG_ROW);
+});
+test("blocks: every block makes a valid starting row, the Linear block is a find step already set to Linear, and bad ids do nothing", () => {
+  assert.equal(new Set(BLOCKS.map((block) => block.id)).size, BLOCKS.length);
+  for (const block of BLOCKS) {
+    assert.ok(ICON_NAMES.includes(block.icon), `${block.id}: icon ${block.icon}`);
+    assert.ok(block.label && block.help);
+    assert.equal(parseDragKind(block.id), block.id);
+    const row = newRowForBlock(block.id);
+    assert.ok(row.key > 0, block.id);
+  }
+  const linear = newRowForBlock("linear");
+  assert.equal(linear.kind, "find");
+  assert.deepEqual(linear.fields, { where: "linear", what: "My open tasks" });
+  assert.ok(checkSteps([linear]).value, "the Linear block is valid right away");
+  assert.equal(blockName(linear), "Linear");
+  assert.equal(blockName(newRowForBlock("find")), "Find something");
+  assert.equal(blockName(newRowForBlock("request")), "Web address");
+  assert.equal(blockName(newRowForBlock("note")), "Note");
+  for (const bad of ["__proto__", "constructor", "toString", "teleport", "", null, undefined, 5, {}]) assert.equal(parseDragKind(bad), null, String(bad));
 });
