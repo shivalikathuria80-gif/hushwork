@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary } from "./run-engine.js";
+import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary } from "./run-engine.js";
 import { STEP_KINDS, blankFields, describeStep } from "./steps.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -35,6 +35,15 @@ test("long text is cut and saved results are read back as plain strings", () => 
   assert.ok(practiceStep({ icon: "", title: "t".repeat(1000), detail: "" }).title.length <= 300);
   assert.deepEqual(readSavedResults("x"), []);
   assert.deepEqual(readSavedResults([{ icon: 1, title: "a", outcome: {}, status: "weird" }]), [{ icon: "", title: "a", detail: "", outcome: "", status: "done" }]);
+});
+
+test("only a Look-something-up step set to Linear can be approved", () => {
+  const find = (where) => practiceStep({ icon: "Search", title: "t", detail: "d", kind: "find", fields: { where, what: "my tasks" } });
+  assert.equal(isLinearLookup(find("linear")), true);
+  assert.equal(isLinearLookup(readSavedResults([find("linear")])[0]), true);
+  assert.equal(isLinearLookup(find("inbox")), false);
+  assert.equal(isLinearLookup(null), false);
+  assert.ok(linearSummary(find("linear")).includes("my tasks"));
 });
 
 test("only a web-call step with an address can be approved, and the preview shows the address", () => {

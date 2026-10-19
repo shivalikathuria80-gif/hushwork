@@ -7,6 +7,13 @@ import { STEP_KINDS, isTypedKind } from "./steps.js";
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
 export const isRequestStep = (step) => step?.kind === "request" && typeof step?.fields?.url === "string";
 
+// A "Look something up" step set to Linear can be approved on the Runs page: Hushwork then asks Linear for your open tasks
+// (read-only). The "what to look for" note is kept for reading; the lookup always lists the person's open assigned tasks.
+export const isLinearLookup = (step) => step?.kind === "find" && step?.fields?.where === "linear";
+
+export const linearSummary = (step) =>
+  ["Hushwork will ask Linear for up to 10 open tasks assigned to you (read-only, nothing in Linear is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.
 export const requestSummary = (step) =>
   ["Hushwork will ask this web address (a read-only GET, nothing is posted):", step?.fields?.url ?? "", step?.fields?.why ? `What it is for: ${step.fields.why}` : ""].filter(Boolean).join(String.fromCharCode(10));

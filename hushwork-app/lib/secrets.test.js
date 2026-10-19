@@ -96,3 +96,38 @@ test("web calls: only the Server Action imports the fetcher, the action checks w
   const raw = files.filter((file) => /from\s+["']node:https["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
   assert.deepEqual(raw, ["lib/connectors/http.js"]);
 });
+
+// The Linear key follows the same rules as the Groq key. Names are built from pieces so this file does not contain them.
+const LINEAR_NAME = "LINEAR" + "_API_KEY";
+
+test("the Linear key's name appears in code only in lib/connectors/linear-env.js (and docs, the example, this test and the Connections page)", () => {
+  const allowed = new Set(["lib/connectors/linear-env.js", "lib/connectors/linear.js", "lib/connectors/linear.test.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js"]);
+  assert.deepEqual(withText(LINEAR_NAME).filter((file) => !allowed.has(file)), []);
+  assert.ok(withText(LINEAR_NAME).includes("lib/connectors/linear-env.js"));
+});
+
+test("linear-env.js is server-only and imported only by server code", () => {
+  const env = files.find((file) => file.name === "lib/connectors/linear-env.js").text;
+  assert.match(env, /^import "server-only";/m);
+  const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/linear-env|(?:\.\.?\/)+(?:connectors\/)?linear-env)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
+  assert.deepEqual(importers.sort(), ["lib/actions/runs.js", "lib/connector-status.js"]);
+  for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
+});
+
+test("the Linear key is never NEXT_PUBLIC_, no real-looking key is written anywhere, and Linear's address is in one place", () => {
+  assert.deepEqual(withText("NEXT_PUBLIC_" + "LINEAR"), []);
+  const looksReal = new RegExp("lin_api_" + "[A-Za-z0-9]{30,}");
+  assert.deepEqual(files.filter((file) => looksReal.test(file.text)).map((file) => file.name), []);
+  const urls = files.filter((file) => /api\.linear\.app/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
+  assert.deepEqual(urls, ["lib/connectors/linear.js"]);
+});
+
+test("approveLinearLookup asks who is calling first, then reads the saved step, then asks Linear; Linear queries never change data", () => {
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveLinearLookup"));
+  const order = ["requireUser(", "getLinearKey(", "loadPracticeStep(", "fetchLinearIssues("].map((call) => body.indexOf(call));
+  assert.ok(order.every((index) => index > 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  const linear = files.find((file) => file.name === "lib/connectors/linear.js").text;
+  assert.ok(!/mutation/i.test(linear.replace(/\/\/.*$/gm, "")), "the Linear connector contains no mutation (a change request)");
+});

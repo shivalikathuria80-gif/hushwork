@@ -2,7 +2,7 @@
 
 The Hushwork landing page plus a first app slice: sign in, a workspace where you preview a plan and save drafts, and a runs page. Next.js 16 (App Router), React 19, Tailwind 4, `motion` for animation, Phosphor icons, Supabase for sign-in and the database. The earlier no-build prototype lives in `../hushwork/` for reference.
 
-Almost nothing runs for real yet: the one real action is a **read-only web call**, only when you press Approve on the Runs page (see "Web calls" below). A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
+Almost nothing runs for real yet: the two real actions are a **read-only web call** and a **read-only Linear lookup**, each only when you press Approve on the Runs page (see "Web calls" and "Linear" below). A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
 
 ## Run it
 
@@ -134,3 +134,9 @@ The **Builder** (`/app/builder`) builds a workflow by hand. It opens blank, from
 A step of the kind **Call a web address** (an https address and what it is for) is described in a practice run and can then be approved on the Runs page, which asks that address once with a read-only GET and saves the status and the start of the answer as a "Real" run. Because the server fetches an address a person typed, `lib/connectors/http.js` defends against SSRF (making the server reach its own network): https only, a real domain name (no `127.0.0.1`, `localhost`, `10.x`, `.internal` and so on), the name is looked up at connection time and every answer must be a public address, no redirects are followed, 8 seconds and 64 KB at most, and no cookies or secrets are sent. `approveWebCall` in `lib/actions/runs.js` reads the address from the saved run, never from the browser, and limits calls to 5 a minute and 30 a day per person. `lib/connectors/http.test.js` covers the address checks, private and IPv6 ranges, redirects, size and time limits, with a pretend network.
 
 Not built yet: a schedule ("run every day at 9"). It needs the app hosted and a scheduler that works when your computer is off, plus a safe way to run a workflow without a signed-in person, so it waits for deployment.
+
+## Linear
+
+A **Look something up** step with Where set to **Linear** can be approved on the Runs page: Hushwork asks Linear for your up to 10 open tasks and saves the list as a "Real" run. It can only READ (`lib/connectors/linear.js` sends one fixed query and has no way to change anything).
+
+Set-up (also on the Connections page): in Linear create a personal API key (Settings, Security & access, Personal API keys), add `LINEAR_API_KEY=your key` to `hushwork-app/.env.local`, and restart `npm run dev`. The key is a secret: it is read only in `lib/connectors/linear-env.js` (server only, checked by `lib/secrets.test.js`), never shown or logged. `approveLinearLookup` in `lib/actions/runs.js` limits lookups to 5 a minute and 30 a day per person.

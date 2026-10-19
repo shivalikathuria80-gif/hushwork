@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic } from "@/lib/connectors/http";
+import { getLinearKey } from "@/lib/connectors/linear-env";
+import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
 // Server Action behind the "Practice run" button. It loads the person's own workflow, walks its steps with the
@@ -46,11 +48,12 @@ export async function startPracticeRun(input) {
 }
 
 // Real actions are rare and deliberate, so the limits are small. They live in the server's memory (a restart forgets
-// them), like the AI limits. Web calls: 5 a minute and 30 a day per person.
+// them), like the AI limits. Web calls and Linear lookups: 5 a minute and 30 a day per person (each counted separately).
 const MINUTE = 60_000;
 const DAY = 86_400_000;
 const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
+const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
 
 // Used by the "Approve" action. The browser only says WHICH run and WHICH step; this re-reads the saved practice
 // run from the database (only the person's own, thanks to user_id and the database rules) and returns the saved step.
@@ -112,4 +115,30 @@ export async function approveWebCall(input) {
   const reply = answer.status >= 300 && answer.status < 400 ? `${answer.status} (a redirect, not followed)` : String(answer.status);
   const outcome = `Asked ${step.fields.url}. It answered ${reply}${answer.type ? ` (${answer.type})` : ""}.${answer.excerpt ? ` Start of the answer: ${answer.excerpt}` : ""}`;
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 700) });
+}
+
+// The "Approve and ask Linear" button. READ-ONLY: lib/connectors/linear.js can only ask, never change. Only a Look something
+// up step set to Linear qualifies, and the key comes from .env.local on the server.
+export async function approveLinearLookup(input) {
+  const user = await requireUser();
+  const key = getLinearKey();
+  if (!key) return { error: "Linear is not connected yet. The Connections page explains the one setting to add." };
+
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isLinearLookup);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+
+  const now = Date.now();
+  const tooMany = limitError(linearLimits(), user.id, now, "Linear lookups");
+  if (tooMany) return { error: tooMany };
+  linearLimits().minute.take(user.id, now);
+  linearLimits().day.take(user.id, now);
+
+  const answer = await fetchLinearIssues({ key });
+  if (!answer.ok) return { error: answer.error };
+
+  const list = answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("; ");
+  const outcome = answer.issues.length ? `Asked Linear. You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}: ${list}` : "Asked Linear. You have no open tasks.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
 }

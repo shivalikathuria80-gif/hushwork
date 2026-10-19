@@ -35,7 +35,7 @@ export const STEP_KINDS = {
     help: "Find the information a later step needs.",
     icon: "Search",
     fields: [
-      choice("where", "Where", { inbox: "Inbox", sheet: "Spreadsheet", calendar: "Calendar", files: "Files", payments: "Payments", other: "Somewhere else" }),
+      choice("where", "Where", { inbox: "Inbox", sheet: "Spreadsheet", calendar: "Calendar", files: "Files", payments: "Payments", linear: "Linear", other: "Somewhere else" }),
       text("what", "What to look for", 120, { hint: "For example: invoices more than 7 days overdue" }),
     ],
     describe: (fields, label) => ({ title: "Look something up", detail: join(label("where"), fields.what) }),

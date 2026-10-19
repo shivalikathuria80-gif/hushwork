@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { Icon } from "@/components/icons";
+import { connectorStatus } from "@/lib/connector-status";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
 
-// The apps a workflow can act in. Web addresses work now.
+// The apps a workflow can act in. Web addresses and Linear work now (Linear needs one key in .env.local).
 // The others are planned and say so: there are no Connect buttons that would not work.
 const APPS = [
   { name: "Slack", icon: "MessageSquare", does: "Post a message to a channel." },
@@ -16,7 +18,25 @@ export default function ConnectionsPage() {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses work, and only after you approve them on the Runs page. The rest are planned.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses and Linear work, and only after you approve them on the Runs page. The rest are planned.</p>
+
+      <section aria-labelledby="linear-heading" className="mt-8">
+        <h2 id="linear-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Linear</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <Suspense fallback={<span aria-hidden="true" className="block h-6 w-40 rounded-md bg-raised" />}>
+            <LinearStatus />
+          </Suspense>
+          <p className="mt-3 text-sm text-mute">Hushwork can read your open Linear tasks. It can only look. It cannot change anything in Linear.</p>
+          <h3 className="mt-4 text-sm font-medium">Connect it (about two minutes)</h3>
+          <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-mute">
+            <li>In Linear, click your workspace name (top left), then <b className="font-medium text-ink">Settings</b>.</li>
+            <li>Open <b className="font-medium text-ink">Security &amp; access</b>, then <b className="font-medium text-ink">Personal API keys</b>, then <b className="font-medium text-ink">New API key</b>. Name it Hushwork and copy the key. It is a secret code, so keep it private.</li>
+            <li>Open <code>hushwork-app/.env.local</code> and add one line: <code>LINEAR_API_KEY=your key</code></li>
+            <li>Stop the app and start it again with <code>npm run dev</code>. This card will then say Connected.</li>
+            <li>In the Builder, add <b className="font-medium text-ink">Look something up</b>, set Where to Linear, save it, press Practice run, then Approve.</li>
+          </ol>
+        </div>
+      </section>
 
       <section aria-labelledby="web-heading" className="mt-8">
         <h2 id="web-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Web addresses</h2>
@@ -43,5 +63,14 @@ export default function ConnectionsPage() {
         <p className="mt-4 text-sm text-mute">These are planned. Until one is built, steps for them only describe what would happen.</p>
       </section>
     </main>
+  );
+}
+
+async function LinearStatus() {
+  const { linear } = await connectorStatus();
+  return linear ? (
+    <p className="flex items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Connected.</p>
+  ) : (
+    <p className="flex items-center gap-2 font-medium"><Icon name="CircleAlert" className="text-mute" />Not connected yet.</p>
   );
 }
