@@ -3,6 +3,7 @@
 // happens in lib/actions/runs.js after an Approve click, never in this walk.) Plain data in, plain data out, no imports from Next.js or Supabase,
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, isTypedKind } from "./steps.js";
+import { parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
 export const isRequestStep = (step) => step?.kind === "request" && typeof step?.fields?.url === "string";
@@ -20,6 +21,16 @@ export const isCalendarLookup = (step) => step?.kind === "find" && step?.fields?
 
 export const calendarSummary = (step) =>
   ["Hushwork will ask Google Calendar for your next 10 events in the coming 7 days (read-only, nothing in your calendar is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+
+// An "Add a row" step whose Google Sheet address and boxes are valid can be approved on the Runs page: Hushwork then adds that
+// one row at the bottom of the sheet. (An older plan that only names a spreadsheet stays a description.)
+export const isSheetsRow = (step) => step?.kind === "row" && !parseSheetUrl(step?.fields?.to).error && !parseCells(step?.fields?.values).error;
+
+// What you read before approving: the exact boxes, in order. The server builds the row again from the saved run.
+export const sheetsSummary = (step) => {
+  const cells = parseCells(step?.fields?.values).cells ?? [];
+  return ["Hushwork will add ONE row at the bottom of your Google Sheet. It adds a row and changes nothing else.", `The row has ${cells.length} ${cells.length === 1 ? "box" : "boxes"}:`, cells.map((cell, index) => `${index + 1}. ${cell || "(empty)"}`).join(String.fromCharCode(10))].join(String.fromCharCode(10));
+};
 
 // An "Ask the AI" step can be approved on the Runs page: the AI then does the job, using only the read-only tool the step allows.
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";

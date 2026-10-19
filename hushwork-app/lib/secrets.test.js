@@ -179,19 +179,26 @@ test("the sign-in flow: signed-in people only, the state is checked before the c
   assert.ok(/<a href=\{`\/api\/connect\/\$\{app\}`\}/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
 });
 
-test("Google: only the read-only calendar permission is ever asked for, the calendar address is in one file, and calendar approvals ask who is calling first", () => {
+test("Google: exactly two permissions are asked for, each address is in one file, the calendar and sheets connectors can only do their one thing, and approvals ask who is calling first", () => {
   const oauth = files.find((file) => file.name === "lib/connectors/google-oauth.js").text;
   const scopes = oauth.match(/https:\/\/www\.googleapis\.com\/auth\/[a-z.]+/g) ?? [];
-  assert.deepEqual([...new Set(scopes)], ["https://www.googleapis.com/auth/calendar.readonly"]);
-  const apis = files.filter((file) => /googleapis\.com\/calendar/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
-  assert.deepEqual(apis, ["lib/connectors/google-calendar.js"]);
-  const calendar = files.find((file) => file.name === "lib/connectors/google-calendar.js").text.replace(/\/\/.*$/gm, "");
+  assert.deepEqual([...new Set(scopes)].sort(), ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets"]);
+  const only = (pattern) => files.filter((file) => pattern.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
+  assert.deepEqual(only(/googleapis\.com\/calendar/), ["lib/connectors/google-calendar.js"]);
+  assert.deepEqual(only(/sheets\.googleapis\.com/), ["lib/connectors/google-sheets.js"]);
+  const calendar = files.find((file) => file.name === "lib/connectors/google-calendar.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(calendar), "the calendar connector only sends GET");
+  const sheets = files.find((file) => file.name === "lib/connectors/google-sheets.js").text.replace(/^\s*\/\/.*$/gm, "");
+  assert.deepEqual(sheets.match(/method:\s*["'][A-Z]+["']/g), ['method: "POST"'], "the sheets connector sends exactly one kind of request: an append");
+  assert.ok(sheets.includes("values/A1:append") && sheets.includes('"RAW"') && !sheets.includes("USER_ENTERED"), "append only, as plain text (never formulas)");
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
-  const body = action.slice(action.indexOf("export async function approveCalendarLookup"));
-  const order = ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("].map((call) => body.indexOf(call));
-  assert.ok(order.every((index) => index > 0));
-  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  for (const [fn, steps] of [["approveCalendarLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveSheetsRow", ["requireUser(", "loadPracticeStep(", "parseSheetUrl(", "googleAuthorization(", "appendRow("]]]) {
+    const body = action.slice(action.indexOf(`export async function ${fn}`));
+    const order = steps.map((call) => body.indexOf(call));
+    assert.ok(order.every((index) => index > 0), fn);
+    assert.deepEqual(order, [...order].sort((a, b) => a - b), fn);
+  }
+  assert.ok(!/appendRow\(\{[^}]*input/.test(action), "the sheet and the boxes always come from the saved run");
 });
 
 test("approveAiStep: who is calling, then the saved step, then the secret check, then the AI; and the AI loop offers only tools with no input", () => {

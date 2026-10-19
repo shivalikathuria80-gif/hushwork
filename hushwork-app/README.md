@@ -165,7 +165,7 @@ Safety, all covered by `lib/ai/agent.test.js` and `lib/secrets.test.js`: every t
 
 Reliability: Groq sometimes refuses to produce the richer shape (`json_validate_failed`). Then `lib/ai/groq.js` asks **once more** for the original plain plan (`SYSTEM_PROMPT_PLAIN`, `PLAN_SCHEMA_PLAIN`), so a person still gets an AI plan; any other failure is not retried. The log line for a failed plan now also carries Groq's short error code and, for shape failures, the length of the failed answer (numbers only, never the text).
 
-## Google Calendar (the second Connect button)
+## Google Calendar and Sheets (the second Connect button)
 
 A **Look something up** step with Where set to **Calendar** can be approved on the Runs page: Hushwork asks Google Calendar for the person's next 10 events in the coming 7 days and saves the list as a "Real" run. An **Ask the AI** step may also be allowed to look at "My Google Calendar" (a tool with no input from the model). It is READ-ONLY twice over: the only permission ever requested is `calendar.readonly` and `lib/connectors/google-calendar.js` only sends GET requests (both are checked by `lib/secrets.test.js`).
 
@@ -174,3 +174,11 @@ Connect works exactly like Linear's (`lib/connections/oauth-flow.js` is shared; 
 ## Deleting runs
 
 Every run has a **Delete this run** button (it asks first). A run is only a record, so deleting it changes nothing outside Hushwork; `deleteRun` in `lib/actions/runs.js` only ever deletes the caller's own run.
+
+### Google Sheets: add a row
+
+An **Add a row** step whose **Google Sheet address** is a normal `https://docs.google.com/spreadsheets/d/...` address and whose **What to add** has comma-separated boxes (for example `Ana, 500, 20 Oct`) can be approved on the Runs page. The approval card shows the exact boxes; **Approve and add the row** then adds ONE row at the bottom of that sheet and saves a "Real" run. Older plans that only name a spreadsheet (no address) stay descriptions.
+
+This is the one action that writes into a person's Google account, so: the sheet and the boxes come from the saved run (never the browser) and are checked again on the server; `lib/connectors/google-sheets.js` has a single request, Google's "append" (`values/A1:append`, `INSERT_ROWS`), with `valueInputOption=RAW` so a box that starts with `=` stays plain text and never runs as a formula; it has no way to read, change or delete cells; the address must be a real Google Sheets address (the id is the only part used); at most 20 boxes of 100 characters; 5 rows a minute and 30 a day per person (`lib/secrets.test.js` and `lib/connectors/google-sheets.test.js`).
+
+**Permissions:** the Google Allow screen now shows two: `calendar.readonly` and `spreadsheets` (Google has no narrower permission that works on an existing sheet). In Google Cloud also enable the **Google Sheets API**. Someone who connected Google before Sheets was added must press Disconnect and Connect Google again so Google asks for the new permission. Not yet tested against the real Google.

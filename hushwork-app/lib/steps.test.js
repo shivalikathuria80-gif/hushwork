@@ -101,9 +101,9 @@ test("typed fields: a missing required field, a bad choice, too long, not text, 
     else assert.deepEqual(r.problems, [{ index: 0, field: "fields.how", kind: "choice", error: 'Step 1: choose an option for "How".' }], JSON.stringify(how));
   }
 
-  r = one({ kind: "row", fields: { to: "x".repeat(81), values: "ok" } });
-  assert.deepEqual(r.problems, [{ index: 0, field: "fields.to", kind: "long", over: 1, error: 'Step 1: use 80 characters or fewer in "Spreadsheet".' }]);
-  assert.ok(one({ kind: "row", fields: { to: "x".repeat(80), values: "y".repeat(100) } }).value, "exactly at the limits is fine");
+  r = one({ kind: "row", fields: { to: "x".repeat(121), values: "ok" } });
+  assert.deepEqual(r.problems, [{ index: 0, field: "fields.to", kind: "long", over: 1, error: 'Step 1: use 120 characters or fewer in "Google Sheet address".' }]);
+  assert.ok(one({ kind: "row", fields: { to: "x".repeat(120), values: "y".repeat(80) } }).value, "exactly at the limits is fine");
 
   r = one({ kind: "row", fields: { to: 5, values: "ok" } });
   assert.deepEqual(r.problems, [{ index: 0, field: "fields.to", kind: "unreadable", error: UNREADABLE }]);
@@ -121,7 +121,7 @@ test("typed fields: every problem is listed, in order, with the right step numbe
     { kind: "send", fields: { how: "email", to: "ok" } },
   ]);
   assert.deepEqual(r.problems.map((p) => [p.index, p.field]), [[1, "fields.to"], [1, "fields.values"]]);
-  assert.equal(r.error, 'Step 2: fill in "Spreadsheet".');
+  assert.equal(r.error, 'Step 2: fill in "Google Sheet address".');
 });
 
 test("typed fields: text is tidied before it is checked (invisible characters, runs of spaces)", () => {
@@ -382,4 +382,10 @@ test("blocks: every block makes a valid starting row, the Linear block is a find
   assert.equal(blockName(newRowForBlock("request")), "Web address");
   assert.equal(blockName(newRowForBlock("note")), "Note");
   for (const bad of ["__proto__", "constructor", "toString", "teleport", "", null, undefined, 5, {}]) assert.equal(parseDragKind(bad), null, String(bad));
+});
+
+test("the Add a row step: a pasted Google Sheet address reads as 'your Google Sheet', an older plain name is shown as it is, and a long name is cut", () => {
+  assert.deepEqual(describeStep("row", { to: "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit", values: "Ana, 500" }), { title: "Add a row", detail: "To your Google Sheet: Ana, 500" });
+  assert.equal(describeStep("row", { to: "Invoice tracker", values: "a, b" }).detail, "To Invoice tracker: a, b");
+  assert.ok(describeStep("row", { to: "x".repeat(120), values: "v" }).detail.length < 70);
 });

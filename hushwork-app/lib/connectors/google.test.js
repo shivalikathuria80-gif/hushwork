@@ -1,17 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { authorizeUrl, exchangeCode, refreshTokens, revokeToken, GOOGLE_SCOPE } from "./google-oauth.js";
+import { authorizeUrl, exchangeCode, refreshTokens, revokeToken, GOOGLE_SCOPES } from "./google-oauth.js";
 import { fetchUpcomingEvents, CALENDAR_FAILED } from "./google-calendar.js";
 import { OAUTH_FAILED } from "./oauth-common.js";
 
 const reply = (status, body) => async () => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 
-test("the Google sign-in address asks for read-only calendar access, offline renewal and the state", () => {
+test("the Google sign-in address asks for exactly two permissions (read the calendar, add rows to sheets), offline renewal and the state", () => {
   const url = new URL(authorizeUrl({ clientId: "cid", redirectUri: "http://localhost:3100/api/connect/google/callback", state: "abc" }));
   assert.equal(url.origin + url.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
-  assert.equal(url.searchParams.get("scope"), "https://www.googleapis.com/auth/calendar.readonly");
-  assert.equal(GOOGLE_SCOPE, "https://www.googleapis.com/auth/calendar.readonly");
-  assert.ok(url.searchParams.get("scope").endsWith(".readonly"), "never a permission that can change the calendar");
+  assert.equal(url.searchParams.get("scope"), "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets");
+  assert.deepEqual(GOOGLE_SCOPES, ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets"]);
+  assert.ok(!url.searchParams.get("scope").includes("auth/calendar ") && !/gmail|drive/.test(url.searchParams.get("scope")), "no permission to change the calendar, read mail or reach Drive");
   assert.equal(url.searchParams.get("access_type"), "offline");
   assert.equal(url.searchParams.get("prompt"), "consent");
   assert.equal(url.searchParams.get("state"), "abc");

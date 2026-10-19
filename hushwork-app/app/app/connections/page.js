@@ -11,7 +11,6 @@ export const metadata = { title: "Connections - Hushwork", robots: { index: fals
 // there are no Connect buttons that would not work.
 const APPS = [
   { name: "Slack", icon: "MessageSquare", does: "Post a message to a channel." },
-  { name: "Google Sheets", icon: "Table", does: "Add a row to a spreadsheet." },
   { name: "Gmail", icon: "Mail", does: "Read and send email." },
   { name: "Google Drive", icon: "Folder", does: "File and find documents." },
 ];
@@ -34,7 +33,7 @@ export default function ConnectionsPage({ searchParams }) {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear and Google Calendar work, and only after you approve them on the Runs page. The rest are planned.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear, Google Calendar and Google Sheets work, and only after you approve them on the Runs page. The rest are planned.</p>
 
       <section aria-labelledby="linear-heading" className="mt-8">
         <h2 id="linear-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Linear</h2>
@@ -44,7 +43,7 @@ export default function ConnectionsPage({ searchParams }) {
       </section>
 
       <section aria-labelledby="google-heading" className="mt-8">
-        <h2 id="google-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Google Calendar</h2>
+        <h2 id="google-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Google (Calendar and Sheets)</h2>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <Suspense fallback={fallback}><AppCard app="google" searchParams={searchParams} /></Suspense>
         </div>
@@ -117,7 +116,7 @@ async function AppCard({ app, searchParams }) {
       <p className="mt-3 text-sm text-mute">
         {app === "linear"
           ? "Hushwork can read your open Linear tasks. It can only look. It cannot change anything in Linear. You press Allow on Linear’s own page, and you can press Disconnect any time."
-          : "Hushwork can read your next Google Calendar events. It can only look: the permission is read-only, so it cannot add, change or delete anything. You press Allow on Google’s own page, and you can press Disconnect any time."}
+          : "Google shows you two permissions before you press Allow: reading your calendar events (it cannot change the calendar) and adding rows to Google Sheets (a step can only add one row at the bottom of a sheet you name; Hushwork never reads or changes the other cells). You can press Disconnect any time."}
       </p>
 
       {!ready && !status.connected && (
@@ -133,7 +132,7 @@ async function AppCard({ app, searchParams }) {
                 <b className="font-medium text-ink">3. Hushwork{"’"}s own app in Google.</b> Open <code className={code}>console.cloud.google.com</code> and sign in.
                 <ol className="mt-1 list-decimal space-y-1 pl-5">
                   <li>Make a <b className="font-medium text-ink">New project</b> called Hushwork.</li>
-                  <li>Open <b className="font-medium text-ink">APIs &amp; Services</b>, then <b className="font-medium text-ink">Library</b>, search <b className="font-medium text-ink">Google Calendar API</b> and press <b className="font-medium text-ink">Enable</b>.</li>
+                  <li>Open <b className="font-medium text-ink">APIs &amp; Services</b>, then <b className="font-medium text-ink">Library</b>, and <b className="font-medium text-ink">Enable</b> two things: <b className="font-medium text-ink">Google Calendar API</b> and <b className="font-medium text-ink">Google Sheets API</b>.</li>
                   <li>Open <b className="font-medium text-ink">OAuth consent screen</b> (it may be called Google Auth platform). Choose <b className="font-medium text-ink">External</b>, name it Hushwork, add your email, and under <b className="font-medium text-ink">Test users</b> add your own Google email. Keep it in <b className="font-medium text-ink">Testing</b>.</li>
                   <li>Open <b className="font-medium text-ink">Credentials</b>, then <b className="font-medium text-ink">Create credentials</b>, then <b className="font-medium text-ink">OAuth client ID</b>. Type: <b className="font-medium text-ink">Web application</b>. Under Authorized redirect URIs add <code className={code}>http://localhost:3100/api/connect/google/callback</code>.</li>
                   <li>Copy the <b className="font-medium text-ink">Client ID</b> and <b className="font-medium text-ink">Client secret</b> into <code className={code}>.env.local</code> as <code className={code}>GOOGLE_CLIENT_ID=...</code> and <code className={code}>GOOGLE_CLIENT_SECRET=...</code>. The secret is private.</li>

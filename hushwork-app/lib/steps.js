@@ -72,13 +72,17 @@ export const STEP_KINDS = {
   },
   row: {
     label: "Add a row",
-    help: "Add a line to a spreadsheet.",
+    help: "Add a line to a Google Sheet. A practice run only describes it; after you connect Google, you approve the real row on the Runs page.",
     icon: "Table",
     fields: [
-      text("to", "Spreadsheet", 80, { hint: "For example: Invoice tracker" }),
-      text("values", "What to add", 100, { hint: "For example: client name, amount, date" }),
+      text("to", "Google Sheet address", 120, { hint: "Paste the web address of your Google Sheet (docs.google.com/spreadsheets/...)" }),
+      text("values", "What to add", 80, { hint: "Boxes separated by commas, for example: Ana, 500, 20 Oct" }),
     ],
-    describe: (fields) => ({ title: "Add a row", detail: `To ${fields.to}: ${fields.values}` }),
+    // A pasted sheet address is long, so the plan just says "your Google Sheet"; a plain name (an older plan) is shown as it is, cut at 50.
+    describe: (fields) => {
+      const where = /^https:\/\/docs\.google\.com\/spreadsheets\//.test(fields.to) ? "your Google Sheet" : fields.to.length > 50 ? `${fields.to.slice(0, 49)}…` : fields.to;
+      return { title: "Add a row", detail: `To ${where}: ${fields.values}` };
+    },
   },
   request: {
     label: "Call a web address",

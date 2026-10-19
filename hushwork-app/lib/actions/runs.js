@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { getGroqKey } from "@/lib/ai/key";
 import { runAgent } from "@/lib/ai/agent";
@@ -13,6 +13,7 @@ import { getLinearKey } from "@/lib/connectors/linear-env";
 import { getConnectionsKey, getGoogleApp, getLinearApp } from "@/lib/connectors/oauth-env";
 import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
+import { appendRow, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -61,6 +62,7 @@ const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: ma
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
 const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
+const sheetsLimits = () => limiters("__hushworkSheetsLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
 // Used by the "Approve" action. The browser only says WHICH run and WHICH step; this re-reads the saved practice
@@ -275,4 +277,30 @@ export async function deleteRun(input) {
   if (!data?.length) return { error: "That run no longer exists." };
   revalidatePath("/app", "layout");
   return { ok: true };
+}
+
+// The "Approve and add the row" button. The ONE action that writes into somebody's Google account, so: the sheet address and the
+// boxes come from the SAVED run (never from the browser), they are checked again here, the person saw the exact boxes on the
+// approval card, and lib/connectors/google-sheets.js can only append a row (it cannot read, change or delete cells).
+export async function approveSheetsRow(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isSheetsRow);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const sheet = parseSheetUrl(step.fields.to);
+  const row = parseCells(step.fields.values);
+  if (sheet.error || row.error) return { error: sheet.error ?? row.error };
+  const authorization = await googleAuthorization(supabase, user.id);
+  if (!authorization) return { error: GOOGLE_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(sheetsLimits(), user.id, now, "added rows");
+  if (tooMany) return { error: tooMany };
+  sheetsLimits().minute.take(user.id, now);
+  sheetsLimits().day.take(user.id, now);
+
+  const added = await appendRow({ authorization, spreadsheetId: sheet.id, cells: row.cells });
+  if (!added.ok) return { error: added.error };
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Added one row to your Google Sheet (${row.cells.length} ${row.cells.length === 1 ? "box" : "boxes"}): ${row.cells.join(" | ")}`.slice(0, 700) });
 }

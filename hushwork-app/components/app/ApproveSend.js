@@ -5,7 +5,7 @@ import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import Link from "next/link";
-import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveAiStep } from "@/lib/actions/runs";
+import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveSheetsRow, approveAiStep } from "@/lib/actions/runs";
 
 // The one place a workflow really does something. It shows exactly what will happen and does it only when you press the
 // button. `message` is for reading; the server builds the real thing again from the saved run.
@@ -21,6 +21,12 @@ const COPY = {
     intro: "This step asks the AI. If you approve, your request (and anything the AI reads) goes to Groq, the company that runs the AI, and Hushwork saves its answer. The AI can only read. It cannot change anything.",
     button: "Approve and ask the AI",
     icon: "Sparkles",
+  },
+  sheets: {
+    action: approveSheetsRow,
+    intro: "This step adds a row to your Google Sheet. If you approve, Hushwork adds ONE row at the bottom with exactly the boxes below. It adds a row and changes nothing else.",
+    button: "Approve and add the row",
+    icon: "Table",
   },
   calendar: {
     action: approveCalendarLookup,
@@ -66,7 +72,7 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
       {connected ? (
         <Btn className="mt-3" icon={copy.icon} loading={pending} onClick={send}>{copy.button}</Btn>
       ) : (
-        <p className="mt-3 text-sm text-mute">{kind === "ai" ? "AI is switched off (no Groq key), so nothing can be asked." : <>{kind === "calendar" ? "Google" : "Linear"} is not connected yet, so nothing can be asked. <Link href="/app/connections">See how to connect it</Link>.</>}</p>
+        <p className="mt-3 text-sm text-mute">{kind === "ai" ? "AI is switched off (no Groq key), so nothing can be asked." : <>{kind === "calendar" || kind === "sheets" ? "Google" : "Linear"} is not connected yet, so nothing can be asked. <Link href="/app/connections">See how to connect it</Link>.</>}</p>
       )}
       {error && <p role="alert" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>
