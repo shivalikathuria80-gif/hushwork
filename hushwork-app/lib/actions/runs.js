@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { practiceRun, readSavedResults, isTelegramSend, telegramMessage, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isTelegramSend, isRequestStep, telegramMessage, SETUP_MESSAGE } from "@/lib/run-engine";
 import { getTelegram } from "@/lib/connectors/telegram-env";
 import { sendTelegram } from "@/lib/connectors/telegram";
+import { fetchPublic } from "@/lib/connectors/http";
 import { makeLimiter } from "@/lib/ai/limits";
 
 // Server Action behind the "Practice run" button. It loads the person's own workflow, walks its steps with the
@@ -46,53 +47,96 @@ export async function startPracticeRun(input) {
   return { ok: true, runId: String(data?.[0]?.id ?? "") };
 }
 
-// Real sends are rare and deliberate, so the limits are small: 3 a minute and 20 a day per person. They live in the
-// server's memory (a restart forgets them), like the AI limits.
+// Real actions are rare and deliberate, so the limits are small. They live in the server's memory (a restart forgets
+// them), like the AI limits. Telegram: 3 a minute and 20 a day per person. Web calls: 5 a minute and 30 a day.
 const MINUTE = 60_000;
 const DAY = 86_400_000;
-const limits = () => (globalThis.__hushworkSendLimits ??= { minute: makeLimiter({ max: 3, windowMs: MINUTE }), day: makeLimiter({ max: 20, windowMs: DAY, calendar: true }) });
+const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
+const telegramLimits = () => limiters("__hushworkSendLimits", 3, 20);
+const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 
-// The "Approve and send" button. It re-reads the saved practice run from the database, so the message sent is the one
-// built from that saved step (the browser only says WHICH run and WHICH step). Only a send step set to Telegram can be
-// sent, and only to the owner's own chat from .env.local. The real send is saved as a separate "live" run.
-export async function approveTelegramSend(input) {
-  const user = await requireUser();
+// Shared by the two "Approve" actions. The browser only says WHICH run and WHICH step; this re-reads the saved practice
+// run from the database (only the person's own, thanks to user_id and the database rules) and returns the saved step.
+async function loadPracticeStep(supabase, user, input, allowed) {
   const id = checkId(input?.runId);
   const index = input?.index;
   if (id.error || !Number.isInteger(index) || index < 0 || index > 50) return { error: "That run no longer exists." };
-
-  const telegram = getTelegram();
-  if (!telegram) return { error: "Telegram is not connected yet. The Connections page explains the two settings to add." };
-
-  const supabase = await createClient();
-  const { data: rows, error: loadError } = await supabase.from("runs").select("workflow_id, workflow_name, mode, results").eq("id", id.value).eq("user_id", user.id);
-  if (loadError) {
-    console.error("approveTelegramSend load failed:", loadError.code);
+  const { data: rows, error } = await supabase.from("runs").select("workflow_id, workflow_name, mode, results").eq("id", id.value).eq("user_id", user.id);
+  if (error) {
+    console.error("loading a run to approve failed:", error.code);
     return { error: "Could not load that run. Check your connection and try again." };
   }
   const run = rows?.[0];
   const step = run ? readSavedResults(run.results)[index] : null;
-  if (!run || run.mode !== "practice" || !isTelegramSend(step)) return { error: "That step cannot be sent." };
+  if (!run || run.mode !== "practice" || !allowed(step)) return { error: "That step cannot be sent." };
+  return { run, step };
+}
 
-  const now = Date.now();
-  if (limits().minute.left(user.id, now) < 1) return { error: "You sent several messages a moment ago. Try again in a minute." };
-  if (limits().day.left(user.id, now) < 1) return { error: "You have reached today's limit of 20 sent messages. It resets at midnight UTC." };
+// Checks the person's limits, without using a slot yet.
+function limitError(limits, userId, now, what) {
+  if (limits.minute.left(userId, now) < 1) return `You did that a moment ago. Try again in a minute.`;
+  if (limits.day.left(userId, now) < 1) return `You have reached today's limit for ${what}. It resets at midnight UTC.`;
+  return "";
+}
 
-  const sent = await sendTelegram({ ...telegram, text: telegramMessage(run.workflow_name, step) });
-  if (!sent.ok) return { error: sent.error };
-  limits().minute.take(user.id, now);
-  limits().day.take(user.id, now);
-
-  // The message is out. Saving the record is best effort: if it fails, say so but do not pretend the send failed.
-  const record = { ...step, status: "done", outcome: "Sent to your Telegram chat after you approved it." };
+// Saves what really happened as a separate "live" run. Best effort: the real action already happened, so a failure to
+// save is reported but never turned into "it failed".
+async function saveLiveRun(supabase, run, record) {
   const { data, error } = await supabase
     .from("runs")
     .insert({ workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [record] })
     .select("id");
   if (error) {
-    console.error("approveTelegramSend save failed:", error.code);
-    return { ok: true, runId: "", note: "The message was sent, but the record could not be saved." };
+    console.error("saving the live run failed:", error.code);
+    return { ok: true, runId: "", note: "It was done, but the record could not be saved." };
   }
   revalidatePath("/app", "layout");
   return { ok: true, runId: String(data?.[0]?.id ?? "") };
+}
+
+// The "Approve and send" button for a Telegram step. Only a send step set to Telegram can be sent, and only to the owner's
+// own chat from .env.local.
+export async function approveTelegramSend(input) {
+  const user = await requireUser();
+  const telegram = getTelegram();
+  if (!telegram) return { error: "Telegram is not connected yet. The Connections page explains the two settings to add." };
+
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isTelegramSend);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+
+  const now = Date.now();
+  const tooMany = limitError(telegramLimits(), user.id, now, "sent messages");
+  if (tooMany) return { error: tooMany };
+
+  const sent = await sendTelegram({ ...telegram, text: telegramMessage(run.workflow_name, step) });
+  if (!sent.ok) return { error: sent.error };
+  telegramLimits().minute.take(user.id, now);
+  telegramLimits().day.take(user.id, now);
+
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: "Sent to your Telegram chat after you approved it." });
+}
+
+// The "Approve and call the address" button for a web-call step. lib/connectors/http.js does the careful part (https
+// only, public addresses only, no redirects, size and time limits); the answer is kept as a short text excerpt.
+export async function approveWebCall(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isRequestStep);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+
+  const now = Date.now();
+  const tooMany = limitError(webCallLimits(), user.id, now, "web calls");
+  if (tooMany) return { error: tooMany };
+  webCallLimits().minute.take(user.id, now);
+  webCallLimits().day.take(user.id, now);
+
+  const answer = await fetchPublic(step.fields.url);
+  if (!answer.ok) return { error: answer.error };
+
+  const reply = answer.status >= 300 && answer.status < 400 ? `${answer.status} (a redirect, not followed)` : String(answer.status);
+  const outcome = `Asked ${step.fields.url}. It answered ${reply}${answer.type ? ` (${answer.type})` : ""}.${answer.excerpt ? ` Start of the answer: ${answer.excerpt}` : ""}`;
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 700) });
 }

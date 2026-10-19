@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { practiceRun, practiceStep, readSavedResults, isTelegramSend, telegramMessage } from "./run-engine.js";
+import { practiceRun, practiceStep, readSavedResults, isTelegramSend, telegramMessage, isRequestStep, requestSummary } from "./run-engine.js";
 import { STEP_KINDS, blankFields, describeStep } from "./steps.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -35,6 +35,16 @@ test("long text is cut and saved results are read back as plain strings", () => 
   assert.ok(practiceStep({ icon: "", title: "t".repeat(1000), detail: "" }).title.length <= 300);
   assert.deepEqual(readSavedResults("x"), []);
   assert.deepEqual(readSavedResults([{ icon: 1, title: "a", outcome: {}, status: "weird" }]), [{ icon: "", title: "a", detail: "", outcome: "", status: "done" }]);
+});
+
+test("only a web-call step with an address can be approved, and the preview shows the address", () => {
+  const call = practiceStep({ icon: "Plug", title: "Call a web address", detail: "x", kind: "request", fields: { url: "https://api.example.com/a", why: "check" } });
+  assert.equal(isRequestStep(call), true);
+  assert.equal(isRequestStep(readSavedResults([call])[0]), true);
+  assert.equal(isRequestStep({ kind: "request", fields: {} }), false);
+  assert.equal(isRequestStep({ kind: "send", fields: { url: "https://x.com" } }), false);
+  assert.match(call.outcome, /^Would ask https:\/\/api.example.com\/a/);
+  assert.ok(requestSummary(call).includes("https://api.example.com/a") && requestSummary(call).includes("check"));
 });
 
 test("only a send step set to Telegram can be approved, and the message is built from the saved step", () => {

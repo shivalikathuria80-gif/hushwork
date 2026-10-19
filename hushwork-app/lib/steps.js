@@ -80,6 +80,16 @@ export const STEP_KINDS = {
     ],
     describe: (fields) => ({ title: "Add a row", detail: `To ${fields.to}: ${fields.values}` }),
   },
+  request: {
+    label: "Call a web address",
+    help: "Ask a web address for information (a read-only GET). A practice run only describes it; you approve the real call on the Runs page.",
+    icon: "Plug",
+    fields: [
+      text("url", "Web address", 120, { hint: "For example: https://api.example.com/status. Starts with https://. Never put a password or key in it." }),
+      text("why", "What it is for", 60, { optional: true, hint: "For example: check if the site is up" }),
+    ],
+    describe: (fields) => ({ title: "Call a web address", detail: join(`Get ${fields.url}`, fields.why) }),
+  },
 };
 
 // The kinds in the order the editor lists them (note, the free-text step, is offered first by the editor itself).

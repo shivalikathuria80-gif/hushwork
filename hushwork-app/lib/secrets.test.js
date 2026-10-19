@@ -117,3 +117,16 @@ test("approveTelegramSend asks who is calling before anything else and the Teleg
   const urls = files.filter((file) => /api\.telegram\.org/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== "app/app/connections/page.js");
   assert.deepEqual(urls, ["lib/connectors/telegram.js"]);
 });
+
+test("web calls: only the Server Action imports the fetcher, the action checks who is calling first, and nothing else makes outside requests", () => {
+  const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/http|(?:\.\.?\/)+(?:connectors\/)?http)(?:\.js)?["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
+  assert.deepEqual(importers, ["lib/actions/runs.js"]);
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveWebCall"));
+  assert.ok(body.indexOf("requireUser(") > 0 && body.indexOf("requireUser(") < body.indexOf("loadPracticeStep("));
+  assert.ok(body.indexOf("loadPracticeStep(") < body.indexOf("fetchPublic("), "the saved step is read before the address is fetched");
+  assert.ok(!/fetchPublic\(\s*input/.test(action), "the address always comes from the saved run, never straight from the browser");
+  // the Node https module (the one that can reach the outside) is imported in exactly one non-test file
+  const raw = files.filter((file) => /from\s+["']node:https["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
+  assert.deepEqual(raw, ["lib/connectors/http.js"]);
+});

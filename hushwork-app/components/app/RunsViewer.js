@@ -5,7 +5,7 @@ import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isTelegramSend, telegramMessage, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isTelegramSend, isRequestStep, telegramMessage, requestSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
@@ -74,7 +74,8 @@ export default async function RunsViewer({ searchParams }) {
 
   const selected = runs.find((run) => run.id === wanted) ?? runs[0];
   const { telegram: telegramConnected } = await connectorStatus();
-  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isTelegramSend(step));
+  const liveWeb = selected.live && isRequestStep(selected.results[0]);
+  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isTelegramSend(step) || isRequestStep(step));
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -86,7 +87,7 @@ export default async function RunsViewer({ searchParams }) {
                 href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
                 className={`block rounded-xl px-4 py-3 hover:bg-raised ${run.id === selected.id ? "bg-accent-subtle" : ""}`}
               >
-                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chip}>{run.live ? "Sent" : "Practice"}</span></span>
+                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chip}>{run.live ? "Real" : "Practice"}</span></span>
                 <span className="mt-1 block text-sm text-mute"><RunTime iso={run.createdAt} /> · {run.results.length} {run.results.length === 1 ? "step" : "steps"}</span>
               </Link>
             </li>
@@ -96,11 +97,11 @@ export default async function RunsViewer({ searchParams }) {
 
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
-          <span className={chip}>{selected.live ? "Sent" : "Practice"}</span>
-          <p className="text-sm">{selected.live ? "This message was really sent to your Telegram chat, after you approved it." : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
+          <span className={chip}>{selected.live ? "Real" : "Practice"}</span>
+          <p className="text-sm">{selected.live ? (liveWeb ? "This web address was really asked, after you approved it." : "This message was really sent to your Telegram chat, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
         </div>
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.live ? "One message was sent." : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveWeb ? "One web address was asked." : "One message was sent.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
         <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
         <ol className="mt-1 space-y-1">
           {selected.results.map((step, index) => (
@@ -112,7 +113,11 @@ export default async function RunsViewer({ searchParams }) {
         </ol>
         {approvals.map(({ step, index }) => (
           <div key={index} className="mt-6">
-            <ApproveSend runId={selected.id} index={index} message={telegramMessage(selected.name, step)} connected={telegramConnected} />
+            <ApproveSend
+              runId={selected.id} index={index} connected={isRequestStep(step) || telegramConnected}
+              kind={isRequestStep(step) ? "request" : "telegram"}
+              message={isRequestStep(step) ? requestSummary(step) : telegramMessage(selected.name, step)}
+            />
           </div>
         ))}
       </section>

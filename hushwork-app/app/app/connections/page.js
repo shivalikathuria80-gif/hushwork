@@ -18,7 +18,7 @@ export default function ConnectionsPage() {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Telegram is the first one that works: it can send a message to you, only after you approve it on the Runs page.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Telegram and web addresses work: each acts only after you approve it on the Runs page.</p>
 
       <section aria-labelledby="telegram-heading" className="mt-8">
         <h2 id="telegram-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Telegram</h2>
@@ -35,6 +35,14 @@ export default function ConnectionsPage() {
             <li>Open <code>hushwork-app/.env.local</code> and add two lines: <code>TELEGRAM_BOT_TOKEN=your token</code> and <code>TELEGRAM_CHAT_ID=your number</code>.</li>
             <li>Stop the app and start it again with <code>npm run dev</code>, so it reads the new lines. This card will then say Connected.</li>
           </ol>
+        </div>
+      </section>
+
+      <section aria-labelledby="web-heading" className="mt-8">
+        <h2 id="web-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Web addresses</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="flex items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Works now. Nothing to set up.</p>
+          <p className="mt-2 text-sm text-mute">A {"“"}Call a web address{"”"} step asks one https address for information (a read-only request) after you approve it on the Runs page. Private and internal addresses are refused. Never put a password or key in the address.</p>
         </div>
       </section>
 

@@ -8,6 +8,13 @@ import { STEP_KINDS, isTypedKind } from "./steps.js";
 // posts one message to the owner's own Telegram chat. Everything else stays a practice.
 export const isTelegramSend = (step) => step?.kind === "send" && step?.fields?.how === "telegram";
 
+// A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
+export const isRequestStep = (step) => step?.kind === "request" && typeof step?.fields?.url === "string";
+
+// What you read before approving a web call. The server reads the address from the saved run again when you approve.
+export const requestSummary = (step) =>
+  ["Hushwork will ask this web address (a read-only GET, nothing is posted):", step?.fields?.url ?? "", step?.fields?.why ? `What it is for: ${step.fields.why}` : ""].filter(Boolean).join(String.fromCharCode(10));
+
 // The exact text that would be posted, built from a SAVED run result. The server builds it again when you approve, so what
 // you read on screen is what is sent and the browser cannot change it.
 export const telegramMessage = (workflowName, step) =>
@@ -27,6 +34,7 @@ const WOULD = {
   approve: (f) => `Would stop and wait for your yes${f.what ? ` to: ${f.what}` : ""}. A practice run carries on.`,
   send: (f, label) => `Would send ${label("how").toLowerCase()} to ${f.to}${f.about ? ` about ${f.about}` : ""}. Nothing was sent.`,
   row: (f) => `Would add a row to ${f.to}: ${f.values}. Nothing was added.`,
+  request: (f) => `Would ask ${f.url} and read the answer${f.why ? ` (${f.why})` : ""}. Nothing was requested.`,
 };
 
 // One step of a saved plan -> one result. Never throws, whatever the step looks like.
