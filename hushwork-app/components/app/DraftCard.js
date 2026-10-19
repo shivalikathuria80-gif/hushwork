@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
-import { unstable_rethrow } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import { useFillComposer } from "./Workspace";
 import { renameDraft, deleteDraft } from "@/lib/actions/drafts";
+import { startPracticeRun } from "@/lib/actions/runs";
 import { LIMITS } from "@/lib/validate";
 
-// One saved draft: a name you can open, rename or delete. A draft is only a saved preview plan and never runs.
+// One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Practice run" walks its steps and sends nothing.
 // Opening it puts its request and steps back into the composer; it does not start anything.
 // On the Workflows page `openBase` is set (for example "/app/builder?draft="): the name is then a link that opens the
 // draft in the Builder instead.
@@ -42,6 +43,7 @@ async function call(action, input, fallback) {
 
 export default function DraftCard({ draft, onDeleted, openBase }) {
   const fill = useFillComposer();
+  const router = useRouter();
   const [mode, setMode] = useState("view"); // view | rename | delete
   const [name, setName] = useState(draft.name);
   const [error, setError] = useState("");
@@ -81,6 +83,16 @@ export default function DraftCard({ draft, onDeleted, openBase }) {
       const result = await call(deleteDraft, { id: draft.id }, "Could not delete. Try again.");
       if (result.error) setError(result.error);
       else onDeleted(draft.id);
+    });
+  }
+
+  // Walks the steps without sending anything, saves the run, then opens it on the Runs page.
+  function practice() {
+    setError("");
+    startTransition(async () => {
+      const result = await call(startPracticeRun, { id: draft.id }, "Could not start the run. Try again.");
+      if (result.error) setError(result.error);
+      else router.push(`/app/runs?run=${result.runId}`);
     });
   }
 
@@ -146,12 +158,14 @@ export default function DraftCard({ draft, onDeleted, openBase }) {
             </>
           ) : (
             <>
+              {openBase && <Btn variant="secondary" size="sm" icon="Play" loading={pending} onClick={practice} aria-label={`Practice run: ${draft.name}`}>Practice run</Btn>}
               <button type="button" ref={renameRef} aria-label={`Rename draft: ${draft.name}`} onClick={startRename} className={iconButton}><Icon name="Pencil" size={18} /></button>
               <button type="button" ref={deleteRef} aria-label={`Delete draft: ${draft.name}`} onClick={() => { setError(""); setMode("delete"); }} className={iconButton}><Icon name="Trash" size={18} /></button>
             </>
           )}
         </div>
       )}
+      {mode === "view" && error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>
   );
 }

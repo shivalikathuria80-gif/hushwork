@@ -1,84 +1,111 @@
+import Link from "next/link";
 import { Btn, StepRow } from "../ui";
 import { Icon } from "../icons";
-import { ApprovalSample, PauseSample } from "../Features";
+import RunTime from "./RunTime";
+import { requireUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { readSavedResults, SETUP_MESSAGE } from "@/lib/run-engine";
 
-// The runs page: a list on the left, the detail of the selected run on the right (stacked on phones).
-// Honest by design: nothing has ever run, so the real list is an empty state. The only run shown is a SAMPLE,
-// labelled as such everywhere, with placeholder values only. It is a constant in this file, stored nowhere.
-// The sample's list item is deliberately not a button: there is only one thing to select, so a button would
-// pretend to do something.
+// The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
+// Every run is a PRACTICE run for now: the steps were walked and each one's outcome written down, but nothing left
+// the app. It reads the session and the database, so the page wraps it in <Suspense>.
 
 const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-medium text-ink";
+const text = (value) => (typeof value === "string" ? value : "");
+const heading = "text-xl font-semibold leading-[1.35] tracking-tight";
 
-const SAMPLE_STEPS = [
-  ["Zap", "Trigger", "Invoice 14 days overdue", "0.1s"],
-  ["CreditCard", "Check Stripe", "No payment found", "0.8s"],
-  ["PenLine", "Draft reminder", "Polite, firm, your tone", "2.1s"],
-  ["ShieldCheck", "Approval", "Waiting for you", null],
-];
+export function RunsFallback() {
+  return (
+    <div aria-busy="true" className="mt-8">
+      <p role="status" className="sr-only">Loading your runs</p>
+      <div aria-hidden="true" className="space-y-3">{[0, 1, 2].map((row) => <div key={row} className="h-[68px] rounded-2xl border border-line bg-raised" />)}</div>
+    </div>
+  );
+}
 
-export default function RunsViewer() {
+function Notice({ icon, title, children }) {
+  return (
+    <div className="mt-8 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name={icon} size={18} /></span>
+      <p className="mt-3 font-semibold">{title}</p>
+      <div className="mt-1 text-sm leading-relaxed text-mute">{children}</div>
+      <Btn href="/app/workflows" size="sm" variant="secondary" className="mt-4">Go to Workflows</Btn>
+    </div>
+  );
+}
+
+export default async function RunsViewer({ searchParams }) {
+  const user = await requireUser(); // outside try/catch on purpose: a signed-out visitor is redirected
+  const { run: wanted } = await searchParams;
+
+  let runs = [];
+  let failure = "";
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("runs")
+      .select("id, workflow_name, mode, status, results, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) {
+      console.error("Loading runs failed:", error.code);
+      failure = error.code === "42P01" || error.code === "PGRST205" ? SETUP_MESSAGE : "Could not load your runs. Check your connection and try again.";
+    } else {
+      runs = data.map((row) => ({
+        id: text(row.id), name: text(row.workflow_name), status: row.status === "failed" ? "failed" : "done",
+        createdAt: text(row.created_at), results: readSavedResults(row.results),
+      }));
+    }
+  } catch {
+    failure = "Could not load your runs. Check your connection and try again.";
+  }
+
+  if (failure) return <Notice icon="CircleAlert" title="Your runs could not be shown">{failure}</Notice>;
+  if (runs.length === 0) {
+    return (
+      <Notice icon="History" title="Nothing has run yet.">
+        Open Workflows and choose Practice run on one of your workflows. A practice run walks every step and writes down what it would do. It sends nothing and changes nothing outside Hushwork.
+      </Notice>
+    );
+  }
+
+  const selected = runs.find((run) => run.id === wanted) ?? runs[0];
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
-        <h2 className="text-xl font-semibold leading-[1.35] tracking-tight">Your runs</h2>
-        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name="History" size={18} /></span>
-          <p className="mt-3 font-semibold">Nothing has run yet.</p>
-          <p className="mt-1 text-sm leading-relaxed text-mute">Hushwork does not run workflows yet. When it does, each run will be listed here with every step it took.</p>
-          <Btn href="/app" size="sm" variant="secondary" className="mt-4">Preview a plan</Btn>
-        </div>
-
-        <h2 className="mt-8 text-xl font-semibold leading-[1.35] tracking-tight">Example</h2>
-        <ul className="mt-3">
-          <li aria-current="true" className="rounded-xl bg-accent-subtle px-4 py-3">
-            <span className="flex flex-wrap items-center gap-2"><b className="font-medium">Chase overdue invoices</b><span className={chip}>Sample</span></span>
-            <span className="mt-1 block text-sm text-mute">3 steps done, 1 waiting</span>
-          </li>
+        <h2 className={heading}>Your runs</h2>
+        <ul className="mt-3 space-y-1">
+          {runs.map((run) => (
+            <li key={run.id}>
+              <Link
+                href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
+                className={`block rounded-xl px-4 py-3 hover:bg-raised ${run.id === selected.id ? "bg-accent-subtle" : ""}`}
+              >
+                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chip}>Practice</span></span>
+                <span className="mt-1 block text-sm text-mute"><RunTime iso={run.createdAt} /> · {run.results.length} {run.results.length === 1 ? "step" : "steps"}</span>
+              </Link>
+            </li>
+          ))}
         </ul>
       </div>
 
-      <section aria-labelledby="sample-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
+      <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
-          <span className={chip}>Sample</span>
-          <p className="text-sm">This is an example run. Nothing here happened.</p>
+          <span className={chip}>Practice</span>
+          <p className="text-sm">This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork.</p>
         </div>
-        <h2 id="sample-heading" className="mt-5 text-xl font-semibold leading-[1.35] tracking-tight">Chase overdue invoices</h2>
-        <p className="mt-1 text-[15px] text-mute">3 steps done. 1 step waiting for your approval.</p>
-
-        <h3 className="mt-6 text-sm font-medium">Steps</h3>
+        <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
+        <p className="mt-1 text-[15px] text-mute">{selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <h3 className="mt-6 text-sm font-medium">What each step would do</h3>
         <ol className="mt-1 space-y-1">
-          {SAMPLE_STEPS.map(([icon, title, detail, duration]) => (
+          {selected.results.map((step, index) => (
             <StepRow
-              key={title} icon={icon} title={title} sub={detail}
-              right={duration ? (
-                <span className="flex items-center gap-2">
-                  <span className="text-success"><Icon name="Check" size={14} /></span>
-                  <span className="font-mono text-xs tabular-nums text-mute">{duration}</span>
-                </span>
-              ) : <span className="text-sm text-mute">Waiting</span>}
+              key={index} icon={step.icon} title={step.title} sub={step.outcome}
+              right={<span className="text-success"><Icon name="Check" size={14} /></span>}
             />
           ))}
         </ol>
-
-        <h3 className="mt-6 text-sm font-medium">Needs your approval</h3>
-        <div className="mt-2">
-          <ApprovalSample
-            heading="Sample approval"
-            body="Client A, Client B and Client C are overdue by 3 to 14 days."
-            approvedText="Approved. In a real run these would send at 9:00. Nothing was sent."
-            skippedText="Skipped. Nothing was sent."
-          />
-        </div>
-
-        <h3 className="mt-6 text-sm font-medium">Pause</h3>
-        <div className="mt-2">
-          <PauseSample
-            name="Invoice chaser (sample)" label="Invoice chaser (sample)"
-            runningText="Sample switch. It only changes this page."
-            pausedText="Sample switch. It only changes this page."
-          />
-        </div>
       </section>
     </div>
   );

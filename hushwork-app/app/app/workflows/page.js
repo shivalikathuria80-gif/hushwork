@@ -13,7 +13,7 @@ export default function WorkflowsPage() {
         <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Workflows</h1>
         <Btn href="/app/builder" icon="Plus" size="sm">New in the Builder</Btn>
       </div>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Your saved workflows. Open one in the Builder to change its steps. They are plans to read: nothing runs yet.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Your saved workflows. Open one in the Builder to change its steps. Choose Practice run to walk through a workflow step by step: it only writes down what each step would do and sends nothing.</p>
       <section className="mt-8">
         <Suspense fallback={<DraftsFallback />}>
           <Drafts openBase="/app/builder?draft=" />

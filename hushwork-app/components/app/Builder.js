@@ -113,7 +113,7 @@ export default function Builder({ initial }) {
         if (!draft) {
           const result = await saveDraft({ name: ready.name, prompt: about.trim() || ready.name, plan: JSON.stringify(ready.steps) });
           if (!result?.ok) { setMessage({ kind: "error", text: result?.error ?? FAILED }); return; }
-          afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, "Saved as a draft. Nothing will run.");
+          afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, "Saved as a draft. Nothing will be sent.");
           // The address now names the draft, so a reload (or a shared link to yourself) opens it again.
           if (result.id) window.history.replaceState(null, "", `/app/builder?draft=${result.id}`);
           return;
@@ -135,7 +135,7 @@ export default function Builder({ initial }) {
           if (!renamed?.ok) { setMessage({ kind: renamed?.error === "That draft no longer exists." ? "gone" : "error", text: renamed?.error ?? FAILED }); return; }
           version = renamed.version ?? version;
         }
-        afterSave({ id: draft.id, version }, ready.name, ready.steps, "Saved. Nothing will run.");
+        afterSave({ id: draft.id, version }, ready.name, ready.steps, "Saved. Nothing will be sent.");
       } catch (problem) {
         unstable_rethrow(problem); // signed out: the server redirects to /login
         setMessage({ kind: "error", text: FAILED });
@@ -152,7 +152,7 @@ export default function Builder({ initial }) {
       try {
         const result = await saveDraft({ name: ready.name, prompt: about.trim() || ready.name, plan: JSON.stringify(ready.steps) });
         if (!result?.ok) { setMessage({ kind: "error", text: result?.error ?? FAILED }); return; }
-        afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, "Saved as a new draft. Nothing will run.");
+        afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, "Saved as a new draft. Nothing will be sent.");
         if (result.id) window.history.replaceState(null, "", `/app/builder?draft=${result.id}`);
       } catch (problem) {
         unstable_rethrow(problem);

@@ -7,7 +7,7 @@ import DraftList from "./DraftList";
 // appears first, and this section streams in. It re-checks who you are (requireUser) right next to the data;
 // the database's own rules are the third check.
 
-const intro = "Drafts are saved plans. They never run, send or connect to anything.";
+const intro = "Drafts are saved plans. A practice run only writes down what each step would do. Nothing is sent or connected.";
 
 // What shows while the list loads. The heading is the same, so nothing above or below it moves.
 export function DraftsFallback() {

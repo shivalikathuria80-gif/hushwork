@@ -214,7 +214,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
     setDraft(null); setEditing(false); setWorking([]); setEditError(null);
     setRetryReady(!nextView.retryAfter);
     setSlow(false);
-    setStatus(announcement || `Plan ready, ${planSteps.length} ${planSteps.length === 1 ? "step" : "steps"}. Nothing will run.`);
+    setStatus(announcement || `Plan ready, ${planSteps.length} ${planSteps.length === 1 ? "step" : "steps"}. Nothing will be sent.`);
     setPhase("ready");
   };
   // `sent` is true when the text DID go to the AI service first (it failed, was slow, or was abandoned). Then the card must not
@@ -371,7 +371,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
         setDraft({ ...current, version: result.version });
         setSaveState({ status: "saved", updated: true });
         closeEditor();
-        announce("Draft updated. It will not run.");
+        announce("Draft updated. It will not be sent.");
       } else {
         if (adopted) setDraft(current);
         const message = result?.why === "invalid" ? `${result.error} Check each step and try again.` : (result?.error ?? STEPS_FAILED);
@@ -403,7 +403,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
       setDraft(result.id ? { id: result.id, name: result.name, version: result.version } : null);
       setSaveState({ status: "saved" });
       closeEditor();
-      announce("Saved to your drafts. It will not run.");
+      announce("Saved to your drafts. It will not be sent.");
     });
   }
 
@@ -445,15 +445,15 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
   let heading;
   let subheading = null;
   if (view.source === "saved") {
-    heading = "Saved plan. Nothing will run.";
+    heading = "Saved plan. Nothing will be sent.";
   } else if (edited) {
-    heading = "Plan edited by you. Nothing will run.";
+    heading = "Plan edited by you. Nothing will be sent.";
     subheading = view.source === "ai" ? "It started as a plan written by AI, and you changed it. Read each step before you save." : "It started as a keyword preview, and you changed it.";
   } else if (view.source === "ai") {
-    heading = "Plan written by AI. Nothing will run.";
+    heading = "Plan written by AI. Nothing will be sent.";
     subheading = "AI can get things wrong. Read each step before you save.";
   } else {
-    heading = "Keyword preview. Nothing will run.";
+    heading = "Keyword preview. Nothing will be sent.";
     subheading = view.sent ? "Matched on keywords in your text." : "Matched on keywords in your text. No AI was used.";
   }
   const editingSubheading = draft ? `Draft: ${draft.name || "this draft"}. Changes are saved only when you choose Save changes.` : "Changes stay on this page until you choose Save as draft.";
@@ -556,7 +556,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
             <motion.div key="editor" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
               <StepEditor
                 steps={working} onChange={setWorking} announce={announce} showErrors={showErrors} busy={saving}
-                heading="Edit the steps. Nothing will run." subheading={editingSubheading}
+                heading="Edit the steps. Nothing will be sent." subheading={editingSubheading}
               />
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-4">
                 {!draft && <Btn size="sm" icon="Check" onClick={done} className="w-full sm:w-auto">Done</Btn>}
@@ -610,7 +610,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
                 <Btn size="sm" variant="ghost" icon="RotateCcw" onClick={() => guard(() => { reset(true); taRef.current?.focus(); })}>Start over</Btn>
                 <p role="status" className="w-full text-sm text-mute">
                   {saveState.status === "saved" ? (
-                    <span className="flex flex-wrap items-center gap-x-2"><Icon name="CircleCheck" className="shrink-0 text-success" />{saveState.updated ? "Draft updated." : "Saved to your drafts."} It will not run. <a href="#drafts-heading">See your drafts</a></span>
+                    <span className="flex flex-wrap items-center gap-x-2"><Icon name="CircleCheck" className="shrink-0 text-success" />{saveState.updated ? "Draft updated." : "Saved to your drafts."} It will not be sent. <a href="#drafts-heading">See your drafts</a></span>
                   ) : "Not saved yet."}
                 </p>
                 {saveState.status === "error" && <p role="alert" className="flex w-full items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{saveState.message}</p>}

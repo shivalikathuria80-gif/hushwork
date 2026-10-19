@@ -29,7 +29,7 @@ export default function PrivacyPage() {
       <p className={p}>To tell you when early access opens, to sign you in, to keep the drafts you choose to save, and, when you ask for one, to have an AI write a preview plan.</p>
 
       <h2 className={h2}>Drafts do nothing</h2>
-      <p className={p}>A draft is only a saved plan to read. It is never run, sent or shared, and it is not connected to your email, Stripe or any other app. Hushwork does not run workflows yet.</p>
+      <p className={p}>A draft is a saved plan. It is never sent or shared, and it is not connected to your email, Stripe or any other app. A practice run walks through the steps and saves a note of what each one would do; it sends nothing and changes nothing outside Hushwork, and the saved run is private to your account. Hushwork does not run workflows for real yet.</p>
 
       <h2 className={h2}>AI plans</h2>
       <ul className={ul}>
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
         <li>When AI planning is on and you press the arrow, only the task text you typed is sent, through our server, to Groq, a company that runs AI models. Groq runs an AI model (currently <span className="font-mono text-ink">openai/gpt-oss-20b</span>, an open-weight model from OpenAI) to write the plan. Your email address, name, account id and other drafts are not sent. Our server also refuses to send text that looks like a card number or a secret key.</li>
         <li>Groq says it does not keep inference requests by default. It may log inputs and outputs for up to 30 days, only to fix errors or investigate abuse, and it keeps any data it retains in the United States (<a href="https://console.groq.com/docs/your-data" rel="noopener">Groq{"’"}s data page</a>, read 17 October 2026).</li>
         <li>Groq{"’"}s Services Agreement says Groq may not use inputs or outputs to train or fine-tune models unless the customer allows it, and we do not allow it (<a href="https://console.groq.com/docs/legal/services-agreement" rel="noopener">Services Agreement</a>, modified 22 June 2026). Groq handles your text under its own terms.</li>
-        <li>An AI can get things wrong. A plan is shown as text for you to read; it is never run, sent or connected to anything. Do not type passwords, card numbers or other people{"’"}s personal details into a task.</li>
+        <li>An AI can get things wrong. A plan is shown as text for you to read; it is never sent or connected to anything, and a practice run only writes down what it would do. Do not type passwords, card numbers or other people{"’"}s personal details into a task.</li>
       </ul>
 
       <h2 className={h2}>Where it lives</h2>
