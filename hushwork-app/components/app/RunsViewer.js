@@ -3,6 +3,7 @@ import { Btn, StepRow } from "../ui";
 import { Icon } from "../icons";
 import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
+import DeleteRun from "./DeleteRun";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
@@ -107,6 +108,9 @@ export default async function RunsViewer({ searchParams }) {
         </div>
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
         <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveCalendar ? "Google Calendar was asked once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        {/* key={selected.id}: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
+        {/* key: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
+        <div className="mt-2"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
         <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
         <ol className="mt-1 space-y-1">
           {selected.results.map((step, index) => (

@@ -206,3 +206,11 @@ test("approveAiStep: who is calling, then the saved step, then the secret check,
   assert.ok(!/api\.groq\.com/.test(agent), "the AI address comes from groq.js");
   assert.ok(!/key\.js|getGroqKey/.test(agent.replace(/\/\/.*$/gm, "")), "the agent is handed the key, it never reads it");
 });
+
+test("deleteRun asks who is calling first, checks the id, and only ever deletes the caller's own run", () => {
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function deleteRun"));
+  const order = ["requireUser(", "checkId(", '.from("runs").delete()', '.eq("user_id", user.id)'].map((call) => body.indexOf(call));
+  assert.ok(order.every((index) => index > 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+});

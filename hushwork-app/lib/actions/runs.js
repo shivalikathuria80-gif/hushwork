@@ -259,3 +259,20 @@ export async function approveCalendarLookup(input) {
   const outcome = answer.events.length ? `Asked Google Calendar. You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days: ${eventLines(answer.events)}` : "Asked Google Calendar. You have no events in the next 7 days.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
 }
+
+// The "Delete this run" button. A run is only a record, so deleting it changes nothing outside Hushwork. Only the person's
+// own run can go (user_id filter plus the database rules; there is no way to delete somebody else's). Returns { ok: true } or { error }.
+export async function deleteRun(input) {
+  const user = await requireUser();
+  const id = checkId(input?.id);
+  if (id.error) return { error: "That run no longer exists." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("runs").delete().eq("id", id.value).eq("user_id", user.id).select("id");
+  if (error) {
+    console.error("deleteRun failed:", error.code);
+    return { error: "Could not delete. Try again." };
+  }
+  if (!data?.length) return { error: "That run no longer exists." };
+  revalidatePath("/app", "layout");
+  return { ok: true };
+}
