@@ -1,12 +1,8 @@
 // The practice-run engine. A practice run walks a plan step by step and writes down what each step WOULD do.
-// It touches nothing outside Hushwork: no email, no Slack, no spreadsheet. (The one real action, a Telegram message,
+// It touches nothing outside Hushwork: no email, no Slack, no spreadsheet. (The one real action, a web call,
 // happens in lib/actions/runs.js after an Approve click, never in this walk.) Plain data in, plain data out, no imports from Next.js or Supabase,
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, isTypedKind } from "./steps.js";
-
-// Telegram is the first real connection. A "send" step set to "On Telegram" can be approved on the Runs page and then
-// posts one message to the owner's own Telegram chat. Everything else stays a practice.
-export const isTelegramSend = (step) => step?.kind === "send" && step?.fields?.how === "telegram";
 
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
 export const isRequestStep = (step) => step?.kind === "request" && typeof step?.fields?.url === "string";
@@ -14,11 +10,6 @@ export const isRequestStep = (step) => step?.kind === "request" && typeof step?.
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.
 export const requestSummary = (step) =>
   ["Hushwork will ask this web address (a read-only GET, nothing is posted):", step?.fields?.url ?? "", step?.fields?.why ? `What it is for: ${step.fields.why}` : ""].filter(Boolean).join(String.fromCharCode(10));
-
-// The exact text that would be posted, built from a SAVED run result. The server builds it again when you approve, so what
-// you read on screen is what is sent and the browser cannot change it.
-export const telegramMessage = (workflowName, step) =>
-  [`Hushwork: ${String(workflowName).slice(0, 120)}`, String(step?.detail ?? "").slice(0, 300), "", "Sent after you approved it in Hushwork."].join("\n");
 
 // Shown when the "runs" table has not been created in Supabase yet (see supabase/runs.sql).
 export const SETUP_MESSAGE = "Run history needs one setup step that is not done yet. Open supabase/runs.sql and run it in Supabase.";

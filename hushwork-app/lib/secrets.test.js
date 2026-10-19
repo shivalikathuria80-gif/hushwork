@@ -84,40 +84,6 @@ test("previewPlan: 'use server' comes first and it asks who is calling before an
   assert.ok(!/export (?:const|let|var|default)\s/.test(action), "a 'use server' file may export only async functions");
 });
 
-// The Telegram settings follow the same rules as the Groq key. Names are built from pieces for the same reason as above.
-const TOKEN_NAME = "TELEGRAM" + "_BOT_TOKEN";
-const CHAT_NAME = "TELEGRAM" + "_CHAT_ID";
-
-test("the Telegram setting names appear in code only in lib/connectors/telegram-env.js (and docs, the example and this test)", () => {
-  const allowed = new Set(["lib/connectors/telegram-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js"]);
-  for (const name of [TOKEN_NAME, CHAT_NAME]) assert.deepEqual(withText(name).filter((file) => !allowed.has(file)), [], name);
-  assert.ok(withText(TOKEN_NAME).includes("lib/connectors/telegram-env.js"));
-});
-
-test("telegram-env.js is server-only and imported only by server code", () => {
-  const env = files.find((file) => file.name === "lib/connectors/telegram-env.js").text;
-  assert.match(env, /^import "server-only";/m);
-  const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/telegram-env|(?:\.\.?\/)+(?:connectors\/)?telegram-env)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/runs.js", "lib/connector-status.js"]);
-  for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
-});
-
-test("Telegram settings are never NEXT_PUBLIC_ and no real-looking bot token is written anywhere", () => {
-  assert.deepEqual(withText("NEXT_PUBLIC_" + "TELEGRAM"), []);
-  const looksReal = new RegExp("\b[0-9]{8,10}:[A-Za-z0-9_-]{35}\b");
-  assert.deepEqual(files.filter((file) => looksReal.test(file.text)).map((file) => file.name), []);
-});
-
-test("approveTelegramSend asks who is calling before anything else and the Telegram address is written in one place", () => {
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
-  const start = action.indexOf("export async function approveTelegramSend");
-  const body = action.slice(start);
-  assert.ok(body.indexOf("requireUser(") > 0 && body.indexOf("requireUser(") < body.indexOf("getTelegram("));
-  assert.ok(body.indexOf("getTelegram(") < body.indexOf("sendTelegram("));
-  const urls = files.filter((file) => /api\.telegram\.org/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== "app/app/connections/page.js");
-  assert.deepEqual(urls, ["lib/connectors/telegram.js"]);
-});
-
 test("web calls: only the Server Action imports the fetcher, the action checks who is calling first, and nothing else makes outside requests", () => {
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/http|(?:\.\.?\/)+(?:connectors\/)?http)(?:\.js)?["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
   assert.deepEqual(importers, ["lib/actions/runs.js"]);

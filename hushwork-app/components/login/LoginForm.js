@@ -157,7 +157,7 @@ export default function LoginForm() {
           </form>
 
           <p className="mt-4 text-sm leading-relaxed text-mute">
-            {creating ? "Hushwork is an early preview. You can describe work and save drafts. Nothing runs yet. " : ""}
+            {creating ? "Hushwork is an early preview. You can describe work and save drafts. Practice runs only pretend. " : ""}
             We store your email and your drafts. <Link href="/privacy">Privacy</Link>
           </p>
         </>

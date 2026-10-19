@@ -5,12 +5,11 @@ import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isTelegramSend, isRequestStep, telegramMessage, requestSummary, SETUP_MESSAGE } from "@/lib/run-engine";
-import { connectorStatus } from "@/lib/connector-status";
+import { readSavedResults, isRequestStep, requestSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
-// A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A LIVE run is the record of
-// one message really sent to Telegram after an Approve click. It reads the session and the database, so the page wraps it in <Suspense>.
+// A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A "Real" run is the record of
+// one web address really asked after an Approve click. It reads the session and the database, so the page wraps it in <Suspense>.
 
 const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-medium text-ink";
 const text = (value) => (typeof value === "string" ? value : "");
@@ -73,9 +72,7 @@ export default async function RunsViewer({ searchParams }) {
   }
 
   const selected = runs.find((run) => run.id === wanted) ?? runs[0];
-  const { telegram: telegramConnected } = await connectorStatus();
-  const liveWeb = selected.live && isRequestStep(selected.results[0]);
-  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isTelegramSend(step) || isRequestStep(step));
+  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step));
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -98,10 +95,10 @@ export default async function RunsViewer({ searchParams }) {
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
           <span className={chip}>{selected.live ? "Real" : "Practice"}</span>
-          <p className="text-sm">{selected.live ? (liveWeb ? "This web address was really asked, after you approved it." : "This message was really sent to your Telegram chat, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
+          <p className="text-sm">{selected.live ? "This web address was really asked, after you approved it." : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
         </div>
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveWeb ? "One web address was asked." : "One message was sent.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <p className="mt-1 text-[15px] text-mute">{selected.live ? "One web address was asked." : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
         <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
         <ol className="mt-1 space-y-1">
           {selected.results.map((step, index) => (
@@ -113,11 +110,7 @@ export default async function RunsViewer({ searchParams }) {
         </ol>
         {approvals.map(({ step, index }) => (
           <div key={index} className="mt-6">
-            <ApproveSend
-              runId={selected.id} index={index} connected={isRequestStep(step) || telegramConnected}
-              kind={isRequestStep(step) ? "request" : "telegram"}
-              message={isRequestStep(step) ? requestSummary(step) : telegramMessage(selected.name, step)}
-            />
+            <ApproveSend runId={selected.id} index={index} message={requestSummary(step)} />
           </div>
         ))}
       </section>

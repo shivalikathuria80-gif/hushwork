@@ -4,9 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { practiceRun, readSavedResults, isTelegramSend, isRequestStep, telegramMessage, SETUP_MESSAGE } from "@/lib/run-engine";
-import { getTelegram } from "@/lib/connectors/telegram-env";
-import { sendTelegram } from "@/lib/connectors/telegram";
+import { practiceRun, readSavedResults, isRequestStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic } from "@/lib/connectors/http";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -48,14 +46,13 @@ export async function startPracticeRun(input) {
 }
 
 // Real actions are rare and deliberate, so the limits are small. They live in the server's memory (a restart forgets
-// them), like the AI limits. Telegram: 3 a minute and 20 a day per person. Web calls: 5 a minute and 30 a day.
+// them), like the AI limits. Web calls: 5 a minute and 30 a day per person.
 const MINUTE = 60_000;
 const DAY = 86_400_000;
 const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
-const telegramLimits = () => limiters("__hushworkSendLimits", 3, 20);
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 
-// Shared by the two "Approve" actions. The browser only says WHICH run and WHICH step; this re-reads the saved practice
+// Used by the "Approve" action. The browser only says WHICH run and WHICH step; this re-reads the saved practice
 // run from the database (only the person's own, thanks to user_id and the database rules) and returns the saved step.
 async function loadPracticeStep(supabase, user, input, allowed) {
   const id = checkId(input?.runId);
@@ -92,30 +89,6 @@ async function saveLiveRun(supabase, run, record) {
   }
   revalidatePath("/app", "layout");
   return { ok: true, runId: String(data?.[0]?.id ?? "") };
-}
-
-// The "Approve and send" button for a Telegram step. Only a send step set to Telegram can be sent, and only to the owner's
-// own chat from .env.local.
-export async function approveTelegramSend(input) {
-  const user = await requireUser();
-  const telegram = getTelegram();
-  if (!telegram) return { error: "Telegram is not connected yet. The Connections page explains the two settings to add." };
-
-  const supabase = await createClient();
-  const loaded = await loadPracticeStep(supabase, user, input, isTelegramSend);
-  if (loaded.error) return loaded;
-  const { run, step } = loaded;
-
-  const now = Date.now();
-  const tooMany = limitError(telegramLimits(), user.id, now, "sent messages");
-  if (tooMany) return { error: tooMany };
-
-  const sent = await sendTelegram({ ...telegram, text: telegramMessage(run.workflow_name, step) });
-  if (!sent.ok) return { error: sent.error };
-  telegramLimits().minute.take(user.id, now);
-  telegramLimits().day.take(user.id, now);
-
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: "Sent to your Telegram chat after you approved it." });
 }
 
 // The "Approve and call the address" button for a web-call step. lib/connectors/http.js does the careful part (https

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { practiceRun, practiceStep, readSavedResults, isTelegramSend, telegramMessage, isRequestStep, requestSummary } from "./run-engine.js";
+import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary } from "./run-engine.js";
 import { STEP_KINDS, blankFields, describeStep } from "./steps.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -45,16 +45,4 @@ test("only a web-call step with an address can be approved, and the preview show
   assert.equal(isRequestStep({ kind: "send", fields: { url: "https://x.com" } }), false);
   assert.match(call.outcome, /^Would ask https:\/\/api.example.com\/a/);
   assert.ok(requestSummary(call).includes("https://api.example.com/a") && requestSummary(call).includes("check"));
-});
-
-test("only a send step set to Telegram can be approved, and the message is built from the saved step", () => {
-  const send = (how) => practiceStep({ icon: "Send", title: "Send a message", detail: `x`, kind: "send", fields: { how, to: "me", about: "" } });
-  assert.equal(isTelegramSend(send("telegram")), true);
-  assert.equal(isTelegramSend(send("email")), false);
-  assert.equal(isTelegramSend(practiceStep({ icon: "", title: "t", detail: "d", kind: "find", fields: { where: "inbox", what: "x" } })), false);
-  assert.equal(isTelegramSend(null), false);
-  const saved = readSavedResults([send("telegram")])[0];
-  assert.equal(saved.fields.how, "telegram");
-  assert.ok(telegramMessage("Invoices", { detail: "On Telegram, to me" }).startsWith("Hushwork: Invoices\nOn Telegram, to me\n"));
-  assert.ok(telegramMessage("n".repeat(999), { detail: "d".repeat(999) }).length < 700);
 });

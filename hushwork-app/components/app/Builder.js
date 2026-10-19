@@ -201,7 +201,7 @@ export default function Builder({ initial }) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside aria-labelledby="palette-heading" className="lg:sticky lg:top-6 lg:self-start">
           <h2 id="palette-heading" className="text-sm font-medium">Step kinds</h2>
-          <p className="mt-1 text-sm text-mute">Drag a kind into the steps, or press it to add it at the end. This only describes the step: nothing is connected.</p>
+          <p className="mt-1 text-sm text-mute">Drag a kind into the steps, or press it to add it at the end. This only describes the step.</p>
           <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
             {PALETTE.map((item) => (
               <li

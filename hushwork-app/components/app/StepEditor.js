@@ -332,7 +332,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                       <option value={NOTE}>Free text</option>
                       {STEP_KIND_ORDER.map((kind) => <option key={kind} value={kind}>{STEP_KINDS[kind].label}</option>)}
                     </select>
-                    <p className="mt-1 text-sm text-mute">{typed ? `${spec.help} This only describes the step: nothing is connected.` : "Your own words. Or pick a kind of step to fill in named blanks."}</p>
+                    <p className="mt-1 text-sm text-mute">{typed ? `${spec.help} This only describes the step.` : "Your own words. Or pick a kind of step to fill in named blanks."}</p>
                   </div>
 
                   {!typed && (
