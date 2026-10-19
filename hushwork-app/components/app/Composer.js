@@ -522,7 +522,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
       )}
 
       <div id="ai-note" className="mt-2 space-y-1 px-1 text-sm text-mute">
-        <p>A plan is only something to read. Nothing is sent. Do not put passwords or card numbers in a task.</p>
+        <p>Nothing is sent or changed unless you press Approve later. Do not put passwords or card numbers in a task.</p>
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
           {note ? <p className="flex min-w-0 items-start gap-2"><Icon name={note.icon} className="mt-0.5 shrink-0" />{note.text}</p> : <p className="min-h-5" aria-hidden="true" />}
           <span className="ml-auto text-right">
