@@ -6,7 +6,7 @@
 // shape, wait at most 15 seconds, and try ONCE (no automatic retries: a retry would spend a second slice of a small
 // budget). Whatever goes wrong becomes a short code in `why`; Groq's own error text is never read out, logged or shown,
 // because it can quote what the model wrote.
-import { PLAN_SCHEMA, SYSTEM_PROMPT, finishSteps, wrapTask } from "./plan.js";
+import { PLAN_SCHEMA, PLAN_SCHEMA_PLAIN, SYSTEM_PROMPT, SYSTEM_PROMPT_PLAIN, finishSteps, wrapTask } from "./plan.js";
 
 // The model's name. To use a different model, change this one line (the bigger `openai/gpt-oss-120b` is the next step up).
 // Groq retires models now and then; if the terminal prints `ai-plan failed why=model_missing`, this is the line to update.
@@ -45,14 +45,23 @@ async function explainError(response, now) {
     const body = await response.json().catch(() => null);
     const label = `${body?.error?.code ?? ""} ${body?.error?.type ?? ""}`;
     const errorType = typeof body?.error?.type === "string" && /^[a-z_]{1,40}$/.test(body.error.type) ? body.error.type : undefined;
-    return /model_not_found|model_decommissioned/.test(label) ? fail("model_missing", { status, errorType, model: GROQ_MODEL }) : fail("rejected", { status, errorType });
+    const errorCode = typeof body?.error?.code === "string" && /^[a-z_]{1,40}$/.test(body.error.code) ? body.error.code : undefined; // a short slug like json_validate_failed, never text
+    return /model_not_found|model_decommissioned/.test(label) ? fail("model_missing", { status, errorType, model: GROQ_MODEL }) : fail("rejected", { status, errorType, errorCode, failedLength: typeof body?.error?.failed_generation === "string" ? body.error.failed_generation.length : undefined }); // a NUMBER only: the cut-off answer itself is never read or kept
   }
   return status >= 500 ? fail("busy", { status }) : fail("rejected", { status });
 }
 
 // text: the person's task, already checked by the caller. keys: { groqKey, fetchImpl, now } (the last two are for tests).
 // Returns { ok: true, steps, usage: { in, out, reasoning } } or { ok: false, why, status?, retryAfter?, errorType? }.
-export async function writeWithGroq(text, { groqKey, fetchImpl, now = Date.now } = {}) {
+export async function writeWithGroq(text, keys = {}) {
+  const first = await attempt(text, keys, true);
+  // The rich answer (steps with blocks) sometimes does not fit the strict shape. Then ask ONCE more for the plain three-field
+  // plan, so the person still gets an AI plan. Any other problem (busy, key, timeout) is not retried.
+  if (!first.ok && first.why === "rejected" && first.errorCode === "json_validate_failed") return attempt(text, keys, false);
+  return first;
+}
+
+async function attempt(text, { groqKey, fetchImpl, now = Date.now }, rich) {
   if (!groqKey) return fail("off");
   const left = coolOffLeft(now());
   if (left > 0) return fail("busy", { status: 429, retryAfter: left }); // still cooling off: answered here, Groq not called
@@ -60,13 +69,13 @@ export async function writeWithGroq(text, { groqKey, fetchImpl, now = Date.now }
   const body = {
     model: GROQ_MODEL,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT }, // fixed text first
+      { role: "system", content: rich ? SYSTEM_PROMPT : SYSTEM_PROMPT_PLAIN }, // fixed text first
       { role: "user", content: wrapTask(text) }, // the person's words last, marked as data
     ],
     temperature: 0.5,
-    max_completion_tokens: 1200,
+    max_completion_tokens: 1600,
     reasoning_effort: "low",
-    response_format: { type: "json_schema", json_schema: { name: "workflow_plan", strict: true, schema: PLAN_SCHEMA } },
+    response_format: { type: "json_schema", json_schema: { name: "workflow_plan", strict: true, schema: rich ? PLAN_SCHEMA : PLAN_SCHEMA_PLAIN } },
   };
 
   let response;

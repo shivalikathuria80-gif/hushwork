@@ -164,7 +164,7 @@ test("every failure has its plain sentence, and the log says why in numbers and 
     [() => json({}, 503), "busy", "The AI is busy or unavailable right now, so this is a keyword preview.", true, "ai-plan failed why=busy status=503"],
     [() => { throw new TypeError("fetch failed"); }, "busy", "The AI is busy or unavailable right now, so this is a keyword preview.", true, "ai-plan failed why=busy"],
     [() => { throw new DOMException("timeout", "TimeoutError"); }, "timeout", "The AI took too long to answer, so this is a keyword preview.", true, "ai-plan failed why=timeout"],
-    [() => json({ error: { type: "invalid_request_error", code: "blocked_api_access" } }, 400), "rejected", "The AI could not take that request right now, so this is a keyword preview.", true, "ai-plan failed why=rejected status=400 type=invalid_request_error"],
+    [() => json({ error: { type: "invalid_request_error", code: "blocked_api_access" } }, 400), "rejected", "The AI could not take that request right now, so this is a keyword preview.", true, "ai-plan failed why=rejected status=400 type=invalid_request_error code=blocked_api_access"],
     [() => json({}, 413), "rejected", "The AI could not take that request right now, so this is a keyword preview.", true, "ai-plan failed why=rejected status=413"],
     [() => json({}, 422), "unusable", "The AI's reply could not be used, so this is a keyword preview.", true, "ai-plan failed why=unusable status=422"],
     [() => json(groqAnswer(undefined, { finish: "length" })), "unusable", "The AI's reply could not be used, so this is a keyword preview.", true, "ai-plan failed why=unusable"],

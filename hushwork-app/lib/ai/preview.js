@@ -75,6 +75,8 @@ export async function makePreview({ prompt, userId, groqKey, now = Date.now, fet
   const parts = [`why=${result.why}`];
   if (result.status) parts.push(`status=${result.status}`);
   if (result.errorType) parts.push(`type=${result.errorType}`);
+  if (result.errorCode) parts.push(`code=${result.errorCode}`);
+  if (result.failedLength !== undefined) parts.push(`failed_length=${result.failedLength}`);
   if (result.retryAfter) parts.push(`retry_after=${result.retryAfter}`);
   if (result.why === "model_missing" && result.model) parts.push(`model=${result.model}`); // the "model retired" alarm
   log(`ai-plan failed ${parts.join(" ")}`);

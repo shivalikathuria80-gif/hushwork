@@ -254,7 +254,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
     }
     if (typeof result?.remaining === "number") setRemaining(result.remaining);
     if (result?.source === "ai" && Array.isArray(result.steps) && result.steps.length > 0) {
-      showPlan(result.steps.map((step) => [step.icon, step.title, step.detail]), { source: "ai" });
+      showPlan(stepsToPlan(result.steps), { source: "ai" });
       return;
     }
     if (result?.why === "limit_day") setDayNotice(result.notice);

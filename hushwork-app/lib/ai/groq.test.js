@@ -27,7 +27,7 @@ test("the request: exact address, header and body", async () => {
   assert.ok(init.signal instanceof AbortSignal, "has a timeout signal");
   assert.equal(body.model, "openai/gpt-oss-20b");
   assert.equal(body.model, GROQ_MODEL);
-  assert.equal(body.max_completion_tokens, 1200);
+  assert.equal(body.max_completion_tokens, 1600);
   assert.equal(body.reasoning_effort, "low");
   assert.equal(body.temperature, 0.5);
   assert.equal(body.response_format.type, "json_schema");
@@ -217,4 +217,32 @@ test("a shorter 429 that arrives later does not shorten a longer cool-off", asyn
   await Promise.all([ask(long, () => clock), ask(short, () => clock)]); // both were already on their way when the first answer came back
   assert.equal(coolOffLeft(clock), 600);
   assert.equal(coolOffLeft(clock + 599_000), 1);
+});
+
+test("fallback: when the rich answer does not fit the strict shape, ask once more for the plain plan", async () => {
+  const bodies = [];
+  const fake = mockFetch((n) => {
+    bodies.push(fake.calls[n - 1].body);
+    return n === 1 ? json({ error: { type: "invalid_request_error", code: "json_validate_failed", failed_generation: "x".repeat(572) } }, 400) : json(groqAnswer());
+  });
+  const result = await ask(fake);
+  assert.equal(result.ok, true);
+  assert.equal(fake.calls.length, 2, "exactly one retry");
+  assert.ok(bodies[0].response_format.json_schema.schema.properties.steps.items.required.includes("block"));
+  assert.deepEqual(bodies[1].response_format.json_schema.schema.properties.steps.items.required, ["icon", "title", "detail"]);
+  assert.ok(!bodies[1].messages[0].content.includes("block"));
+});
+
+test("fallback: only a shape failure is retried, and a second failure is the answer", async () => {
+  for (const [status, body] of [[400, { error: { type: "invalid_request_error", code: "blocked_api_access" } }], [429, {}], [401, {}], [500, {}]]) {
+    resetCoolOff(); // a 429 starts a pause; clear it so the next case really reaches the fake
+    const fake = mockFetch(() => json(body, status));
+    const result = await ask(fake, () => 5_000_000_000);
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.length, 1, `status ${status} is not retried`);
+  }
+  resetCoolOff();
+  const fake = mockFetch(() => json({ error: { type: "invalid_request_error", code: "json_validate_failed" } }, 400));
+  const result = await ask(fake);
+  assert.deepEqual([result.ok, result.why, fake.calls.length], [false, "rejected", 2]);
 });
