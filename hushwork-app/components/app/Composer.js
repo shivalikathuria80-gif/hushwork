@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { unstable_rethrow } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Btn, EASE, StepRow, Switch } from "../ui";
 import { Icon } from "../icons";
@@ -83,6 +83,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
   const [dayNotice, setDayNotice] = useState(null); // set when today's AI plans are used up
   const [handledSeed, setHandledSeed] = useState(0);
   const [saveState, setSaveState] = useState({ status: "idle" }); // idle | saved (updated: true after Save changes) | error
+  const router = useRouter();
   const [draft, setDraft] = useState(null); // { id, name, version } when the plan on screen is a saved draft
   const [editing, setEditing] = useState(false); // is the step editor open?
   const [working, setWorking] = useState([]); // the editor's working copy: [{ key, icon, title, detail }]
@@ -288,6 +289,28 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
       setSaveState(result.ok ? { status: "saved" } : { status: "error", message: result.error });
       // From now on this plan IS a draft: the next change updates it, it never saves a copy.
       if (result.ok && result.id) setDraft({ id: result.id, name: result.name, version: result.version });
+    });
+  }
+  // "Open in the Builder": the Builder opens saved drafts, so a new plan is saved first (the same save as "Save as draft"), then
+  // the Builder opens it. A plan that is already a saved draft just opens.
+  function openInBuilder() {
+    const mine = requestId.current;
+    startSaving(async () => {
+      let id = draft?.id;
+      if (!id) {
+        let result;
+        try {
+          result = await saveDraft({ prompt: text.trim(), plan: JSON.stringify(steps) });
+        } catch (problem) {
+          unstable_rethrow(problem); // signed out: the server redirects to /login
+          if (mine === requestId.current) setSaveState({ status: "error", message: SAVE_FAILED });
+          return;
+        }
+        if (mine !== requestId.current) return;
+        if (!result.ok || !result.id) { setSaveState({ status: "error", message: result.error ?? SAVE_FAILED }); return; }
+        id = result.id;
+      }
+      router.push(`/app/builder?draft=${id}`);
     });
   }
   // Typing in the box after a preview clears that preview: the plan on screen would no longer match the words,
@@ -605,6 +628,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
                 {saveState.status !== "saved" && (
                   <Btn size="sm" icon="Save" loading={saving} onClick={save} className="w-full sm:w-auto">{saving ? "Saving..." : saveState.status === "error" ? "Try again" : "Save as draft"}</Btn>
                 )}
+                {(!draft || saveState.status === "saved") && <Btn size="sm" variant="secondary" icon="Workflow" loading={saving} onClick={openInBuilder} title="Open this plan in the Builder, where you can drag the blocks around">Open in the Builder</Btn>}
                 {canEdit && <Btn size="sm" variant="secondary" icon="ListChecks" ref={editRef} disabled={saving} title="Change the steps of this plan by hand" onClick={startEditing}>Edit steps</Btn>}
                 <Btn size="sm" variant="secondary" icon="Pencil" title="Change the words in the box and make a new plan" onClick={() => guard(() => { reset(false); taRef.current?.focus(); })}>Edit request</Btn>
                 <Btn size="sm" variant="ghost" icon="RotateCcw" onClick={() => guard(() => { reset(true); taRef.current?.focus(); })}>Start over</Btn>
