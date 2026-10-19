@@ -2,7 +2,7 @@
 
 The Hushwork landing page plus a first app slice: sign in, a workspace where you preview a plan and save drafts, and a runs page. Next.js 16 (App Router), React 19, Tailwind 4, `motion` for animation, Phosphor icons, Supabase for sign-in and the database. The earlier no-build prototype lives in `../hushwork/` for reference.
 
-Nothing here runs a workflow for real yet. A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
+Almost nothing runs for real yet: the one real action is a **Telegram message to yourself**, sent only when you press Approve and send on the Runs page (see "Telegram" below). A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
 
 ## Run it
 
@@ -128,3 +128,16 @@ The **Builder** (`/app/builder`) builds a workflow by hand. It opens blank, from
 - The headline entrance is plain CSS, so it starts without waiting for JavaScript.
 - Scroll reveals, the folder-tab indicator, the run log and the footer wordmark use the `motion` library.
 - The glow and the workflow band move on their own. They stop when scrolled offscreen, when the visitor presses **Pause motion**, or when their system asks for reduced motion (then movement is removed and only fades remain).
+
+## Telegram (the first real connection)
+
+A "Send a message" step set to **On Telegram** can really post to your own Telegram chat. It works in two stages: a **Practice run** (Workflows page) records the step and shows the exact message on the Runs page; there, **Approve and send to my Telegram** posts it and saves a separate "Sent" run. Nothing is sent without that click.
+
+Set-up (also explained on the Connections page): create a bot with @BotFather in Telegram, send your bot one message, find your chat id, then add two lines to `hushwork-app/.env.local` and restart `npm run dev`:
+
+```
+TELEGRAM_BOT_TOKEN=your bot token
+TELEGRAM_CHAT_ID=your chat id
+```
+
+The token is a secret. It is read only in `lib/connectors/telegram-env.js` (server only, checked by `lib/secrets.test.js`), never shown on a page or logged. `lib/connectors/telegram.js` makes the web request (tested with a pretend `fetch`), and `approveTelegramSend` in `lib/actions/runs.js` is the Server Action behind the button: it re-reads the saved run, allows only a Telegram send step, limits sends to 3 a minute and 20 a day per person, and saves a "live" run.

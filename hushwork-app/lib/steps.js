@@ -61,10 +61,10 @@ export const STEP_KINDS = {
   },
   send: {
     label: "Send a message",
-    help: "Say who gets it. Nothing is sent: this is a plan.",
+    help: "Say who gets it. A practice run sends nothing. On Telegram, you can approve a real message to yourself from the Runs page.",
     icon: "Send",
     fields: [
-      choice("how", "How", { email: "By email", slack: "On Slack", other: "Another way" }),
+      choice("how", "How", { email: "By email", slack: "On Slack", telegram: "On Telegram", other: "Another way" }),
       text("to", "To whom", 80, { hint: "For example: each overdue client" }),
       text("about", "About", 80, { optional: true, hint: "For example: payment reminder" }),
     ],

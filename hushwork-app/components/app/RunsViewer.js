@@ -2,13 +2,15 @@ import Link from "next/link";
 import { Btn, StepRow } from "../ui";
 import { Icon } from "../icons";
 import RunTime from "./RunTime";
+import ApproveSend from "./ApproveSend";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isTelegramSend, telegramMessage, SETUP_MESSAGE } from "@/lib/run-engine";
+import { connectorStatus } from "@/lib/connector-status";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
-// Every run is a PRACTICE run for now: the steps were walked and each one's outcome written down, but nothing left
-// the app. It reads the session and the database, so the page wraps it in <Suspense>.
+// A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A LIVE run is the record of
+// one message really sent to Telegram after an Approve click. It reads the session and the database, so the page wraps it in <Suspense>.
 
 const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-medium text-ink";
 const text = (value) => (typeof value === "string" ? value : "");
@@ -53,7 +55,7 @@ export default async function RunsViewer({ searchParams }) {
       failure = error.code === "42P01" || error.code === "PGRST205" ? SETUP_MESSAGE : "Could not load your runs. Check your connection and try again.";
     } else {
       runs = data.map((row) => ({
-        id: text(row.id), name: text(row.workflow_name), status: row.status === "failed" ? "failed" : "done",
+        id: text(row.id), name: text(row.workflow_name), live: row.mode === "live", status: row.status === "failed" ? "failed" : "done",
         createdAt: text(row.created_at), results: readSavedResults(row.results),
       }));
     }
@@ -71,6 +73,8 @@ export default async function RunsViewer({ searchParams }) {
   }
 
   const selected = runs.find((run) => run.id === wanted) ?? runs[0];
+  const { telegram: telegramConnected } = await connectorStatus();
+  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isTelegramSend(step));
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -82,7 +86,7 @@ export default async function RunsViewer({ searchParams }) {
                 href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
                 className={`block rounded-xl px-4 py-3 hover:bg-raised ${run.id === selected.id ? "bg-accent-subtle" : ""}`}
               >
-                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chip}>Practice</span></span>
+                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chip}>{run.live ? "Sent" : "Practice"}</span></span>
                 <span className="mt-1 block text-sm text-mute"><RunTime iso={run.createdAt} /> · {run.results.length} {run.results.length === 1 ? "step" : "steps"}</span>
               </Link>
             </li>
@@ -92,12 +96,12 @@ export default async function RunsViewer({ searchParams }) {
 
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
-          <span className={chip}>Practice</span>
-          <p className="text-sm">This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork.</p>
+          <span className={chip}>{selected.live ? "Sent" : "Practice"}</span>
+          <p className="text-sm">{selected.live ? "This message was really sent to your Telegram chat, after you approved it." : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
         </div>
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
-        <h3 className="mt-6 text-sm font-medium">What each step would do</h3>
+        <p className="mt-1 text-[15px] text-mute">{selected.live ? "One message was sent." : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
         <ol className="mt-1 space-y-1">
           {selected.results.map((step, index) => (
             <StepRow
@@ -106,6 +110,11 @@ export default async function RunsViewer({ searchParams }) {
             />
           ))}
         </ol>
+        {approvals.map(({ step, index }) => (
+          <div key={index} className="mt-6">
+            <ApproveSend runId={selected.id} index={index} message={telegramMessage(selected.name, step)} connected={telegramConnected} />
+          </div>
+        ))}
       </section>
     </div>
   );

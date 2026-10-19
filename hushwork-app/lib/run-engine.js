@@ -1,8 +1,17 @@
 // The practice-run engine. A practice run walks a plan step by step and writes down what each step WOULD do.
-// It touches nothing outside Hushwork: no email, no Slack, no spreadsheet. (A real run will reuse this walk and
-// add one real action behind an Approve click.) Plain data in, plain data out, no imports from Next.js or Supabase,
+// It touches nothing outside Hushwork: no email, no Slack, no spreadsheet. (The one real action, a Telegram message,
+// happens in lib/actions/runs.js after an Approve click, never in this walk.) Plain data in, plain data out, no imports from Next.js or Supabase,
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, isTypedKind } from "./steps.js";
+
+// Telegram is the first real connection. A "send" step set to "On Telegram" can be approved on the Runs page and then
+// posts one message to the owner's own Telegram chat. Everything else stays a practice.
+export const isTelegramSend = (step) => step?.kind === "send" && step?.fields?.how === "telegram";
+
+// The exact text that would be posted, built from a SAVED run result. The server builds it again when you approve, so what
+// you read on screen is what is sent and the browser cannot change it.
+export const telegramMessage = (workflowName, step) =>
+  [`Hushwork: ${String(workflowName).slice(0, 120)}`, String(step?.detail ?? "").slice(0, 300), "", "Sent after you approved it in Hushwork."].join("\n");
 
 // Shown when the "runs" table has not been created in Supabase yet (see supabase/runs.sql).
 export const SETUP_MESSAGE = "Run history needs one setup step that is not done yet. Open supabase/runs.sql and run it in Supabase.";
@@ -29,7 +38,7 @@ export function practiceStep(step) {
     const f = {};
     for (const field of spec.fields) f[field.key] = text(step.fields[field.key]);
     const label = (key) => spec.fields.find((field) => field.key === key).options[f[key]] ?? f[key];
-    return { ...base, kind: step.kind, status: "done", outcome: short(WOULD[step.kind](f, label)) };
+    return { ...base, kind: step.kind, fields: f, status: "done", outcome: short(WOULD[step.kind](f, label)) };
   }
   return { ...base, status: "done", outcome: "A note. There is nothing to do for this step." };
 }
@@ -44,8 +53,13 @@ export function practiceRun(plan) {
 export function readSavedResults(value) {
   if (!Array.isArray(value)) return [];
   const text = (v) => (typeof v === "string" ? v : "");
-  return value.map((r) => ({
-    icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome),
-    status: r?.status === "failed" ? "failed" : "done",
-  }));
+  return value.map((r) => {
+    const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : "done" };
+    if (isTypedKind(r?.kind) && r.fields && typeof r.fields === "object") {
+      read.kind = r.kind;
+      read.fields = {};
+      for (const field of STEP_KINDS[r.kind].fields) read.fields[field.key] = text(r.fields[field.key]);
+    }
+    return read;
+  });
 }
