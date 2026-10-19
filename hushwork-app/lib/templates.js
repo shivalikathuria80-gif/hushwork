@@ -1,5 +1,7 @@
 // Starter workflows for the Builder, written as TYPED steps (see lib/steps.js). A template is only a starting point: it
-// opens in the Builder, where every step can be changed, and nothing in it runs or connects to anything.
+// opens in the Builder, where every step can be changed. Nothing runs by itself: a template with `needs` set is one whose
+// steps can really do something after you connect that app and press Approve on the Runs page (needs: "Linear", "Google" or
+// "Nothing", meaning it works straight away). The others only describe what would happen.
 // `request` is the sentence the template stands for; it is saved with the draft, like the text typed in the workspace box.
 // Pure data and one small function, no imports from React or Next.js, so tests and both sides of the app can load it.
 import { checkSteps } from "./validate.js";
@@ -7,6 +9,35 @@ import { checkSteps } from "./validate.js";
 const step = (kind, fields) => ({ kind, fields });
 
 export const TEMPLATES = [
+  // ---- these three work for real (after the right connection, and only after you press Approve on the Runs page) ----
+  {
+    id: "firsttask", icon: "ListTodo", title: "Which task should I do first?", needs: "Linear",
+    body: "The AI looks at your open Linear tasks and tells you where to start.",
+    request: "When I ask, look at my open Linear tasks and tell me which one to do first and why.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Tell me which of my open tasks to do first and why, in 3 short lines.", uses: "linear", address: "" }),
+    ],
+  },
+  {
+    id: "weekahead", icon: "Calendar", title: "My week ahead", needs: "Google",
+    body: "The AI reads your Google Calendar and sums up the next 7 days.",
+    request: "When I ask, read my Google Calendar for the next 7 days and sum up the week.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Sum up my next 7 days in 5 short lines. Point out the busiest day.", uses: "calendar", address: "" }),
+    ],
+  },
+  {
+    id: "siteup", icon: "Plug", title: "Is my website up?", needs: "Nothing",
+    body: "The AI reads one web page and tells you if it looks like a normal working site. Change the address to your own.",
+    request: "When I ask, read my website's front page and tell me if it looks like a normal working site.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Does this page look like a normal working website? Answer in one sentence.", uses: "web", address: "https://example.com/" }),
+    ],
+  },
+  // ---- these describe a plan only ----
   {
     id: "invoices", icon: "Receipt", title: "Chase unpaid invoices",
     body: "Spot invoices more than 7 days late and draft a polite reminder for each client.",

@@ -186,3 +186,7 @@ This is the one action that writes into a person's Google account, so: the sheet
 ## Open an AI plan in the Builder
 
 On the workspace page, a plan (written by the AI or the keyword preview) has an **Open in the Builder** button next to Save as draft. A new plan is saved as a draft first (the same save as Save as draft), then the Builder opens it (`/app/builder?draft=<id>`), where its blocks can be dragged around and its blanks filled in (for example the Google Sheet address of an Add a row step). The button is hidden while a saved draft has unsaved step edits (save the changes first).
+
+## Templates that work for real
+
+Three templates in `lib/templates.js` carry a `needs` label and show "Works with Linear", "Works with Google" or "Works now" on the Templates page: **Which task should I do first?** (an Ask the AI step that may look at your Linear tasks), **My week ahead** (an Ask the AI step that may look at your Google Calendar) and **Is my website up?** (an Ask the AI step that may read one web page; the address starts as `https://example.com/`, change it to your own). Open one in the Builder, Save, press Practice run on the Workflows page, then Approve on the Runs page. `lib/templates.test.js` checks that each one's AI step can really be approved and that its tool matches what it needs. The older templates still only describe a plan.

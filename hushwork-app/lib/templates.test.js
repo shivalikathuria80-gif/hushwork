@@ -41,3 +41,19 @@ test("templateById: a known id gives checked steps; anything else gives null", (
   assert.equal(invoices.steps.at(-1).detail, "By email, to each overdue client: payment reminder");
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["invoices"], { id: "invoices" }]) assert.equal(templateById(bad), null, String(bad));
 });
+
+test("templates: the three that work for real say what they need, and their steps can really be approved on the Runs page", async () => {
+  const { isAiStep } = await import("./run-engine.js");
+  const { checkRequestUrl } = await import("./connectors/http.js");
+  const real = TEMPLATES.filter((t) => t.needs);
+  assert.deepEqual(real.map((t) => t.id), ["firsttask", "weekahead", "siteup"]);
+  for (const t of real) {
+    assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
+    const checked = checkSteps(t.steps).value;
+    const ai = checked.find((s) => s.kind === "ai");
+    assert.ok(ai && isAiStep(ai), `${t.id}: has an Ask the AI step that can be approved`);
+    assert.equal(ai.fields.uses, { Linear: "linear", Google: "calendar", Nothing: "web" }[t.needs], `${t.id}: the tool matches what it needs`);
+    if (ai.fields.uses === "web") assert.ok(checkRequestUrl(ai.fields.address).value, `${t.id}: the starting web address is valid`);
+  }
+  for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);
+});
