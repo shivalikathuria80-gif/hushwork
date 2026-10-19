@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
-import { checkId } from "@/lib/validate";
+import { checkId, checkSteps } from "@/lib/validate";
 import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
@@ -78,7 +78,13 @@ async function loadPracticeStep(supabase, user, input, allowed) {
     return { error: "Could not load that run. Check your connection and try again." };
   }
   const run = rows?.[0];
-  const step = run ? readSavedResults(run.results)[index] : null;
+  let step = run ? readSavedResults(run.results)[index] : null;
+  // A person can write their own rows into the runs table with the public key, so a saved step is never trusted: its kind and
+  // blanks go through the same checks as any step a person types (right choices, right lengths) before anything is acted on.
+  if (step?.kind) {
+    const checked = checkSteps([{ kind: step.kind, fields: step.fields }]);
+    step = checked.value ? { ...step, fields: checked.value[0].fields } : null;
+  }
   if (!run || run.mode !== "practice" || !allowed(step)) return { error: "That step cannot be sent." };
   return { run, step };
 }
@@ -120,6 +126,7 @@ export async function approveWebCall(input) {
   webCallLimits().minute.take(user.id, now);
   webCallLimits().day.take(user.id, now);
 
+  if (looksSensitive(step.fields.url)) return { error: "That address looks like it holds a secret key, so it was not used. Remove the key from the address." };
   const answer = await fetchPublic(step.fields.url);
   if (!answer.ok) return { error: answer.error };
 
@@ -138,7 +145,9 @@ async function linearAuthorization(supabase, userId) {
     const access = await loadAccess({ supabase, userId, provider: "linear", key: secretKey, app });
     if (access) return `Bearer ${access.token}`;
   }
-  return getLinearKey();
+  // The personal key in .env.local is for the owner testing on their own computer. It must never be used on a real (production) server,
+  // where every signed-in person would otherwise read the owner's Linear.
+  return process.env.NODE_ENV === "production" ? null : getLinearKey();
 }
 
 // Google works only through the Connect button (there is no personal-key shortcut). Returns "Bearer <token>" or null.
@@ -193,7 +202,14 @@ export async function approveAiStep(input) {
   const { task, uses, address } = step.fields;
   if (looksSensitive(task)) return { error: "That request looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
 
-  const tools = {};
+  // Counted BEFORE anything goes out (an MCP step connects to an outside server), so a loop of Approves cannot be used as a request relay.
+  const now = Date.now();
+  const tooMany = limitError(aiLimits(), user.id, now, "AI steps");
+  if (tooMany) return { error: tooMany };
+  aiLimits().minute.take(user.id, now);
+  aiLimits().day.take(user.id, now);
+
+  const tools = Object.create(null); // no prototype, so a tool called __proto__ is just a name
   if (uses === "linear") {
     const authorization = await linearAuthorization(supabase, user.id);
     if (!authorization) return { error: LINEAR_OFF };
@@ -220,12 +236,14 @@ export async function approveAiStep(input) {
     // The tools come from the ONE server written in the step; only its read-only tools are offered (lib/connectors/mcp.js).
     const checked = checkRequestUrl(address);
     if (checked.error) return { error: `This step's MCP server address cannot be used: ${checked.error}` };
+    if (looksSensitive(address)) return { error: "That address looks like it holds a secret key, so it was not used. Remove the key from the address." };
     const mcp = await openMcp(checked.value);
     if (!mcp.ok) return { error: mcp.error };
     for (const tool of mcp.tools) tools[tool.name] = { description: tool.description, parameters: tool.parameters, run: (input) => mcp.call(tool.name, input) };
   } else if (uses === "web") {
     const checked = checkRequestUrl(address);
     if (checked.error) return { error: `This step's web address cannot be used: ${checked.error}` };
+    if (looksSensitive(address)) return { error: "That address looks like it holds a secret key, so it was not used. Remove the key from the address." };
     tools.read_web_page = {
       description: "Reads the start of the one web page the person chose for this step.",
       run: async () => {
@@ -234,12 +252,6 @@ export async function approveAiStep(input) {
       },
     };
   }
-
-  const now = Date.now();
-  const tooMany = limitError(aiLimits(), user.id, now, "AI steps");
-  if (tooMany) return { error: tooMany };
-  aiLimits().minute.take(user.id, now);
-  aiLimits().day.take(user.id, now);
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };

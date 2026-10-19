@@ -56,7 +56,18 @@ export async function loadAccess({ supabase, userId, provider, key, app, now = D
   if (!refresh || !app) return null;
 
   const renewed = await APPS[provider].refreshTokens({ clientId: app.clientId, clientSecret: app.clientSecret, refreshToken: refresh, fetchImpl, now });
-  if (!renewed.ok) return null;
+  if (!renewed.ok) {
+    // Two requests can try to renew at the same moment, and the app hands out a new refresh token each time, so the second one
+    // fails. Look again: if the other request already saved a fresh token, use that one.
+    const again = await supabase.from(TABLE).select("access_token_enc, expires_at").eq("user_id", userId).eq("provider", provider).limit(1);
+    const latest = again.error ? null : again.data?.[0];
+    try {
+      if (latest && latest.access_token_enc !== row.access_token_enc && Date.parse(latest.expires_at) - RENEW_BEFORE_MS > now()) return { token: decryptText(latest.access_token_enc, key) };
+    } catch {
+      // unreadable: treated as not connected below
+    }
+    return null;
+  }
   const nextRefresh = renewed.refreshToken ?? refresh; // Google keeps the same refresh token; Linear sends a new one each time
   const { error: saveError } = await supabase
     .from(TABLE)

@@ -8,7 +8,8 @@
 //   - the address is typed by a person, so every request goes through publicRequest (lib/connectors/http.js): https only,
 //     public addresses only (checked at connection time), no redirects, size and time limits, no cookies or secrets sent.
 //   - only READ-ONLY tools are offered to the AI: tools the server itself marks read-only (readOnlyHint), or, when it says
-//     nothing, tools whose name is a plain reading word (get, list, read, search...) and that are not marked destructive.
+//     nothing, tools whose name starts with a plain reading word (get, list, read, search...), contains no writing word
+//     (delete, create, send, run...) and that are not marked destructive.
 //     Everything else (anything that could create, change or delete) is never offered and never called.
 //   - at most 8 tools and one small input shape per tool are kept; what a tool answers is cut to 3000 characters before the
 //     AI sees it, and is wrapped as data by the AI loop (lib/ai/agent.js).
@@ -21,7 +22,10 @@ const KNOWN_PROTOCOLS = new Set(["2025-06-18", "2025-03-26", "2024-11-05"]);
 const MAX_TOOLS = 8;
 const MAX_SCHEMA = 2500;
 const MAX_ANSWER = 3000;
-const READING_NAME = /^(?:get|list|read|search|find|fetch|query|lookup|ask|describe|show|view)(?:[_.-]|[A-Z]|$)/;
+const READING_NAME = /^(?:get|list|read|search|find|fetch|lookup|ask|describe|show|view)(?:[_.-]|[A-Z]|$)/;
+// A name that contains any of these words is never guessed to be read-only ("get_and_delete_item", "ask_agent_to_deploy").
+const WRITING_WORDS = new Set(["create", "update", "delete", "remove", "write", "set", "add", "send", "run", "exec", "execute", "drop", "clear", "post", "put", "patch", "ack", "deploy", "insert", "modify", "edit", "move", "rename", "merge", "push", "commit", "kill", "stop", "start", "reset", "revoke", "grant", "approve", "cancel", "submit", "publish", "upload", "install", "save", "store", "invoke", "trigger", "call", "and"]);
+const wordsOf = (name) => name.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 
 export const MCP_FAILED = {
   login: "That MCP server asks for a login, which Hushwork cannot give yet. Pick a server that needs none.",
@@ -75,7 +79,7 @@ export function isReadOnlyTool(tool) {
   if (hints.destructiveHint === true) return false;
   if (hints.readOnlyHint === true) return true;
   if (hints.readOnlyHint === false) return false;
-  return READING_NAME.test(tool.name);
+  return READING_NAME.test(tool.name) && !wordsOf(tool.name).some((word) => WRITING_WORDS.has(word));
 }
 
 // The input shape the server declared for a tool, kept only if it is a plain object shape of a sensible size.
@@ -86,6 +90,8 @@ function inputShape(schema) {
 }
 
 const cut = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+// What a server says about its own tool is untrusted too: angle brackets are made harmless so it cannot fake a tag.
+const safeText = (value, max) => cut(value, max).replace(/</g, "\u2039").replace(/>/g, "\u203a");
 
 // Connects and lists the tools the AI may use. Returns { ok: true, tools: [{ name, description, parameters }], call } or
 // { ok: false, error }. call(name, args) runs one of THOSE tools and returns text (never throws).
@@ -109,7 +115,7 @@ export async function openMcp(url, { send = publicRequest } = {}) {
     if (tools.length >= MAX_TOOLS) break;
     if (!isReadOnlyTool(tool)) continue;
     const parameters = inputShape(tool.inputSchema);
-    if (parameters) tools.push({ name: tool.name, description: cut(tool.description, 300) || tool.name, parameters });
+    if (parameters) tools.push({ name: tool.name, description: safeText(tool.description, 300) || tool.name, parameters });
   }
   if (tools.length === 0) return { ok: false, error: MCP_FAILED.noTools };
 

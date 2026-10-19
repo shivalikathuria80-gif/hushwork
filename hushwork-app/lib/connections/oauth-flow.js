@@ -47,7 +47,7 @@ export async function finishConnect(provider, request) {
   const url = new URL(request.url);
   const jar = await cookies();
   const expected = jar.get(cookieName(provider))?.value ?? "";
-  jar.delete(cookieName(provider)); // a state is good for one try only
+  jar.delete({ name: cookieName(provider), path: `/api/connect/${provider}` }); // a state is good for one try only (same path it was set with)
 
   if (url.searchParams.get("error")) back(provider, "denied"); // the person pressed Cancel on the app's screen
   const state = url.searchParams.get("state") ?? "";

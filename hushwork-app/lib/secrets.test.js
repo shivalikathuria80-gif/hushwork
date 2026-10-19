@@ -232,3 +232,32 @@ test("MCP: the client only POSTs through the guarded request, only read-only too
   assert.ok(body.indexOf("checkRequestUrl(") > 0 && body.indexOf("checkRequestUrl(") < body.indexOf("openMcp("));
   assert.ok(!/openMcp\([^)]*input/.test(action), "the server address always comes from the saved step");
 });
+
+test("audit fixes stay fixed: the owner's personal Linear key never works in production, limits come before outside requests, saved steps are re-checked, the one-try cookie is cleared with its path", () => {
+  const runs = files.find((file) => file.name === "lib/actions/runs.js").text;
+  assert.match(runs, /process\.env\.NODE_ENV === "production" \? null : getLinearKey\(\)/, "the personal key is dev-only");
+  const status = files.find((file) => file.name === "lib/connector-status.js").text;
+  assert.match(status, /NODE_ENV !== "production" && Boolean\(getLinearKey\(\)\)/);
+  const ai = runs.slice(runs.indexOf("export async function approveAiStep"), runs.indexOf("export async function deleteRun"));
+  assert.ok(ai.indexOf("limitError(aiLimits()") > 0 && ai.indexOf("limitError(aiLimits()") < ai.indexOf("openMcp("), "the AI-step limit is counted before an MCP server is contacted");
+  assert.ok(ai.indexOf("limitError(aiLimits()") < ai.indexOf("fetchPublic("), "...and before a web page is fetched");
+  const loader = runs.slice(runs.indexOf("async function loadPracticeStep"), runs.indexOf("// Checks the person's limits"));
+  assert.ok(loader.includes("checkSteps(["), "a saved step is validated again before it is acted on");
+  const flow = files.find((file) => file.name === "lib/connections/oauth-flow.js").text;
+  assert.ok(flow.includes("jar.delete({ name: cookieName(provider), path:"), "the state cookie is deleted with the path it was set with");
+});
+
+test("repository hygiene: .env.local is git-ignored, no Google client secret is written anywhere, and browser components never import the token code", () => {
+  const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
+  assert.match(ignore, /^\.env\*$/m); // covers .env.local (the .env.example is let through on the next line)
+  assert.match(ignore, /^!\.env\.example$/m);
+  const googleSecret = new RegExp("GOC" + "SPX-[A-Za-z0-9_-]{20,}");
+  assert.deepEqual(files.filter((file) => googleSecret.test(file.text)).map((file) => file.name), []);
+  const serverOnly = ["lib/connections/store.js", "lib/connections/crypto.js", "lib/connections/oauth-flow.js", "lib/connectors/oauth-env.js", "lib/connectors/linear-env.js", "lib/ai/key.js"];
+  for (const file of files.filter((entry) => /^\s*["']use client["']/m.test(entry.text))) {
+    for (const name of serverOnly) {
+      const stem = name.replace(/\.js$/, "");
+      assert.ok(!new RegExp(`from\\s+["'][^"']*${stem.split("/").slice(-2).join("/")}(?:\\.js)?["']`).test(file.text), `${file.name} (browser code) must not import ${name}`);
+    }
+  }
+});

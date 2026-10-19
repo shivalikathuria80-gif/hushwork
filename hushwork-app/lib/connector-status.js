@@ -25,7 +25,7 @@ export async function connectorStatus(supabase, userId) {
   } catch {
     // for example the network is down: shown as not connected
   }
-  const personalKey = Boolean(getLinearKey());
+  const personalKey = process.env.NODE_ENV !== "production" && Boolean(getLinearKey()); // the owner's own key works on a local computer only
   return {
     linear: { connected: connected.linear, personalKey, hasApp: Boolean(getLinearApp()), hasKey, tableMissing, usable: connected.linear || personalKey },
     google: { connected: connected.google, hasApp: Boolean(getGoogleApp()), hasKey, tableMissing, usable: connected.google },

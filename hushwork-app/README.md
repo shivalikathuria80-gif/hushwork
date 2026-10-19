@@ -202,3 +202,15 @@ MCP (Model Context Protocol) is a standard way for apps and companies to offer *
 - no logins: a server that asks for one is refused, because Hushwork has nowhere safe to keep a person's login for a third-party server yet;
 - an MCP step gets no other private source in the same step (no Linear or calendar), so there is nothing else for the AI to pass on.
 The built-in tools (Linear, calendar, one web page) still take no input from the model at all.
+
+## Security review (2026-10-19) and what changed
+
+An independent read-only review of the Linear/Google connections, the guarded web request, MCP, the AI tool loop, token storage and the SQL found no high-severity problem. Fixed afterwards (each locked in by a test):
+- The owner's personal Linear key (`LINEAR_API_KEY`) now works only when `NODE_ENV` is not `production` (before, any signed-in person on a server that had the key set could read the owner's tasks).
+- The AI step's rate limit is counted before any outside request, so a loop of Approves cannot be used as a request relay (an MCP step connects to an outside server).
+- The one-try OAuth state cookie is now really deleted (it is deleted with the same path it was set with).
+- MCP: with no read-only hint from the server, a tool whose name contains a writing word (delete, create, send, run, deploy, and, ...) is never offered; `query` is no longer a reading word; a server's own tool descriptions have angle brackets made harmless and the AI is told to ignore instructions inside them.
+- Saved run steps are validated again (right choices, right lengths) before any Approve acts on them, because a person can write their own rows into `runs` with the public key.
+- An address that looks like it holds a secret key is refused for web calls and for web/MCP AI steps.
+- A Linear token renewal that fails because another request just renewed uses that request's fresh token.
+Known and accepted: the Google `spreadsheets` permission covers all of a person's sheets (Google has no narrower option for an existing sheet; the code only ever appends); stored tokens are not bound to the user/provider as AES-GCM "additional data" (changing it would force everyone to reconnect; users cannot read each other's rows anyway); there is no PKCE (not needed for a server-side client with a secret and a `state`).

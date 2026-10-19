@@ -130,3 +130,23 @@ test("one person can hold a Linear and a Google connection side by side, and an 
   }
   assert.equal(db.rows.length, 2);
 });
+
+test("two requests renewing at once: when the renewal fails because the other request just saved a fresh token, that fresh token is used", async () => {
+  const db = pretendDatabase();
+  await saveConnection({ supabase: db, provider: "linear", key, tokens: { accessToken: "OLD", refreshToken: "R1", expiresAt: 1000 } });
+  db.rows[0].user_id = "u1";
+  // The renewal is refused (the other request already used refresh token R1). Meanwhile that request saved a new token.
+  const fetchImpl = async () => {
+    const { encryptText } = await import("./crypto.js");
+    // a NEW row object, like a real database would return (not the same object the first read got)
+    db.rows[0] = { ...db.rows[0], access_token_enc: encryptText("FRESH", key), expires_at: new Date(10_000_000).toISOString() };
+    return { ok: false, status: 400, json: async () => ({}) };
+  };
+  assert.deepEqual(await loadAccess({ supabase: db, userId: "u1", provider: "linear", key, app, now: () => 5_000_000, fetchImpl }), { token: "FRESH" });
+  // But when nobody saved anything new, a refused renewal still means "not connected".
+  const db2 = pretendDatabase();
+  await saveConnection({ supabase: db2, provider: "linear", key, tokens: { accessToken: "OLD", refreshToken: "R1", expiresAt: 1000 } });
+  db2.rows[0].user_id = "u1";
+  const refused = async () => ({ ok: false, status: 400, json: async () => ({}) });
+  assert.equal(await loadAccess({ supabase: db2, userId: "u1", provider: "linear", key, app, now: () => 5_000_000, fetchImpl: refused }), null);
+});
