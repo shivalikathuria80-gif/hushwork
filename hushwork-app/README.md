@@ -190,3 +190,15 @@ On the workspace page, a plan (written by the AI or the keyword preview) has an 
 ## Templates that work for real
 
 Three templates in `lib/templates.js` carry a `needs` label and show "Works with Linear", "Works with Google" or "Works now" on the Templates page: **Which task should I do first?** (an Ask the AI step that may look at your Linear tasks), **My week ahead** (an Ask the AI step that may look at your Google Calendar) and **Is my website up?** (an Ask the AI step that may read one web page; the address starts as `https://example.com/`, change it to your own). Open one in the Builder, Save, press Practice run on the Workflows page, then Approve on the Runs page. `lib/templates.test.js` checks that each one's AI step can really be approved and that its tool matches what it needs. The older templates still only describe a plan.
+
+## MCP servers (the "MCP server" block)
+
+MCP (Model Context Protocol) is a standard way for apps and companies to offer **tools** to an AI. The **MCP server** block (an Ask the AI step with "An MCP server" and the server's https address) lets the AI use the tools of ONE server the person typed in. After a practice run, press **Approve and ask the AI** on the Runs page. Tried for real against the public DeepWiki server (`https://mcp.deepwiki.com/mcp`): the AI used its `read_wiki_structure` tool and answered correctly.
+
+`lib/connectors/mcp.js` speaks the "Streamable HTTP" transport (initialize, the `initialized` note, `tools/list`, `tools/call`; answers as JSON or an event stream; session and protocol headers). Safety, all in `lib/connectors/mcp.test.js`, `lib/ai/agent.test.js` and `lib/secrets.test.js`:
+- every request goes through `publicRequest` in `lib/connectors/http.js` (https only, public addresses only checked at connection time, no redirects, size and time limits, no cookies or secrets);
+- only **read-only tools** are offered or callable: tools the server marks `readOnlyHint`, or (when it says nothing) tools whose name is a plain reading word (get, list, read, search, find, fetch, query, lookup, ask, describe, show, view) and are not marked destructive. A tool marked destructive or `readOnlyHint: false` is never used, whatever its name;
+- at most 8 tools; a tool's declared input shape is kept only if small; the AI's input to a tool must be a small JSON object (2,000 characters at most); an answer is cut to 3,000 characters and wrapped as data for the AI;
+- no logins: a server that asks for one is refused, because Hushwork has nowhere safe to keep a person's login for a third-party server yet;
+- an MCP step gets no other private source in the same step (no Linear or calendar), so there is nothing else for the AI to pass on.
+The built-in tools (Linear, calendar, one web page) still take no input from the model at all.

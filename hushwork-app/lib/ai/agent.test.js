@@ -90,3 +90,25 @@ test("the task is wrapped as data, and very long answers are cut", async () => {
   const user = seen[0].body.messages[1].content;
   assert.ok(user.startsWith("<task>") && user.endsWith("</task>") && user.match(/<\/task>/g).length === 1);
 });
+
+test("MCP tools (the only tools with input): the model's input reaches the tool, a built-in tool never receives any, and bad or huge input is refused", async () => {
+  const seen = [];
+  const tools = {
+    builtin: { description: "no input", run: async (...args) => { seen.push(["builtin", args.length]); return "ok"; } },
+    mcp_tool: { description: "takes input", parameters: { type: "object", properties: { q: { type: "string" } } }, run: async (input) => { seen.push(["mcp_tool", input]); return "found it"; } },
+  };
+  const call = (id, name, args) => ({ id, function: { name, arguments: args } });
+  const { fetchImpl, seen: requests } = script([
+    answer({ tool_calls: [call("a", "builtin", '{"evil":"x"}'), call("b", "mcp_tool", '{"q":"hello"}'), call("c", "mcp_tool", "{not json")] }),
+    answer({ tool_calls: [call("d", "mcp_tool", JSON.stringify({ q: "x".repeat(2500) }))] }),
+    answer({ content: "done" }),
+  ]);
+  const result = await runAgent({ task: "t", tools, groqKey: "k", fetchImpl });
+  assert.equal(result.ok, true);
+  assert.deepEqual(seen, [["builtin", 0], ["mcp_tool", { q: "hello" }]], "a built-in tool is run with no input at all; bad and huge input never reach the tool");
+  const offered = Object.fromEntries(requests[0].body.tools.map((t) => [t.function.name, t.function.parameters]));
+  assert.deepEqual(offered.builtin, { type: "object", properties: {}, additionalProperties: false });
+  assert.deepEqual(offered.mcp_tool, { type: "object", properties: { q: { type: "string" } } });
+  const replies = requests[2].body.messages.filter((m) => m.role === "tool").map((m) => m.content);
+  assert.equal(replies.filter((r) => r.includes("The tool input was not valid.")).length, 2);
+});

@@ -5,8 +5,8 @@
 //   1. checkRequestUrl: https only, a real domain name (no numbers like 10.0.0.1), no password in the address, no odd port.
 //   2. the CONNECTION itself is checked: the name is looked up and every answer must be a public address. The check runs
 //      at the moment of connecting, so a name that changes its answer later cannot sneak past.
-//   3. redirects are never followed (a redirect could point anywhere), 8 seconds at most, 64 KB at most, GET only,
-//      no cookies or secrets sent, and only a short text excerpt is kept.
+//   3. redirects are never followed (a redirect could point anywhere), a time limit, a size limit, and no cookies or
+//      secrets are ever sent.
 import https from "node:https";
 import dns from "node:dns";
 import net from "node:net";
@@ -89,9 +89,11 @@ export function isPublicIp(address) {
 }
 
 // ---- 3. make the call ----
-// `lookup` and `request` can be replaced so tests never touch the network. Returns { ok: true, status, type, excerpt }
-// or { ok: false, error }.
-export function fetchPublic(href, { lookup = dns.lookup, request = https.request, timeoutMs = TIMEOUT_MS, excerptChars = EXCERPT_CHARS } = {}) {
+// Sends one request to a checked address. `lookup` and `request` can be replaced so tests never touch the network.
+// Returns { ok: true, status, headers, bytes } (the answer, cut at maxBytes) or { ok: false, error }.
+// publicRequest is the one function that does all of the above; fetchPublic (a read-only GET that keeps a short text excerpt)
+// and the MCP client (lib/connectors/mcp.js, which POSTs) are both built on it.
+export function publicRequest(href, { method = "GET", headers = {}, body, timeoutMs = TIMEOUT_MS, maxBytes = MAX_BYTES, lookup = dns.lookup, request = https.request } = {}) {
   const checked = checkRequestUrl(href);
   if (checked.error) return Promise.resolve({ ok: false, error: checked.error });
 
@@ -116,30 +118,37 @@ export function fetchPublic(href, { lookup = dns.lookup, request = https.request
       resolve(result);
     }
     try {
+      const payload = body === undefined ? undefined : Buffer.from(String(body));
       req = request(checked.value, {
-        method: "GET", lookup: guardedLookup, agent: false,
-        headers: { "user-agent": "Hushwork/1.0 (read-only check)", accept: "text/*, application/json;q=0.9, */*;q=0.1" },
+        method, lookup: guardedLookup, agent: false,
+        headers: { "user-agent": "Hushwork/1.0", ...headers, ...(payload ? { "content-length": payload.length } : {}) },
       }, (res) => {
         const chunks = [];
         let size = 0;
-        const finish = () => {
-          const type = String(res.headers?.["content-type"] ?? "").split(";")[0].trim().slice(0, 60);
-          const readable = /^(text\/|application\/(json|xml|[\w.+-]*\+(json|xml)))/.test(type);
-          const excerpt = readable ? Buffer.concat(chunks).toString("utf8").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, excerptChars) : "";
-          done({ ok: true, status: Number(res.statusCode) || 0, type, excerpt });
-        };
+        const finish = () => done({ ok: true, status: Number(res.statusCode) || 0, headers: res.headers ?? {}, bytes: Buffer.concat(chunks) });
         res.on("data", (chunk) => {
           size += chunk.length;
-          if (size <= MAX_BYTES) chunks.push(chunk);
+          if (size <= maxBytes) chunks.push(chunk);
           else { res.destroy(); finish(); }
         });
         res.on("end", finish);
         res.on("error", () => done({ ok: false, error: HTTP_FAILED.network }));
       });
       req.on("error", (error) => done({ ok: false, error: error?.message === "blocked" ? HTTP_FAILED.blocked : HTTP_FAILED.network }));
+      if (payload) req.write(payload);
       req.end();
     } catch {
       done({ ok: false, error: HTTP_FAILED.network });
     }
   });
+}
+
+// A read-only GET that keeps a short plain-text excerpt of the answer. Returns { ok: true, status, type, excerpt } or { ok: false, error }.
+export async function fetchPublic(href, { excerptChars = EXCERPT_CHARS, ...options } = {}) {
+  const answer = await publicRequest(href, { ...options, method: "GET", headers: { accept: "text/*, application/json;q=0.9, */*;q=0.1" } });
+  if (!answer.ok) return answer;
+  const type = String(answer.headers["content-type"] ?? "").split(";")[0].trim().slice(0, 60);
+  const readable = /^(text\/|application\/(json|xml|[\w.+-]*\+(json|xml)))/.test(type);
+  const excerpt = readable ? answer.bytes.toString("utf8").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, excerptChars) : "";
+  return { ok: true, status: answer.status, type, excerpt };
 }

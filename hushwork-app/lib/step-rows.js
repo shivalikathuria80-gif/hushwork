@@ -60,6 +60,7 @@ export const BLOCKS = [
   { id: "linear", label: "Linear", help: "Look at your tasks", icon: "ListTodo" },
   { id: "request", label: "Web address", help: "Ask a website", icon: "Plug" },
   { id: "ai", label: "Ask the AI", help: "Let the AI think or look", icon: "Sparkles" },
+  { id: "mcp", label: "MCP server", help: "Let the AI use a tool server", icon: "Plug" },
   { id: "find", label: "Find something", help: "Search for information", icon: "Search" },
   { id: "write", label: "Write something", help: "Draft a text", icon: "PenLine" },
   { id: "approve", label: "Ask me first", help: "Wait for your yes", icon: "ShieldCheck" },
@@ -67,7 +68,10 @@ export const BLOCKS = [
   { id: "row", label: "Add a row", help: "Put a line in a sheet", icon: "Table" },
   { id: NOTE, label: "Note", help: "Your own words", icon: "FileText" },
 ];
-export const PRESET_BLOCKS = { linear: { kind: "find", fields: { where: "linear", what: "My open tasks" } } };
+export const PRESET_BLOCKS = {
+  linear: { kind: "find", fields: { where: "linear", what: "My open tasks" } },
+  mcp: { kind: "ai", fields: { task: "", uses: "mcp", address: "" } },
+};
 export const blockById = (id) => BLOCKS.find((block) => block.id === id) ?? null;
 
 // A dragged block is only used if it names a real block. Anything else is ignored.
@@ -81,11 +85,17 @@ export function newRowForBlock(id) {
   return { ...row, fields: { ...row.fields, ...preset.fields } };
 }
 
-// The short name a row shows in the Builder: "Linear" for the Linear lookup, the block's name for other typed steps, "Note".
+// The short name a row shows in the Builder: "Linear" for the Linear lookup, "MCP server" for an MCP step, the block's name for other typed steps, "Note".
 export function blockName(row) {
-  if (!isTypedKind(row?.kind)) return "Note";
-  if (row.kind === "find" && row.fields?.where === "linear") return "Linear";
-  return blockById(row.kind)?.label ?? STEP_KINDS[row.kind].label;
+  return blockById(blockIdFor(row))?.label ?? (isTypedKind(row?.kind) ? STEP_KINDS[row.kind].label : "Note");
+}
+
+// Which block a row is: its kind, except the Linear lookup and the MCP step, which have blocks of their own.
+export function blockIdFor(row) {
+  if (!isTypedKind(row?.kind)) return NOTE;
+  if (row.kind === "find" && row.fields?.where === "linear") return "linear";
+  if (row.kind === "ai" && row.fields?.uses === "mcp") return "mcp";
+  return row.kind;
 }
 
 // Moves the row with `key` so it ends up BEFORE position `index` of the current list (0 = first, rows.length = last).

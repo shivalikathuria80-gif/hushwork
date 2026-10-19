@@ -57,6 +57,14 @@ export default function ConnectionsPage({ searchParams }) {
         </div>
       </section>
 
+      <section aria-labelledby="mcp-heading" className="mt-8">
+        <h2 id="mcp-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">MCP servers</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="flex items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Works now. Nothing to set up.</p>
+          <p className="mt-2 text-sm text-mute">MCP is a standard way for apps to offer tools to an AI. Drag the {"“"}MCP server{"”"} block into a workflow, paste the https address of a server that needs no login (for example <code className="rounded bg-sunken px-1 py-0.5 text-[13px]">https://mcp.deepwiki.com/mcp</code>), and after you approve it on the Runs page the AI may use that server{"’"}s read-only tools. Tools that could change or delete anything are never used.</p>
+        </div>
+      </section>
+
       <section aria-labelledby="apps-heading" className="mt-8">
         <h2 id="apps-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Planned apps</h2>
         <ul className="mt-3 space-y-3">

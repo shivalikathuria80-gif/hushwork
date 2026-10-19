@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, blankFields, describeStep, isTypedKind, planToSteps, readSavedStep, stepsToPlan } from "./steps.js";
-import { BLOCKS, DRAG_KIND, DRAG_ROW, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
+import { BLOCKS, DRAG_KIND, DRAG_ROW, blockIdFor, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
 import { plainSteps } from "./update-plan.js";
 import { LIMITS, checkSteps, cleanPlan, sameSteps } from "./validate.js";
 import { ICON_NAMES } from "./ai/icon-names.js";
@@ -48,6 +48,7 @@ test("describeStep: good fields become a title and a detail", () => {
     ["request", { url: "https://api.example.com/status", why: "" }, "Call a web address", "Get https://api.example.com/status"],
     ["ai", { task: "Which task first?", uses: "linear", address: "" }, "Ask the AI", "Which task first?: My Linear tasks"],
     ["ai", { task: "What is on today?", uses: "calendar", address: "" }, "Ask the AI", "What is on today?: My Google Calendar"],
+    ["ai", { task: "Read the React wiki", uses: "mcp", address: "https://mcp.deepwiki.com/mcp" }, "Ask the AI", "Read the React wiki: An MCP server"],
     ["ai", { task: "Write a haiku", uses: "nothing", address: "" }, "Ask the AI", "Write a haiku"],
   ];
   for (const [kind, fields, title, detail] of cases) assert.deepEqual(describeStep(kind, fields), { title, detail }, kind);
@@ -373,6 +374,11 @@ test("blocks: every block makes a valid starting row, the Linear block is a find
     const row = newRowForBlock(block.id);
     assert.ok(row.key > 0, block.id);
   }
+  const mcp = newRowForBlock("mcp");
+  assert.deepEqual([mcp.kind, mcp.fields], ["ai", { task: "", uses: "mcp", address: "" }]);
+  assert.equal(blockName(mcp), "MCP server");
+  assert.equal(blockIdFor(mcp), "mcp");
+  assert.equal(blockName(newRowForBlock("ai")), "Ask the AI");
   const linear = newRowForBlock("linear");
   assert.equal(linear.kind, "find");
   assert.deepEqual(linear.fields, { where: "linear", what: "My open tasks" });

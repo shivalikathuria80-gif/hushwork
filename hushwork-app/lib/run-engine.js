@@ -36,8 +36,8 @@ export const sheetsSummary = (step) => {
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
 
 export const aiSummary = (step) => {
-  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
-  return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI."].join(String.fromCharCode(10));
+  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
+  return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI." + (step?.fields?.uses === "mcp" ? " The AI\u2019s questions to the MCP server go to that server. Only its read-only tools can be used." : "")].join(String.fromCharCode(10));
 };
 
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.

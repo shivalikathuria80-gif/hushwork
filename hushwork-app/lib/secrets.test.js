@@ -86,7 +86,7 @@ test("previewPlan: 'use server' comes first and it asks who is calling before an
 
 test("web calls: only the Server Action imports the fetcher, the action checks who is calling first, and nothing else makes outside requests", () => {
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/http|(?:\.\.?\/)+(?:connectors\/)?http)(?:\.js)?["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
-  assert.deepEqual(importers, ["lib/actions/runs.js"]);
+  assert.deepEqual(importers.sort(), ["lib/actions/runs.js", "lib/connectors/mcp.js"]); // the Server Action, and the MCP client (which sends through the same guarded request)
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
   const body = action.slice(action.indexOf("export async function approveWebCall"));
   assert.ok(body.indexOf("requireUser(") > 0 && body.indexOf("requireUser(") < body.indexOf("loadPracticeStep("));
@@ -220,4 +220,15 @@ test("deleteRun asks who is calling first, checks the id, and only ever deletes 
   const order = ["requireUser(", "checkId(", '.from("runs").delete()', '.eq("user_id", user.id)'].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
+});
+
+test("MCP: the client only POSTs through the guarded request, only read-only tools are ever offered or called, and the Server Action checks the address first", () => {
+  const mcp = files.find((file) => file.name === "lib/connectors/mcp.js").text.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/node:https|\bfetch\(/.test(mcp), "no raw network access: everything goes through publicRequest");
+  assert.ok(mcp.includes("isReadOnlyTool(tool)") && mcp.includes("allowed.has(name)"), "offered and called tools are filtered");
+  assert.ok(mcp.includes("destructiveHint === true"), "a destructive tool is never read-only");
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf('} else if (uses === "mcp")'), action.indexOf('} else if (uses === "web")'));
+  assert.ok(body.indexOf("checkRequestUrl(") > 0 && body.indexOf("checkRequestUrl(") < body.indexOf("openMcp("));
+  assert.ok(!/openMcp\([^)]*input/.test(action), "the server address always comes from the saved step");
 });

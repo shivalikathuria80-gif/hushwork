@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
 import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
+import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
 import { runAgent } from "@/lib/ai/agent";
 import { looksSensitive } from "@/lib/ai/plan";
@@ -215,6 +216,13 @@ export async function approveAiStep(input) {
         return answer.events.length ? answer.events.map((event) => `${event.start}  ${event.title}`).join("\n") : "There are no events in the next 7 days.";
       },
     };
+  } else if (uses === "mcp") {
+    // The tools come from the ONE server written in the step; only its read-only tools are offered (lib/connectors/mcp.js).
+    const checked = checkRequestUrl(address);
+    if (checked.error) return { error: `This step's MCP server address cannot be used: ${checked.error}` };
+    const mcp = await openMcp(checked.value);
+    if (!mcp.ok) return { error: mcp.error };
+    for (const tool of mcp.tools) tools[tool.name] = { description: tool.description, parameters: tool.parameters, run: (input) => mcp.call(tool.name, input) };
   } else if (uses === "web") {
     const checked = checkRequestUrl(address);
     if (checked.error) return { error: `This step's web address cannot be used: ${checked.error}` };
@@ -235,7 +243,7 @@ export async function approveAiStep(input) {
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
-  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : "the web address"})` : "";
+  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700) });
 }
 

@@ -8,7 +8,7 @@ import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { ICON_LABELS, ICON_NAMES } from "@/lib/ai/icon-names";
 import { LIMITS, checkSteps, tidyText } from "@/lib/validate";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, isTypedKind } from "@/lib/steps";
-import { DRAG_KIND, DRAG_ROW, blockById, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "@/lib/step-rows";
+import { DRAG_KIND, DRAG_ROW, blockById, blockIdFor, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "@/lib/step-rows";
 
 // The step editor: change the kind, title, detail and icon of each step, add, delete and move steps. A step is either free
 // text (a title and a detail) or one of the typed kinds in lib/steps.js (named fields to fill in: for example "Send a
@@ -274,7 +274,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     </span>
                     {typed ? (
                       <span className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-2 sm:px-3" aria-hidden="true">
-                        <Icon name={simple ? (blockById(row.kind === "find" && row.fields?.where === "linear" ? "linear" : row.kind)?.icon ?? spec.icon) : spec.icon} size={20} className="text-accent-text" />
+                        <Icon name={simple ? (blockById(blockIdFor(row))?.icon ?? spec.icon) : spec.icon} size={20} className="text-accent-text" />
                         <span className={simple ? "text-sm font-medium" : "hidden text-sm sm:inline"}>{simple ? blockName(row) : spec.label}</span>
                       </span>
                     ) : simple ? (

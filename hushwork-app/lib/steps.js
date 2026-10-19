@@ -96,12 +96,12 @@ export const STEP_KINDS = {
   },
   ai: {
     label: "Ask the AI",
-    help: "Give the AI a job. It can look at your Linear tasks or one web address first. It can only read. You approve it on the Runs page.",
+    help: "Give the AI a job. It can look at your Linear tasks, your calendar, one web address or the read-only tools of one MCP server first. It can only read. You approve it on the Runs page.",
     icon: "Sparkles",
     fields: [
       text("task", "What should the AI do?", 110, { hint: "For example: Tell me which task to do first" }),
-      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", web: "A web address" }),
-      text("address", "Web address", 100, { optional: true, hint: "Only if you chose A web address. Starts with https://" }),
+      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", web: "A web address", mcp: "An MCP server" }),
+      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server. Starts with https://" }),
     ],
     describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),
   },
