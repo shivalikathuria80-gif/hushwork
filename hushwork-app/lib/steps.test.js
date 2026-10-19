@@ -47,6 +47,7 @@ test("describeStep: good fields become a title and a detail", () => {
     ["request", { url: "https://api.example.com/status", why: "check the site" }, "Call a web address", "Get https://api.example.com/status: check the site"],
     ["request", { url: "https://api.example.com/status", why: "" }, "Call a web address", "Get https://api.example.com/status"],
     ["ai", { task: "Which task first?", uses: "linear", address: "" }, "Ask the AI", "Which task first?: My Linear tasks"],
+    ["ai", { task: "What is on today?", uses: "calendar", address: "" }, "Ask the AI", "What is on today?: My Google Calendar"],
     ["ai", { task: "Write a haiku", uses: "nothing", address: "" }, "Ask the AI", "Write a haiku"],
   ];
   for (const [kind, fields, title, detail] of cases) assert.deepEqual(describeStep(kind, fields), { title, detail }, kind);

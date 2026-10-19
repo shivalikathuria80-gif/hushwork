@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isAiStep, aiSummary } from "./run-engine.js";
+import { practiceRun, practiceStep, readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isAiStep, aiSummary, isCalendarLookup, calendarSummary } from "./run-engine.js";
 import { STEP_KINDS, blankFields, describeStep } from "./steps.js";
 import { TEMPLATES } from "./templates.js";
 
@@ -44,6 +44,16 @@ test("only a Look-something-up step set to Linear can be approved", () => {
   assert.equal(isLinearLookup(find("inbox")), false);
   assert.equal(isLinearLookup(null), false);
   assert.ok(linearSummary(find("linear")).includes("my tasks"));
+});
+
+test("only a Look-something-up step set to Calendar can be approved, and the preview says it only reads", () => {
+  const find = (where) => practiceStep({ icon: "Search", title: "t", detail: "d", kind: "find", fields: { where, what: "today" } });
+  assert.equal(isCalendarLookup(find("calendar")), true);
+  assert.equal(isCalendarLookup(readSavedResults([find("calendar")])[0]), true);
+  assert.equal(isCalendarLookup(find("linear")), false);
+  assert.equal(isCalendarLookup(null), false);
+  assert.match(calendarSummary(find("calendar")), /read-only/);
+  assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "calendar", address: "" } })), /Google Calendar/);
 });
 
 test("only an Ask-the-AI step with a task can be approved, and the preview says what the AI may look at", () => {

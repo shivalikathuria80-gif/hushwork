@@ -14,11 +14,18 @@ export const isLinearLookup = (step) => step?.kind === "find" && step?.fields?.w
 export const linearSummary = (step) =>
   ["Hushwork will ask Linear for up to 10 open tasks assigned to you (read-only, nothing in Linear is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
+// A "Look something up" step set to Calendar can be approved on the Runs page: Hushwork then asks Google Calendar for the
+// person's next events (read-only). The "what to look for" note is kept for reading.
+export const isCalendarLookup = (step) => step?.kind === "find" && step?.fields?.where === "calendar";
+
+export const calendarSummary = (step) =>
+  ["Hushwork will ask Google Calendar for your next 10 events in the coming 7 days (read-only, nothing in your calendar is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+
 // An "Ask the AI" step can be approved on the Runs page: the AI then does the job, using only the read-only tool the step allows.
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
 
 export const aiSummary = (step) => {
-  const uses = { linear: "your Linear tasks", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
+  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
   return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI."].join(String.fromCharCode(10));
 };
 

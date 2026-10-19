@@ -96,7 +96,7 @@ export const STEP_KINDS = {
     icon: "Sparkles",
     fields: [
       text("task", "What should the AI do?", 110, { hint: "For example: Tell me which task to do first" }),
-      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", web: "A web address" }),
+      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", web: "A web address" }),
       text("address", "Web address", 100, { optional: true, hint: "Only if you chose A web address. Starts with https://" }),
     ],
     describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),

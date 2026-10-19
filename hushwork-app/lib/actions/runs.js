@@ -4,14 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { getGroqKey } from "@/lib/ai/key";
 import { runAgent } from "@/lib/ai/agent";
 import { looksSensitive } from "@/lib/ai/plan";
 import { getLinearKey } from "@/lib/connectors/linear-env";
-import { getConnectionsKey, getLinearApp } from "@/lib/connectors/oauth-env";
-import { loadLinearAccess } from "@/lib/connections/linear-store";
+import { getConnectionsKey, getGoogleApp, getLinearApp } from "@/lib/connectors/oauth-env";
+import { loadAccess } from "@/lib/connections/store";
+import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -59,6 +60,7 @@ const DAY = 86_400_000;
 const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
+const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
 // Used by the "Approve" action. The browser only says WHICH run and WHICH step; this re-reads the saved practice
@@ -130,11 +132,24 @@ async function linearAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
   const app = getLinearApp();
   if (secretKey && app) {
-    const access = await loadLinearAccess({ supabase, userId, key: secretKey, app });
+    const access = await loadAccess({ supabase, userId, provider: "linear", key: secretKey, app });
     if (access) return `Bearer ${access.token}`;
   }
   return getLinearKey();
 }
+
+// Google works only through the Connect button (there is no personal-key shortcut). Returns "Bearer <token>" or null.
+const GOOGLE_OFF = "Google is not connected yet. Open Connections and press Connect Google.";
+async function googleAuthorization(supabase, userId) {
+  const secretKey = getConnectionsKey();
+  const app = getGoogleApp();
+  if (!secretKey || !app) return null;
+  const access = await loadAccess({ supabase, userId, provider: "google", key: secretKey, app });
+  return access ? `Bearer ${access.token}` : null;
+}
+
+// One line per event for the Runs page and the AI: "Tue 20 Oct, 09:00  Maths test".
+const eventLines = (events) => events.map((event) => `${event.start}  ${event.title}`).join("; ");
 
 // The "Approve and ask Linear" button. READ-ONLY: lib/connectors/linear.js can only ask, never change. Only a Look something
 // up step set to Linear qualifies, and the key comes from .env.local on the server.
@@ -187,6 +202,17 @@ export async function approveAiStep(input) {
         return answer.issues.length ? answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n") : "There are no open tasks.";
       },
     };
+  } else if (uses === "calendar") {
+    const authorization = await googleAuthorization(supabase, user.id);
+    if (!authorization) return { error: GOOGLE_OFF };
+    tools.calendar_next_events = {
+      description: "Lists the person's next events in Google Calendar (up to 10, in the next 7 days).",
+      run: async () => {
+        const answer = await fetchUpcomingEvents({ authorization });
+        if (!answer.ok) return answer.error;
+        return answer.events.length ? answer.events.map((event) => `${event.start}  ${event.title}`).join("\n") : "There are no events in the next 7 days.";
+      },
+    };
   } else if (uses === "web") {
     const checked = checkRequestUrl(address);
     if (checked.error) return { error: `This step's web address cannot be used: ${checked.error}` };
@@ -207,6 +233,29 @@ export async function approveAiStep(input) {
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
-  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : "the web address"})` : "";
+  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : "the web address"})` : "";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700) });
+}
+
+// The "Approve and look at my calendar" button. READ-ONLY (the permission Google gave is read-only, and
+// lib/connectors/google-calendar.js only sends a GET). Only a Look something up step set to Calendar qualifies.
+export async function approveCalendarLookup(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isCalendarLookup);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const authorization = await googleAuthorization(supabase, user.id);
+  if (!authorization) return { error: GOOGLE_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(calendarLimits(), user.id, now, "calendar lookups");
+  if (tooMany) return { error: tooMany };
+  calendarLimits().minute.take(user.id, now);
+  calendarLimits().day.take(user.id, now);
+
+  const answer = await fetchUpcomingEvents({ authorization });
+  if (!answer.ok) return { error: answer.error };
+  const outcome = answer.events.length ? `Asked Google Calendar. You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days: ${eventLines(answer.events)}` : "Asked Google Calendar. You have no events in the next 7 days.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
 }

@@ -133,7 +133,7 @@ test("approveLinearLookup asks who is calling first, reads the saved step, finds
 });
 
 // The Connect button's settings and its sign-in routes.
-const APP_NAMES = ["LINEAR" + "_CLIENT_ID", "LINEAR" + "_CLIENT_SECRET", "CONNECTIONS" + "_KEY"];
+const APP_NAMES = ["LINEAR" + "_CLIENT_ID", "LINEAR" + "_CLIENT_SECRET", "GOOGLE" + "_CLIENT_ID", "GOOGLE" + "_CLIENT_SECRET", "CONNECTIONS" + "_KEY"];
 
 test("the Connect settings' names appear in code only in lib/connectors/oauth-env.js (and docs, the example, the setup script, the Connections page and this test)", () => {
   const allowed = new Set(["lib/connectors/oauth-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js", "scripts/make-secret.mjs"]);
@@ -147,7 +147,7 @@ test("oauth-env.js is server-only and imported only by server code, never by bro
   const env = files.find((file) => file.name === "lib/connectors/oauth-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/oauth-env|(?:\.\.?\/)+(?:connectors\/)?oauth-env)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/api/connect/linear/callback/route.js", "app/api/connect/linear/route.js", "lib/actions/connections.js", "lib/actions/runs.js", "lib/connector-status.js"]);
+  assert.deepEqual(importers.sort(), ["lib/actions/connections.js", "lib/actions/runs.js", "lib/connections/oauth-flow.js", "lib/connector-status.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
 });
 
@@ -158,16 +158,40 @@ test("Connect settings are never NEXT_PUBLIC_, and no real-looking secret is wri
   assert.ok(!/CONNECTIONS_KEY=[A-Za-z0-9+/]{20,}/.test(script));
 });
 
-test("the sign-in routes: signed-in people only, the state is checked before the code is used, and tokens are never put in an address", () => {
-  const start = files.find((file) => file.name === "app/api/connect/linear/route.js").text;
+test("the sign-in flow: signed-in people only, the state is checked before the code is used, tokens are never put in an address, and every app route is a thin wrapper", () => {
+  const flow = files.find((file) => file.name === "lib/connections/oauth-flow.js").text;
+  assert.match(flow, /^import "server-only";/m);
+  const start = flow.slice(flow.indexOf("export async function startConnect"), flow.indexOf("export async function finishConnect"));
   assert.ok(start.indexOf("requireUser(") > 0 && start.indexOf("requireUser(") < start.indexOf("authorizeUrl("));
   assert.match(start, /httpOnly: true/);
-  const callback = files.find((file) => file.name === "app/api/connect/linear/callback/route.js").text;
-  const order = ["requireUser(", "same(state, expected)", "exchangeCode(", "saveLinearConnection("].map((call) => callback.indexOf(call));
+  const finish = flow.slice(flow.indexOf("export async function finishConnect"));
+  const order = ["requireUser(", "same(state, expected)", "exchangeCode(", "saveConnection("].map((call) => finish.indexOf(call));
   assert.ok(order.every((index) => index > 0) && order.join() === [...order].sort((a, b) => a - b).join(), "requireUser, then the state check, then the code swap, then saving");
-  assert.ok(!/redirect\([^)]*(?:token|secret)/i.test(callback), "no token or secret goes into a redirect address");
+  assert.ok(!/redirect\([^)]*(?:token|secret)/i.test(flow), "no token or secret goes into a redirect address");
+  for (const app of ["linear", "google"]) {
+    for (const [file, call] of [[`app/api/connect/${app}/route.js`, "startConnect"], [`app/api/connect/${app}/callback/route.js`, "finishConnect"]]) {
+      const text = files.find((entry) => entry.name === file).text;
+      assert.ok(text.includes(`${call}("${app}", request)`), `${file} calls ${call} for ${app}`);
+      assert.ok(text.split("\n").filter((line) => line.trim() && !line.trim().startsWith("//")).length <= 3, `${file} stays a thin wrapper`);
+    }
+  }
   const page = files.find((file) => file.name === "app/app/connections/page.js").text;
-  assert.ok(/<a href="\/api\/connect\/linear"/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
+  assert.ok(/<a href=\{`\/api\/connect\/\$\{app\}`\}/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
+});
+
+test("Google: only the read-only calendar permission is ever asked for, the calendar address is in one file, and calendar approvals ask who is calling first", () => {
+  const oauth = files.find((file) => file.name === "lib/connectors/google-oauth.js").text;
+  const scopes = oauth.match(/https:\/\/www\.googleapis\.com\/auth\/[a-z.]+/g) ?? [];
+  assert.deepEqual([...new Set(scopes)], ["https://www.googleapis.com/auth/calendar.readonly"]);
+  const apis = files.filter((file) => /googleapis\.com\/calendar/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
+  assert.deepEqual(apis, ["lib/connectors/google-calendar.js"]);
+  const calendar = files.find((file) => file.name === "lib/connectors/google-calendar.js").text.replace(/\/\/.*$/gm, "");
+  assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(calendar), "the calendar connector only sends GET");
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveCalendarLookup"));
+  const order = ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("].map((call) => body.indexOf(call));
+  assert.ok(order.every((index) => index > 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
 
 test("approveAiStep: who is calling, then the saved step, then the secret check, then the AI; and the AI loop offers only tools with no input", () => {
