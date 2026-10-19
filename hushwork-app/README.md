@@ -135,8 +135,20 @@ A step of the kind **Call a web address** (an https address and what it is for) 
 
 Not built yet: a schedule ("run every day at 9"). It needs the app hosted and a scheduler that works when your computer is off, plus a safe way to run a workflow without a signed-in person, so it waits for deployment.
 
-## Linear
+## Linear (the Connect button)
 
-The **Linear** block (a Look something up step with Where set to Linear) can be approved on the Runs page: Hushwork asks Linear for your up to 10 open tasks and saves the list as a "Real" run. It can only READ (`lib/connectors/linear.js` sends one fixed query and has no way to change anything).
+A **Look something up** step with Where set to **Linear** (the Linear block) can be approved on the Runs page: Hushwork asks Linear for the person's up to 10 open tasks and saves the list as a "Real" run. It can only READ (the one fixed query in `lib/connectors/linear.js` has no way to change anything, and the permission asked for is `read`).
 
-Set-up (also on the Connections page): in Linear create a personal API key (Settings, Security & access, Personal API keys), add `LINEAR_API_KEY=your key` to `hushwork-app/.env.local`, and restart `npm run dev`. The key is a secret: it is read only in `lib/connectors/linear-env.js` (server only, checked by `lib/secrets.test.js`), never shown or logged. `approveLinearLookup` in `lib/actions/runs.js` limits lookups to 5 a minute and 30 a day per person.
+**How people connect (like Zapier or n8n):** on the Connections page they press **Connect Linear**, sign in on Linear's own page and press Allow. Nobody pastes a key.
+1. `/api/connect/linear` (`app/api/connect/linear/route.js`) makes a random `state`, keeps it in a short-lived HttpOnly cookie and sends the person to Linear's Allow screen.
+2. Linear sends them back to `/api/connect/linear/callback` with a one-time code. The callback checks the state, swaps the code for tokens (using the app secret, server only), scrambles them (AES-256-GCM, `lib/connections/crypto.js`) and saves them for that person in the `connections` table.
+3. Linear access tokens last 24 hours; `lib/connections/linear-store.js` renews them with the refresh token (Linear hands out a new refresh token each time, and both are saved). Disconnect revokes the permission at Linear and deletes the row.
+
+**One-time set-up by the owner** (also written step by step on the Connections page, with ticks for what is done):
+1. Run `supabase/connections.sql` in the Supabase SQL Editor (the table, with the same owner-only rules as `runs`).
+2. `npm run secret`, then paste the `CONNECTIONS_KEY=...` line it prints into `hushwork-app/.env.local`. This secret scrambles every saved token: lose it and people must press Connect again.
+3. In Linear (Settings, API, OAuth applications) create an app named Hushwork with the callback address `http://localhost:3100/api/connect/linear/callback` (add the real website address when there is one), and put its Client ID and Client secret into `.env.local` as `LINEAR_CLIENT_ID` and `LINEAR_CLIENT_SECRET`. Restart `npm run dev`.
+
+The owner can still test without the button: a personal key in `.env.local` as `LINEAR_API_KEY` (Linear, Settings, Security & access, Personal API keys) works on that computer only. Every secret is read only in `lib/connectors/linear-env.js` or `lib/connectors/oauth-env.js` (server only, checked by `lib/secrets.test.js`), never shown or logged. `approveLinearLookup` in `lib/actions/runs.js` uses the person's own connection first, then the personal key, and limits lookups to 5 a minute and 30 a day per person.
+
+Not tested against the real Linear yet: the sign-in, the token swap and the renewal were built from Linear's published docs and tested with a pretend Linear.

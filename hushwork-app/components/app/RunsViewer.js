@@ -73,7 +73,8 @@ export default async function RunsViewer({ searchParams }) {
   }
 
   const selected = runs.find((run) => run.id === wanted) ?? runs[0];
-  const { linear: linearConnected } = await connectorStatus();
+  const { linear } = await connectorStatus(await createClient(), user.id);
+  const linearConnected = linear.usable;
   const liveLinear = selected.live && isLinearLookup(selected.results[0]);
   const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step));
   return (

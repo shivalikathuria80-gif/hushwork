@@ -7,6 +7,8 @@ import { checkId } from "@/lib/validate";
 import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic } from "@/lib/connectors/http";
 import { getLinearKey } from "@/lib/connectors/linear-env";
+import { getConnectionsKey, getLinearApp } from "@/lib/connectors/oauth-env";
+import { loadLinearAccess } from "@/lib/connections/linear-store";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -121,13 +123,22 @@ export async function approveWebCall(input) {
 // up step set to Linear qualifies, and the key comes from .env.local on the server.
 export async function approveLinearLookup(input) {
   const user = await requireUser();
-  const key = getLinearKey();
-  if (!key) return { error: "Linear is not connected yet. The Connections page explains the one setting to add." };
-
   const supabase = await createClient();
   const loaded = await loadPracticeStep(supabase, user, input, isLinearLookup);
   if (loaded.error) return loaded;
   const { run, step } = loaded;
+
+  // Whose Linear? The person's own connection (the Connect button) first; else the personal key from .env.local (the owner
+  // testing on their own computer).
+  let authorization = null;
+  const secretKey = getConnectionsKey();
+  const app = getLinearApp();
+  if (secretKey && app) {
+    const access = await loadLinearAccess({ supabase, userId: user.id, key: secretKey, app });
+    if (access) authorization = `Bearer ${access.token}`;
+  }
+  authorization ??= getLinearKey();
+  if (!authorization) return { error: "Linear is not connected yet. Open Connections and press Connect Linear." };
 
   const now = Date.now();
   const tooMany = limitError(linearLimits(), user.id, now, "Linear lookups");
@@ -135,7 +146,7 @@ export async function approveLinearLookup(input) {
   linearLimits().minute.take(user.id, now);
   linearLimits().day.take(user.id, now);
 
-  const answer = await fetchLinearIssues({ key });
+  const answer = await fetchLinearIssues({ authorization });
   if (!answer.ok) return { error: answer.error };
 
   const list = answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("; ");

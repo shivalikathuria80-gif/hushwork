@@ -1,6 +1,7 @@
 // Asks Linear for the signed-in person's open tasks (read-only: this file can only READ, it has no way to change anything).
 // Linear answers questions sent to https://api.linear.app/graphql (GraphQL is just a way of asking for exactly the fields
-// you want). The key is handed in (from linear-env.js); `fetchImpl` can be replaced so tests never call the real Linear.
+// you want). The Authorization value is handed in: a personal key as it is (linear-env.js) or "Bearer <token>" for a person who used
+// the Connect button (lib/connections/linear-store.js); `fetchImpl` can be replaced so tests never call the real Linear.
 // Failures come back as short fixed sentences, never Linear's own error text, and never anything that holds the key.
 
 const TIMEOUT_MS = 10_000;
@@ -22,11 +23,11 @@ const QUERY = `{
 const text = (value, max) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "");
 
 // Returns { ok: true, issues: [{ id, title, state }] } or { ok: false, error }.
-export async function fetchLinearIssues({ key, fetchImpl = fetch }) {
+export async function fetchLinearIssues({ authorization, fetchImpl = fetch }) {
   try {
     const response = await fetchImpl("https://api.linear.app/graphql", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: key },
+      headers: { "content-type": "application/json", authorization },
       body: JSON.stringify({ query: QUERY }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

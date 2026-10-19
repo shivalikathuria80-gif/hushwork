@@ -8,6 +8,7 @@
     "start": "next start -p 3100",
     "lint": "eslint",
     "test": "node --test \"lib/**/*.test.js\"",
+    "secret": "node scripts/make-secret.mjs",
     "make:sculpture": "node scripts/make-sculpture.mjs"
   },
   "dependencies": {

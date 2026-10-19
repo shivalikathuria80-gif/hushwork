@@ -1,11 +1,14 @@
 import { Suspense } from "react";
 import { Icon } from "@/components/icons";
+import { requireUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { connectorStatus } from "@/lib/connector-status";
+import DisconnectLinear from "@/components/app/DisconnectLinear";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
 
-// The apps a workflow can act in. Web addresses and Linear work now (Linear needs one key in .env.local).
-// The others are planned and say so: there are no Connect buttons that would not work.
+// The apps a workflow can act in. Web addresses and Linear work now. The others are planned and say so: there are no
+// Connect buttons that would not work.
 const APPS = [
   { name: "Slack", icon: "MessageSquare", does: "Post a message to a channel." },
   { name: "Google Sheets", icon: "Table", does: "Add a row to a spreadsheet." },
@@ -14,7 +17,19 @@ const APPS = [
   { name: "Google Drive", icon: "Folder", does: "File and find documents." },
 ];
 
-export default function ConnectionsPage() {
+// What the short message in the address means (the Connect button sends the person back with ?linear=...).
+const RESULTS = {
+  connected: ["ok", "Linear is connected."],
+  denied: ["problem", "You pressed Cancel, so nothing was connected."],
+  expired: ["problem", "That took too long, or it came from another window. Press Connect Linear again."],
+  failed: ["problem", "Linear did not accept the sign-in. Press Connect Linear again."],
+  save: ["problem", "Linear said yes, but saving it failed. One of the setup steps below may be missing."],
+  setup: ["problem", "The Connect button needs its one-time setup first. See below."],
+};
+
+const buttonLook = "inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-transparent bg-accent px-5 text-[15px] font-semibold text-on-accent transition-[background-color] duration-120 ease-standard hover:bg-accent-hover active:bg-accent-active md:h-9 md:text-sm";
+
+export default function ConnectionsPage({ searchParams }) {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
@@ -24,17 +39,8 @@ export default function ConnectionsPage() {
         <h2 id="linear-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Linear</h2>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <Suspense fallback={<span aria-hidden="true" className="block h-6 w-40 rounded-md bg-raised" />}>
-            <LinearStatus />
+            <LinearCard searchParams={searchParams} />
           </Suspense>
-          <p className="mt-3 text-sm text-mute">Hushwork can read your open Linear tasks. It can only look. It cannot change anything in Linear.</p>
-          <h3 className="mt-4 text-sm font-medium">Connect it (about two minutes)</h3>
-          <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-mute">
-            <li>In Linear, click your workspace name (top left), then <b className="font-medium text-ink">Settings</b>.</li>
-            <li>Open <b className="font-medium text-ink">Security &amp; access</b>, then <b className="font-medium text-ink">Personal API keys</b>, then <b className="font-medium text-ink">New API key</b>. Name it Hushwork and copy the key. It is a secret code, so keep it private.</li>
-            <li>Open <code>hushwork-app/.env.local</code> and add one line: <code>LINEAR_API_KEY=your key</code></li>
-            <li>Stop the app and start it again with <code>npm run dev</code>. This card will then say Connected.</li>
-            <li>In the Builder, drag in the <b className="font-medium text-ink">Linear</b> block, save it, press Practice run, then Approve.</li>
-          </ol>
         </div>
       </section>
 
@@ -66,11 +72,53 @@ export default function ConnectionsPage() {
   );
 }
 
-async function LinearStatus() {
-  const { linear } = await connectorStatus();
-  return linear ? (
-    <p className="flex items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Connected.</p>
-  ) : (
-    <p className="flex items-center gap-2 font-medium"><Icon name="CircleAlert" className="text-mute" />Not connected yet.</p>
+const Done = ({ yes }) => <Icon name={yes ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${yes ? "text-success" : "text-mute"}`} />;
+
+// The Linear box. It reads the session and the database, so it sits inside <Suspense>.
+async function LinearCard({ searchParams }) {
+  const user = await requireUser();
+  const { linear: result } = await searchParams;
+  const { linear } = await connectorStatus(await createClient(), user.id);
+  const note = typeof result === "string" && Object.hasOwn(RESULTS, result) ? RESULTS[result] : null;
+  const ready = linear.hasApp && linear.hasKey && !linear.tableMissing; // the one-time setup is done
+
+  return (
+    <div>
+      {note && (
+        <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
+          <Icon name={note[0] === "ok" ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${note[0] === "ok" ? "text-success" : "text-error"}`} />{note[1]}
+        </p>
+      )}
+
+      {linear.connected ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="flex min-w-0 flex-1 items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Connected.</p>
+          <DisconnectLinear />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="flex min-w-0 flex-1 items-center gap-2 font-medium">
+            <Icon name={linear.personalKey ? "CircleCheck" : "CircleAlert"} className={linear.personalKey ? "text-success" : "text-mute"} />
+            {linear.personalKey ? "Working with the key in .env.local (this computer only)." : "Not connected yet."}
+          </p>
+          {/* A plain link on purpose: it must not be pre-loaded in the background, because opening it starts the sign-in. */}
+          {ready && <a href="/api/connect/linear" className={buttonLook}>Connect Linear</a>}
+        </div>
+      )}
+
+      <p className="mt-3 text-sm text-mute">Hushwork can read your open Linear tasks. It can only look. It cannot change anything in Linear. You press Allow on Linear{"’"}s own page, and you can press Disconnect any time.</p>
+
+      {!ready && !linear.connected && (
+        <div className="mt-4 rounded-xl border border-line bg-raised p-3">
+          <h3 className="text-sm font-medium">One-time setup (the owner does this once, then everybody just presses Connect)</h3>
+          <ol className="mt-2 space-y-3 text-sm text-mute">
+            <li className="flex gap-2"><Done yes={!linear.tableMissing} /><span><b className="font-medium text-ink">1. A place to keep connections.</b> In Supabase open <b className="font-medium text-ink">SQL Editor</b>, paste everything from the file <code>supabase/connections.sql</code>, and press Run.</span></li>
+            <li className="flex gap-2"><Done yes={linear.hasKey} /><span><b className="font-medium text-ink">2. A secret to lock the connections.</b> In the terminal run <code>npm run secret</code>, copy the line it prints (it starts with <code>CONNECTIONS_KEY=</code>) into <code>hushwork-app/.env.local</code>.</span></li>
+            <li className="flex gap-2"><Done yes={linear.hasApp} /><span><b className="font-medium text-ink">3. Hushwork{"’"}s own app in Linear.</b> In Linear open Settings, then <b className="font-medium text-ink">API</b>, then <b className="font-medium text-ink">OAuth applications</b>, then <b className="font-medium text-ink">New</b>. Name it Hushwork. As the callback address type <code>http://localhost:3100/api/connect/linear/callback</code>. After saving, copy the <b className="font-medium text-ink">Client ID</b> and <b className="font-medium text-ink">Client secret</b> into <code>.env.local</code> as <code>LINEAR_CLIENT_ID=...</code> and <code>LINEAR_CLIENT_SECRET=...</code>. The secret is private.</span></li>
+            <li className="flex gap-2"><Done yes={ready} /><span><b className="font-medium text-ink">4.</b> Stop the app and start it again with <code>npm run dev</code>. The Connect Linear button then appears here.</span></li>
+          </ol>
+        </div>
+      )}
+    </div>
   );
 }

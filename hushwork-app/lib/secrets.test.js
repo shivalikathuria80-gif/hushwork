@@ -119,15 +119,53 @@ test("the Linear key is never NEXT_PUBLIC_, no real-looking key is written anywh
   const looksReal = new RegExp("lin_api_" + "[A-Za-z0-9]{30,}");
   assert.deepEqual(files.filter((file) => looksReal.test(file.text)).map((file) => file.name), []);
   const urls = files.filter((file) => /api\.linear\.app/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
-  assert.deepEqual(urls, ["lib/connectors/linear.js"]);
+  assert.deepEqual(urls.sort(), ["lib/connectors/linear-oauth.js", "lib/connectors/linear.js"], "Linear's addresses are written in these two files only");
 });
 
-test("approveLinearLookup asks who is calling first, then reads the saved step, then asks Linear; Linear queries never change data", () => {
+test("approveLinearLookup asks who is calling first, reads the saved step, finds the person's permission, then asks Linear; Linear queries never change data", () => {
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
   const body = action.slice(action.indexOf("export async function approveLinearLookup"));
-  const order = ["requireUser(", "getLinearKey(", "loadPracticeStep(", "fetchLinearIssues("].map((call) => body.indexOf(call));
+  const order = ["requireUser(", "loadPracticeStep(", "loadLinearAccess(", "getLinearKey(", "fetchLinearIssues("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   const linear = files.find((file) => file.name === "lib/connectors/linear.js").text;
   assert.ok(!/mutation/i.test(linear.replace(/\/\/.*$/gm, "")), "the Linear connector contains no mutation (a change request)");
+});
+
+// The Connect button's settings and its sign-in routes.
+const APP_NAMES = ["LINEAR" + "_CLIENT_ID", "LINEAR" + "_CLIENT_SECRET", "CONNECTIONS" + "_KEY"];
+
+test("the Connect settings' names appear in code only in lib/connectors/oauth-env.js (and docs, the example, the setup script, the Connections page and this test)", () => {
+  const allowed = new Set(["lib/connectors/oauth-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js", "scripts/make-secret.mjs"]);
+  for (const name of APP_NAMES) {
+    assert.deepEqual(withText(name).filter((file) => !allowed.has(file)), [], name);
+    assert.ok(withText(name).includes("lib/connectors/oauth-env.js"), `${name} is read in oauth-env.js`);
+  }
+});
+
+test("oauth-env.js is server-only and imported only by server code, never by browser code", () => {
+  const env = files.find((file) => file.name === "lib/connectors/oauth-env.js").text;
+  assert.match(env, /^import "server-only";/m);
+  const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/oauth-env|(?:\.\.?\/)+(?:connectors\/)?oauth-env)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
+  assert.deepEqual(importers.sort(), ["app/api/connect/linear/callback/route.js", "app/api/connect/linear/route.js", "lib/actions/connections.js", "lib/actions/runs.js", "lib/connector-status.js"]);
+  for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
+});
+
+test("Connect settings are never NEXT_PUBLIC_, and no real-looking secret is written in the project", () => {
+  for (const name of APP_NAMES) assert.deepEqual(withText("NEXT_PUBLIC_" + name), [], name);
+  // the setup script prints a line starting with the key's name, but never contains a value
+  const script = files.find((file) => file.name === "scripts/make-secret.mjs").text;
+  assert.ok(!/CONNECTIONS_KEY=[A-Za-z0-9+/]{20,}/.test(script));
+});
+
+test("the sign-in routes: signed-in people only, the state is checked before the code is used, and tokens are never put in an address", () => {
+  const start = files.find((file) => file.name === "app/api/connect/linear/route.js").text;
+  assert.ok(start.indexOf("requireUser(") > 0 && start.indexOf("requireUser(") < start.indexOf("authorizeUrl("));
+  assert.match(start, /httpOnly: true/);
+  const callback = files.find((file) => file.name === "app/api/connect/linear/callback/route.js").text;
+  const order = ["requireUser(", "same(state, expected)", "exchangeCode(", "saveLinearConnection("].map((call) => callback.indexOf(call));
+  assert.ok(order.every((index) => index > 0) && order.join() === [...order].sort((a, b) => a - b).join(), "requireUser, then the state check, then the code swap, then saving");
+  assert.ok(!/redirect\([^)]*(?:token|secret)/i.test(callback), "no token or secret goes into a redirect address");
+  const page = files.find((file) => file.name === "app/app/connections/page.js").text;
+  assert.ok(/<a href="\/api\/connect\/linear"/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
 });
