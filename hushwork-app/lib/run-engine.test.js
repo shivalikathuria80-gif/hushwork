@@ -77,3 +77,17 @@ test("only a web-call step with an address can be approved, and the preview show
   assert.match(call.outcome, /^Would ask https:\/\/api.example.com\/a/);
   assert.ok(requestSummary(call).includes("https://api.example.com/a") && requestSummary(call).includes("check"));
 });
+
+test("a Look something up step set to Inbox can be approved, and the summary says it reads only sender, subject and time", async () => {
+  const { isGmailLookup, gmailSummary } = await import("./run-engine.js");
+  const find = (where, what = "") => ({ kind: "find", fields: { where, what } });
+  assert.equal(isGmailLookup(find("inbox")), true);
+  assert.equal(isGmailLookup(find("calendar")), false);
+  assert.equal(isGmailLookup({ kind: "write", fields: { where: "inbox" } }), false);
+  assert.equal(isGmailLookup(null), false);
+  const summary = gmailSummary(find("inbox", "invoices"));
+  assert.match(summary, /sender|who sent/i);
+  assert.match(summary, /never reads the text/);
+  assert.match(summary, /Your note: invoices/);
+  assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "gmail", address: "" } })), /Gmail inbox/);
+});

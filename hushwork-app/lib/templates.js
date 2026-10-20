@@ -20,6 +20,15 @@ export const TEMPLATES = [
     ],
   },
   {
+    id: "inboxnow", icon: "Mail", title: "What is in my inbox?", needs: "Google",
+    body: "The AI reads who wrote to you and the subjects of your latest 10 emails, and tells you which to answer first. It never reads the text inside an email.",
+    request: "When I ask, look at my latest emails and tell me which ones need an answer first.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Which 3 of my latest emails need an answer first? Use sender and subject. Say why, in 3 short lines.", uses: "gmail", address: "" }),
+    ],
+  },
+  {
     id: "weekahead", icon: "Calendar", title: "My week ahead", needs: "Google",
     body: "The AI reads your Google Calendar and sums up the next 7 days.",
     request: "When I ask, read my Google Calendar for the next 7 days and sum up the week.",

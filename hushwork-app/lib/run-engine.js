@@ -22,6 +22,13 @@ export const isCalendarLookup = (step) => step?.kind === "find" && step?.fields?
 export const calendarSummary = (step) =>
   ["Hushwork will ask Google Calendar for your next 10 events in the coming 7 days (read-only, nothing in your calendar is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
+// A "Look something up" step set to Inbox can be approved on the Runs page: Hushwork then asks Gmail for the latest mail in the
+// person's inbox (who sent it, the subject and the time; never the text of an email). Read-only.
+export const isGmailLookup = (step) => step?.kind === "find" && step?.fields?.where === "inbox";
+
+export const gmailSummary = (step) =>
+  ["Hushwork will ask Gmail for the latest 10 messages in your inbox: who sent each one, its subject and its time. It never reads the text inside an email, and it cannot send, change or delete anything.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+
 // An "Add a row" step whose Google Sheet address and boxes are valid can be approved on the Runs page: Hushwork then adds that
 // one row at the bottom of the sheet. (An older plan that only names a spreadsheet stays a description.)
 export const isSheetsRow = (step) => step?.kind === "row" && !parseSheetUrl(step?.fields?.to).error && !parseCells(step?.fields?.values).error;
@@ -36,7 +43,7 @@ export const sheetsSummary = (step) => {
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
 
 export const aiSummary = (step) => {
-  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
+  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", gmail: "your Gmail inbox (sender, subject and time of the latest 10 messages)", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
   return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI." + (step?.fields?.uses === "mcp" ? " The AI\u2019s questions to the MCP server go to that server. Only its read-only tools can be used." : "")].join(String.fromCharCode(10));
 };
 

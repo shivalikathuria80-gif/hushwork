@@ -5,7 +5,7 @@ import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import Link from "next/link";
-import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveSheetsRow, approveAiStep } from "@/lib/actions/runs";
+import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveGmailLookup, approveSheetsRow, approveAiStep } from "@/lib/actions/runs";
 
 // The one place a workflow really does something. It shows exactly what will happen and does it only when you press the
 // button. `message` is for reading; the server builds the real thing again from the saved run.
@@ -33,6 +33,12 @@ const COPY = {
     intro: "This step looks in your Google Calendar. If you approve, Hushwork asks Google for your next events and saves the list. It can only read: nothing in your calendar is changed.",
     button: "Approve and ask Google Calendar",
     icon: "Calendar",
+  },
+  gmail: {
+    action: approveGmailLookup,
+    intro: "This step looks in your Gmail inbox. If you approve, Hushwork asks Google for the latest messages and saves who sent each one, its subject and its time. It never reads the text inside an email, and it cannot send, change or delete anything.",
+    button: "Approve and ask Gmail",
+    icon: "Mail",
   },
   linear: {
     action: approveLinearLookup,
@@ -72,7 +78,7 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
       {connected ? (
         <Btn className="mt-3" icon={copy.icon} loading={pending} onClick={send}>{copy.button}</Btn>
       ) : (
-        <p className="mt-3 text-sm text-mute">{kind === "ai" ? "AI is switched off (no Groq key), so nothing can be asked." : <>{kind === "calendar" || kind === "sheets" ? "Google" : "Linear"} is not connected yet, so nothing can be asked. <Link href="/app/connections">See how to connect it</Link>.</>}</p>
+        <p className="mt-3 text-sm text-mute">{kind === "ai" ? "AI is switched off (no Groq key), so nothing can be asked." : <>{kind === "calendar" || kind === "sheets" || kind === "gmail" ? "Google" : "Linear"} is not connected yet, so nothing can be asked. <Link href="/app/connections">See how to connect it</Link>.</>}</p>
       )}
       {error && <p role="alert" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>

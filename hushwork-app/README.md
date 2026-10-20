@@ -153,6 +153,12 @@ The owner can still test without the button: a personal key in `.env.local` as `
 
 Not tested against the real Linear yet: the sign-in, the token swap and the renewal were built from Linear's published docs and tested with a pretend Linear.
 
+## Gmail: look at the inbox (read-only)
+
+A **Look something up** step set to **Inbox** can now be approved on the Runs page (`approveGmailLookup` in `lib/actions/runs.js`): Hushwork asks Gmail for the latest 10 inbox messages and saves the sender, subject and time as a "Real" run. An **Ask the AI** step can also be set to **My Gmail inbox** (the template **What is in my inbox?**). `lib/connectors/google-gmail.js` only sends GET requests and asks only for the From, Subject and Date headers (`format=metadata`), so the text of an email is never read or stored; the new Google permission `gmail.readonly` cannot send, change or delete mail. Values are flattened and cut short because strangers write them; the AI agent wraps them as data and ignores instructions inside. Limits: 5 a minute and 30 a day per person.
+
+**Owner set-up:** in Google Cloud also enable the **Gmail API** (APIs & Services, Library). Anyone who connected Google earlier must press **Disconnect** and **Connect Google** again so Google asks for the new Gmail permission (until then Gmail answers "refused" and the Runs page says so). While the app is in Testing, Google shows the same "not verified" warning. Not yet tested against the real Gmail: built from Google's published docs and tested with a pretend Google.
+
 ## Adding another app to the Connect buttons
 
 The apps are one list: `lib/connectors/app-list.js`. Linear and Google are the first two entries. Everything shared (the sign-in, the encrypted saved permission, renewing, Disconnect, the two route files, the box with the setup checklist on the Connections page, the status ticks) reads that list, so a new app is **one new entry** and nothing else in the sign-in code:

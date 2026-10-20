@@ -12,7 +12,7 @@ export const metadata = { title: "Connections - Hushwork", robots: { index: fals
 // there are no Connect buttons that would not work.
 const APPS = [
   { name: "Slack", icon: "MessageSquare", does: "Post a message to a channel." },
-  { name: "Gmail", icon: "Mail", does: "Read and send email." },
+  { name: "Gmail (sending)", icon: "Mail", does: "Send email. Reading your inbox already works with Google above." },
   { name: "Google Drive", icon: "Folder", does: "File and find documents." },
 ];
 
@@ -34,7 +34,7 @@ export default function ConnectionsPage({ searchParams }) {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear, Google Calendar and Google Sheets work, and only after you approve them on the Runs page. The rest are planned.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear, Google Calendar, Google Sheets and reading your Gmail inbox work, and only after you approve them on the Runs page. The rest are planned.</p>
 
       {APP_LIST.map((entry) => (
         <section key={entry.id} aria-labelledby={`${entry.id}-heading`} className="mt-8">

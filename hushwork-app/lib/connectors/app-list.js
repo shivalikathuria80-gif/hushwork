@@ -37,7 +37,7 @@ export const APP_LIST = [
   {
     id: "google",
     name: "Google",
-    heading: "Google (Calendar and Sheets)",
+    heading: "Google (Calendar, Sheets and Gmail)",
     envPrefix: "GOOGLE",
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
@@ -45,15 +45,16 @@ export const APP_LIST = [
     // calendar.readonly: read calendar events (nothing can be added, changed or deleted).
     // spreadsheets: add a row to a Google Sheet the person names in a step (the sheets connector only ever sends "append one row";
     // Google has no narrower permission that works on an existing sheet).
-    scopes: ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets"],
+    // gmail.readonly: read who sent each message, its subject and time (the connector never asks for the body; the permission cannot send, change or delete mail).
+    scopes: ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/gmail.readonly"],
     // "offline" + "consent" make Google hand out a refresh token, so the short-lived access token can be renewed without asking again.
     extraAuthorize: { access_type: "offline", prompt: "consent" },
-    about: "Google shows you two permissions before you press Allow: reading your calendar events (it cannot change the calendar) and adding rows to Google Sheets (a step can only add one row at the bottom of a sheet you name; Hushwork never reads or changes the other cells). You can press Disconnect any time.",
+    about: "Google shows you three permissions before you press Allow: reading your calendar events (it cannot change the calendar), adding rows to Google Sheets (a step can only add one row at the bottom of a sheet you name; Hushwork never reads or changes the other cells) and reading your Gmail inbox (Hushwork only looks at who sent a message, its subject and its time, never the text inside, and it cannot send, change or delete mail). If you connected Google before Gmail was added, press Disconnect and Connect Google again so Google asks for the new permission. You can press Disconnect any time.",
     setup: {
       intro: "Open `console.cloud.google.com` and sign in.",
       steps: [
         "Make a **New project** called Hushwork.",
-        "Open **APIs & Services**, then **Library**, and **Enable** two things: **Google Calendar API** and **Google Sheets API**.",
+        "Open **APIs & Services**, then **Library**, and **Enable** three things: **Google Calendar API**, **Google Sheets API** and **Gmail API**.",
         "Open **OAuth consent screen** (it may be called Google Auth platform). Choose **External**, name it Hushwork, add your email, and under **Test users** add your own Google email. Keep it in **Testing**.",
         "Open **Credentials**, then **Create credentials**, then **OAuth client ID**. Type: **Web application**. Under Authorized redirect URIs add `{callback}`.",
         "Copy the **Client ID** and **Client secret** into `.env.local` as `{id}=...` and `{secret}=...`. The secret is private.",

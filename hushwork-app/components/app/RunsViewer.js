@@ -6,7 +6,7 @@ import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 
@@ -82,7 +82,8 @@ export default async function RunsViewer({ searchParams }) {
   const liveAi = selected.live && isAiStep(selected.results[0]);
   const liveCalendar = selected.live && isCalendarLookup(selected.results[0]);
   const liveSheets = selected.live && isSheetsRow(selected.results[0]);
-  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isSheetsRow(step) || isAiStep(step));
+  const liveGmail = selected.live && isGmailLookup(selected.results[0]);
+  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isSheetsRow(step) || isAiStep(step));
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -105,10 +106,10 @@ export default async function RunsViewer({ searchParams }) {
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
           <span className={chip}>{selected.live ? "Real" : "Practice"}</span>
-          <p className="text-sm">{selected.live ? (liveAi ? "The AI was really asked, after you approved it." : liveSheets ? "A row was really added to your Google Sheet, after you approved it." : liveCalendar ? "Google Calendar was really asked for your next events, after you approved it." : liveLinear ? "Linear was really asked for your open tasks, after you approved it." : "This web address was really asked, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
+          <p className="text-sm">{selected.live ? (liveAi ? "The AI was really asked, after you approved it." : liveSheets ? "A row was really added to your Google Sheet, after you approved it." : liveCalendar ? "Google Calendar was really asked for your next events, after you approved it." : liveGmail ? "Gmail was really asked for your latest messages, after you approved it." : liveLinear ? "Linear was really asked for your open tasks, after you approved it." : "This web address was really asked, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
         </div>
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveSheets ? "One row was added." : liveCalendar ? "Google Calendar was asked once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveSheets ? "One row was added." : liveCalendar ? "Google Calendar was asked once." : liveGmail ? "Gmail was asked once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
         {/* key={selected.id}: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
         {/* key: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
         <div className="mt-2"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
@@ -125,9 +126,9 @@ export default async function RunsViewer({ searchParams }) {
           <div key={index} className="mt-6">
             <ApproveSend
               runId={selected.id} index={index}
-              kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isSheetsRow(step) ? "sheets" : "request"}
-              connected={isAiStep(step) ? aiOn : isLinearLookup(step) ? linearConnected : isCalendarLookup(step) || isSheetsRow(step) ? google.usable : true}
-              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isSheetsRow(step) ? sheetsSummary(step) : requestSummary(step)}
+              kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isSheetsRow(step) ? "sheets" : "request"}
+              connected={isAiStep(step) ? aiOn : isLinearLookup(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isSheetsRow(step) ? google.usable : true}
+              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isSheetsRow(step) ? sheetsSummary(step) : requestSummary(step)}
             />
           </div>
         ))}

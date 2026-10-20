@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -15,6 +15,7 @@ import { getApp, getConnectionsKey } from "@/lib/connectors/oauth-env";
 import { findApp } from "@/lib/connectors/app-list";
 import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
+import { fetchInbox } from "@/lib/connectors/google-gmail";
 import { appendRow, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
@@ -64,6 +65,7 @@ const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: ma
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
 const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
+const gmailLimits = () => limiters("__hushworkGmailLimits", 5, 30);
 const sheetsLimits = () => limiters("__hushworkSheetsLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
@@ -161,6 +163,9 @@ async function googleAuthorization(supabase, userId) {
   return access ? `Bearer ${access.token}` : null;
 }
 
+// One line per message for the Runs page and the AI: "2026-10-20 03:45  Ana Lopez: Lunch tomorrow?".
+const mailLines = (mails) => mails.map((mail) => `${mail.time ? `${mail.time}  ` : ""}${mail.from}: ${mail.subject}`).join("; ");
+
 // One line per event for the Runs page and the AI: "Tue 20 Oct, 09:00  Maths test".
 const eventLines = (events) => events.map((event) => `${event.start}  ${event.title}`).join("; ");
 
@@ -233,6 +238,17 @@ export async function approveAiStep(input) {
         return answer.events.length ? answer.events.map((event) => `${event.start}  ${event.title}`).join("\n") : "There are no events in the next 7 days.";
       },
     };
+  } else if (uses === "gmail") {
+    const authorization = await googleAuthorization(supabase, user.id);
+    if (!authorization) return { error: GOOGLE_OFF };
+    tools.gmail_latest_mail = {
+      description: "Lists the latest 10 messages in the person's Gmail inbox: time, sender and subject (never the text of an email).",
+      run: async () => {
+        const answer = await fetchInbox({ authorization });
+        if (!answer.ok) return answer.error;
+        return answer.mails.length ? answer.mails.map((mail) => `${mail.time}  ${mail.from}: ${mail.subject}`).join("\n") : "The inbox is empty.";
+      },
+    };
   } else if (uses === "mcp") {
     // The tools come from the ONE server written in the step; only its read-only tools are offered (lib/connectors/mcp.js).
     const checked = checkRequestUrl(address);
@@ -256,7 +272,7 @@ export async function approveAiStep(input) {
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
-  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
+  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700) });
 }
 
@@ -281,6 +297,30 @@ export async function approveCalendarLookup(input) {
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.events.length ? `Asked Google Calendar. You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days: ${eventLines(answer.events)}` : "Asked Google Calendar. You have no events in the next 7 days.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
+}
+
+// The "Approve and look at my inbox" button. READ-ONLY (the permission Google gave cannot send, change or delete mail, and
+// lib/connectors/google-gmail.js only sends GET requests for sender, subject and time). Only a Look something up step set to
+// Inbox qualifies. Mail subjects are saved in the person's own run, so they are private to the person like any other run.
+export async function approveGmailLookup(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isGmailLookup);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const authorization = await googleAuthorization(supabase, user.id);
+  if (!authorization) return { error: GOOGLE_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(gmailLimits(), user.id, now, "inbox lookups");
+  if (tooMany) return { error: tooMany };
+  gmailLimits().minute.take(user.id, now);
+  gmailLimits().day.take(user.id, now);
+
+  const answer = await fetchInbox({ authorization });
+  if (!answer.ok) return { error: answer.error };
+  const outcome = answer.mails.length ? `Asked Gmail. The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox: ${mailLines(answer.mails)}` : "Asked Gmail. Your inbox is empty.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 1200) });
 }
 
 // The "Delete this run" button. A run is only a record, so deleting it changes nothing outside Hushwork. Only the person's

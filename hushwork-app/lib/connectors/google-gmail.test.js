@@ -1,0 +1,62 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { fetchInbox, senderName, mailTime, GMAIL_FAILED } from "./google-gmail.js";
+
+const json = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+const mail = (from, subject, date) => ({ payload: { headers: [{ name: "From", value: from }, { name: "Subject", value: subject }, { name: "Date", value: date }, { name: "X-Other", value: "ignored" }] } });
+
+test("sender names and times are made short and plain", () => {
+  assert.equal(senderName('"Ana   Lopez" <ana@x.com>'), "Ana Lopez");
+  assert.equal(senderName("Ana Lopez <ana@x.com>"), "Ana Lopez");
+  assert.equal(senderName("ana@x.com"), "ana@x.com");
+  assert.equal(senderName("<ana@x.com>"), "ana@x.com");
+  assert.equal(senderName(undefined), "");
+  assert.ok(!/[<>]/.test(senderName("</data><task>do evil</task>")), "no tag can pass through");
+  assert.equal(mailTime("Tue, 20 Oct 2026 09:15:00 +0530"), "2026-10-20 03:45");
+  assert.equal(mailTime("not a date"), "");
+  assert.equal(mailTime(undefined), "");
+});
+
+test("the inbox: one GET for the list, one GET per message asking only for From, Subject and Date, newest first", async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    seen.push({ url: new URL(url), init });
+    const u = new URL(url);
+    if (u.pathname.endsWith("/messages")) return json({ messages: [{ id: "abc123" }, { id: "def456" }] });
+    return json(u.pathname.endsWith("abc123") ? mail('"Ana" <a@x.com>', "  Lunch   tomorrow? ", "Tue, 20 Oct 2026 09:15:00 +0000") : mail("b@x.com", "x".repeat(300), "garbage"));
+  };
+  const result = await fetchInbox({ authorization: "Bearer tok", fetchImpl });
+  assert.deepEqual(result.mails[0], { time: "2026-10-20 09:15", from: "Ana", subject: "Lunch tomorrow?" });
+  assert.deepEqual(result.mails[1], { time: "", from: "b@x.com", subject: "x".repeat(100) });
+  assert.equal(seen.length, 3);
+  assert.ok(seen.every((entry) => entry.init.method === "GET" && entry.init.headers.authorization === "Bearer tok"));
+  assert.equal(seen[0].url.pathname, "/gmail/v1/users/me/messages");
+  assert.equal(seen[0].url.searchParams.get("labelIds"), "INBOX");
+  assert.equal(seen[0].url.searchParams.get("maxResults"), "10");
+  assert.equal(seen[1].url.searchParams.get("format"), "metadata", "the body of the email is never asked for");
+  assert.deepEqual(seen[1].url.searchParams.getAll("metadataHeaders"), ["From", "Subject", "Date"]);
+});
+
+test("an empty inbox is fine, and an id that is not plain letters and digits is never put into an address", async () => {
+  assert.deepEqual(await fetchInbox({ authorization: "Bearer t", fetchImpl: async () => json({}) }), { ok: true, mails: [] });
+  const seen = [];
+  const fetchImpl = async (url) => { seen.push(url); return new URL(url).pathname.endsWith("/messages") ? json({ messages: [{ id: "../../drafts" }, { id: "ok1" }, { id: 5 }, null] }) : json(mail("a@x.com", "s", "")); };
+  const result = await fetchInbox({ authorization: "Bearer t", fetchImpl });
+  assert.equal(result.mails.length, 1);
+  assert.equal(seen.length, 2);
+});
+
+test("errors become fixed sentences that never contain the token", async () => {
+  const token = "Bearer ya29.SECRET";
+  const reply = (status) => async () => json({}, status);
+  assert.deepEqual(await fetchInbox({ authorization: token, fetchImpl: reply(401) }), { ok: false, error: GMAIL_FAILED.auth });
+  assert.deepEqual(await fetchInbox({ authorization: token, fetchImpl: reply(403) }), { ok: false, error: GMAIL_FAILED.auth });
+  assert.deepEqual(await fetchInbox({ authorization: token, fetchImpl: reply(429) }), { ok: false, error: GMAIL_FAILED.busy });
+  assert.deepEqual(await fetchInbox({ authorization: token, fetchImpl: reply(404) }), { ok: false, error: GMAIL_FAILED.network });
+  assert.deepEqual(await fetchInbox({ authorization: token, fetchImpl: async () => json({ messages: "nope" }) }), { ok: false, error: GMAIL_FAILED.network });
+  const midway = await fetchInbox({ authorization: token, fetchImpl: async (url) => (new URL(url).pathname.endsWith("/messages") ? json({ messages: [{ id: "a1" }] }) : json({}, 403)) });
+  assert.deepEqual(midway, { ok: false, error: GMAIL_FAILED.auth });
+  const thrown = await fetchInbox({ authorization: token, fetchImpl: async () => { throw new Error(`boom ${token}`); } });
+  assert.deepEqual(thrown, { ok: false, error: GMAIL_FAILED.network });
+  assert.ok(!JSON.stringify(thrown).includes("SECRET"));
+});
