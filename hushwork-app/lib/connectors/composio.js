@@ -14,7 +14,8 @@ const BASE = "https://backend.composio.dev/api/v3.1";
 const TIMEOUT_MS = 15_000;
 
 export const COMPOSIO_FAILED = {
-  key: "Composio refused Hushwork's key. Check COMPOSIO_API_KEY in .env.local, then restart the app.",
+  key: "Composio refused the key. In Composio open Settings, then Project Settings, then API Keys, and copy the Project API key (it starts with ak_). Put it in .env.local as COMPOSIO_API_KEY, then restart the app.",
+  wrongKey: "That is a Composio User key (it starts with uak_), which Hushwork cannot use. In Composio open Settings, then Project Settings, then API Keys, and copy the Project API key (it starts with ak_).",
   allowance: "The free allowance at Composio is used up for now. Try again later.",
   notConnected: "This app is not connected yet. Open Connections and press Connect for it.",
   noSignIn: "Composio could not make a sign-in for this app. It may not be offered without extra set-up at Composio.",
@@ -27,6 +28,7 @@ const flat = (value, max) => (typeof value === "string" ? value.replace(/[\u0000
 
 // One request. Returns { body } or { error } (a fixed sentence). `notFound` is the sentence used for a 404.
 async function call(key, method, path, { query, body, fetchImpl = fetch, notFound = COMPOSIO_FAILED.failed } = {}) {
+  if (typeof key === "string" && key.startsWith("uak_")) return { error: COMPOSIO_FAILED.wrongKey }; // a user key is a different kind of key (x-user-api-key): never sent as this one
   const url = new URL(`${BASE}${path}`);
   for (const [name, value] of Object.entries(query ?? {})) url.searchParams.set(name, String(value));
   try {

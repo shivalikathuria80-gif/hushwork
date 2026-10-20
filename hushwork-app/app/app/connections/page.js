@@ -137,7 +137,7 @@ async function MoreApps({ searchParams }) {
           <h3 className="text-sm font-medium">One-time setup (the owner does this once)</h3>
           <ol className="mt-2 space-y-2 text-sm text-mute">
             <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">1.</b> Make a free account at <code className={code}>composio.dev</code> (the free plan has 100,000 uses a month).</span></li>
-            <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">2.</b> In Composio open <b className="font-medium text-ink">Settings</b> and copy your <b className="font-medium text-ink">API key</b>. It is private.</span></li>
+            <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">2.</b> In Composio open <b className="font-medium text-ink">Settings</b>, then <b className="font-medium text-ink">Project Settings</b>, then <b className="font-medium text-ink">API Keys</b>, and copy the <b className="font-medium text-ink">Project API key</b> (it starts with <code className={code}>ak_</code>). It is private.</span></li>
             <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">3.</b> Put it in <code className={code}>hushwork-app/.env.local</code> as <code className={code}>COMPOSIO_API_KEY=...</code>, then stop the app and start it again with <code className={code}>npm run dev</code>.</span></li>
           </ol>
         </div>
