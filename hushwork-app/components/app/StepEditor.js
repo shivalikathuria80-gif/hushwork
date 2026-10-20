@@ -259,7 +259,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
               >
                 {dnd && dropAt === index && <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 -top-px z-10 h-0.5 rounded-full bg-accent" />}
                 <div role="group" aria-labelledby={labelId}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {dnd && (
                       <span
                         draggable={!busy} onDragStart={(event) => startRowDrag(event, row)} onDragEnd={endDrag}
