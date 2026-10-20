@@ -1,5 +1,6 @@
 -- The "connections" table: one row per person per app they have connected to Hushwork with the Connect button
--- ("linear" or "google"; if you ran an older copy of this file that only allowed linear, run connections-google.sql too). The row holds the permission Linear gave Hushwork for that person.
+-- (any app listed in lib/connectors/app-list.js: "linear", "google"...; if you ran an older copy of this file that only allowed
+-- some names, run connections-any-app.sql once). The row holds the permission that app gave Hushwork for that person.
 --
 -- STATUS: written, NOT applied yet. The owner pastes it into Supabase (Dashboard > SQL Editor > New query > paste > Run).
 -- Until then the Connect button says one setup step is missing.
@@ -18,7 +19,7 @@ create table public.connections (
   expires_at timestamptz,            -- when the access token runs out (Linear: 24 hours)
   created_at timestamptz not null default now(),
 
-  constraint connections_provider check (provider in ('linear', 'google')),
+  constraint connections_provider check (provider ~ '^[a-z][a-z0-9_]{1,30}$'), -- the app only accepts names from lib/connectors/app-list.js
   constraint connections_token_size check (char_length(access_token_enc) <= 2000 and char_length(coalesce(refresh_token_enc, '')) <= 2000),
   constraint connections_one_per_app unique (user_id, provider)
 );

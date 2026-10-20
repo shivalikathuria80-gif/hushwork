@@ -119,7 +119,7 @@ test("the Linear key is never NEXT_PUBLIC_, no real-looking key is written anywh
   const looksReal = new RegExp("lin_api_" + "[A-Za-z0-9]{30,}");
   assert.deepEqual(files.filter((file) => looksReal.test(file.text)).map((file) => file.name), []);
   const urls = files.filter((file) => /api\.linear\.app/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
-  assert.deepEqual(urls.sort(), ["lib/connectors/linear-oauth.js", "lib/connectors/linear.js"], "Linear's addresses are written in these two files only");
+  assert.deepEqual(urls.sort(), ["lib/connectors/app-list.js", "lib/connectors/linear.js"], "Linear's addresses are written in these two files only");
 });
 
 test("approveLinearLookup asks who is calling first, reads the saved step, finds the person's permission, then asks Linear; Linear queries never change data", () => {
@@ -135,12 +135,13 @@ test("approveLinearLookup asks who is calling first, reads the saved step, finds
 // The Connect button's settings and its sign-in routes.
 const APP_NAMES = ["LINEAR" + "_CLIENT_ID", "LINEAR" + "_CLIENT_SECRET", "GOOGLE" + "_CLIENT_ID", "GOOGLE" + "_CLIENT_SECRET", "CONNECTIONS" + "_KEY"];
 
-test("the Connect settings' names appear in code only in lib/connectors/oauth-env.js (and docs, the example, the setup script, the Connections page and this test)", () => {
-  const allowed = new Set(["lib/connectors/oauth-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js", "scripts/make-secret.mjs"]);
-  for (const name of APP_NAMES) {
-    assert.deepEqual(withText(name).filter((file) => !allowed.has(file)), [], name);
-    assert.ok(withText(name).includes("lib/connectors/oauth-env.js"), `${name} is read in oauth-env.js`);
-  }
+test("the Connect settings' names appear in no code except one setup sentence on the Connections page (and docs, the example, the setup script and this test); oauth-env.js builds them from each app's prefix and is the only file that reads them", () => {
+  const allowed = new Set(["lib/connectors/oauth-env.js", "lib/secrets.test.js", ".env.example", "README.md", "scripts/make-secret.mjs", "app/app/connections/page.js"]);
+  for (const name of APP_NAMES) assert.deepEqual(withText(name).filter((file) => !allowed.has(file)), [], name);
+  const env = files.find((file) => file.name === "lib/connectors/oauth-env.js").text;
+  assert.ok(env.includes("`${entry.envPrefix}_CLIENT_ID`") && env.includes("`${entry.envPrefix}_CLIENT_SECRET`") && env.includes('read("CONNECTIONS_KEY")'));
+  const readers = files.filter((file) => /process\.env\[/.test(file.text) && !file.name.endsWith(".test.js")).map((file) => file.name);
+  assert.deepEqual(readers, ["lib/connectors/oauth-env.js"], "the only code that reads a setting by a built-up name");
 });
 
 test("oauth-env.js is server-only and imported only by server code, never by browser code", () => {
@@ -168,19 +169,19 @@ test("the sign-in flow: signed-in people only, the state is checked before the c
   const order = ["requireUser(", "same(state, expected)", "exchangeCode(", "saveConnection("].map((call) => finish.indexOf(call));
   assert.ok(order.every((index) => index > 0) && order.join() === [...order].sort((a, b) => a - b).join(), "requireUser, then the state check, then the code swap, then saving");
   assert.ok(!/redirect\([^)]*(?:token|secret)/i.test(flow), "no token or secret goes into a redirect address");
-  for (const app of ["linear", "google"]) {
-    for (const [file, call] of [[`app/api/connect/${app}/route.js`, "startConnect"], [`app/api/connect/${app}/callback/route.js`, "finishConnect"]]) {
-      const text = files.find((entry) => entry.name === file).text;
-      assert.ok(text.includes(`${call}("${app}", request)`), `${file} calls ${call} for ${app}`);
-      assert.ok(text.split("\n").filter((line) => line.trim() && !line.trim().startsWith("//")).length <= 3, `${file} stays a thin wrapper`);
-    }
+  for (const [file, call] of [["app/api/connect/[provider]/route.js", "startConnect"], ["app/api/connect/[provider]/callback/route.js", "finishConnect"]]) {
+    const text = files.find((entry) => entry.name === file).text;
+    assert.ok(text.includes(`${call}((await params).provider, request)`), `${file} calls ${call} with the address's app id`);
+    assert.ok(text.split("\n").filter((line) => line.trim() && !line.trim().startsWith("//")).length <= 3, `${file} stays a thin wrapper`);
   }
+  assert.ok(flow.indexOf("findApp(provider)") > 0 && flow.indexOf("notFound()") > 0, "an app id that is not in the list is a 404");
+  assert.ok(start.indexOf("findApp(provider)") < start.indexOf("requireUser(") && finish.indexOf("findApp(provider)") < finish.indexOf("requireUser("), "the id is checked against the list first");
   const page = files.find((file) => file.name === "app/app/connections/page.js").text;
   assert.ok(/<a href=\{`\/api\/connect\/\$\{app\}`\}/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
 });
 
 test("Google: exactly two permissions are asked for, each address is in one file, the calendar and sheets connectors can only do their one thing, and approvals ask who is calling first", () => {
-  const oauth = files.find((file) => file.name === "lib/connectors/google-oauth.js").text;
+  const oauth = files.find((file) => file.name === "lib/connectors/app-list.js").text;
   const scopes = oauth.match(/https:\/\/www\.googleapis\.com\/auth\/[a-z.]+/g) ?? [];
   assert.deepEqual([...new Set(scopes)].sort(), ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets"]);
   const only = (pattern) => files.filter((file) => pattern.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");

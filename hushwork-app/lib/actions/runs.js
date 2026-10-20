@@ -11,7 +11,8 @@ import { getGroqKey } from "@/lib/ai/key";
 import { runAgent } from "@/lib/ai/agent";
 import { looksSensitive } from "@/lib/ai/plan";
 import { getLinearKey } from "@/lib/connectors/linear-env";
-import { getConnectionsKey, getGoogleApp, getLinearApp } from "@/lib/connectors/oauth-env";
+import { getApp, getConnectionsKey } from "@/lib/connectors/oauth-env";
+import { findApp } from "@/lib/connectors/app-list";
 import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { appendRow, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
@@ -140,7 +141,7 @@ export async function approveWebCall(input) {
 const LINEAR_OFF = "Linear is not connected yet. Open Connections and press Connect Linear.";
 async function linearAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
-  const app = getLinearApp();
+  const app = getApp(findApp("linear"));
   if (secretKey && app) {
     const access = await loadAccess({ supabase, userId, provider: "linear", key: secretKey, app });
     if (access) return `Bearer ${access.token}`;
@@ -154,7 +155,7 @@ async function linearAuthorization(supabase, userId) {
 const GOOGLE_OFF = "Google is not connected yet. Open Connections and press Connect Google.";
 async function googleAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
-  const app = getGoogleApp();
+  const app = getApp(findApp("google"));
   if (!secretKey || !app) return null;
   const access = await loadAccess({ supabase, userId, provider: "google", key: secretKey, app });
   return access ? `Bearer ${access.token}` : null;

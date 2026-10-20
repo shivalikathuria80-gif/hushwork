@@ -140,9 +140,9 @@ Not built yet: a schedule ("run every day at 9"). It needs the app hosted and a 
 A **Look something up** step with Where set to **Linear** (the Linear block) can be approved on the Runs page: Hushwork asks Linear for the person's up to 10 open tasks and saves the list as a "Real" run. It can only READ (the one fixed query in `lib/connectors/linear.js` has no way to change anything, and the permission asked for is `read`).
 
 **How people connect (like Zapier or n8n):** on the Connections page they press **Connect Linear**, sign in on Linear's own page and press Allow. Nobody pastes a key.
-1. `/api/connect/linear` (`app/api/connect/linear/route.js`) makes a random `state`, keeps it in a short-lived HttpOnly cookie and sends the person to Linear's Allow screen.
+1. `/api/connect/linear` (`app/api/connect/[provider]/route.js`, the same two route files serve every app) makes a random `state`, keeps it in a short-lived HttpOnly cookie and sends the person to Linear's Allow screen.
 2. Linear sends them back to `/api/connect/linear/callback` with a one-time code. The callback checks the state, swaps the code for tokens (using the app secret, server only), scrambles them (AES-256-GCM, `lib/connections/crypto.js`) and saves them for that person in the `connections` table.
-3. Linear access tokens last 24 hours; `lib/connections/linear-store.js` renews them with the refresh token (Linear hands out a new refresh token each time, and both are saved). Disconnect revokes the permission at Linear and deletes the row.
+3. Linear access tokens last 24 hours; `lib/connections/store.js` renews them with the refresh token (Linear hands out a new refresh token each time, and both are saved). Disconnect revokes the permission at Linear and deletes the row.
 
 **One-time set-up by the owner** (also written step by step on the Connections page, with ticks for what is done):
 1. Run `supabase/connections.sql` in the Supabase SQL Editor (the table, with the same owner-only rules as `runs`).
@@ -152,6 +152,23 @@ A **Look something up** step with Where set to **Linear** (the Linear block) can
 The owner can still test without the button: a personal key in `.env.local` as `LINEAR_API_KEY` (Linear, Settings, Security & access, Personal API keys) works on that computer only. Every secret is read only in `lib/connectors/linear-env.js` or `lib/connectors/oauth-env.js` (server only, checked by `lib/secrets.test.js`), never shown or logged. `approveLinearLookup` in `lib/actions/runs.js` uses the person's own connection first, then the personal key, and limits lookups to 5 a minute and 30 a day per person.
 
 Not tested against the real Linear yet: the sign-in, the token swap and the renewal were built from Linear's published docs and tested with a pretend Linear.
+
+## Adding another app to the Connect buttons
+
+The apps are one list: `lib/connectors/app-list.js`. Linear and Google are the first two entries. Everything shared (the sign-in, the encrypted saved permission, renewing, Disconnect, the two route files, the box with the setup checklist on the Connections page, the status ticks) reads that list, so a new app is **one new entry** and nothing else in the sign-in code:
+
+```js
+{
+  id: "notion",            // lowercase name; also the callback address /api/connect/notion/callback
+  name: "Notion", heading: "Notion", envPrefix: "NOTION",   // settings: NOTION_CLIENT_ID and NOTION_CLIENT_SECRET in .env.local
+  authorizeUrl: "...", tokenUrl: "...", revokeUrl: "...",
+  scopes: ["read"],        // as small as possible
+  about: "One plain sentence under the button.",
+  setup: { intro: "...", steps: ["...", "... `{callback}` ..."] },   // how the owner makes Hushwork's own app on that site
+}
+```
+
+Then: put the two settings in `.env.local`, restart `npm run dev`, and the Connect button appears. The **database** needs nothing new if you ran `supabase/connections-any-app.sql` once (it lets the `provider` column hold any lowercase name; the app still only accepts names in the list). What still has to be written by hand, because it is different for every app: a small connector file that does the actual work with the permission (for example `lib/connectors/linear.js`), a step kind for it in `lib/steps.js`, and its Approve action. Only an app whose token answer looks like the usual OAuth one (`access_token`, optional `refresh_token`, `expires_in`) fits the shared sign-in; Notion-style or Slack-style variations would need a small tweak in `lib/connectors/oauth-common.js`.
 
 ## Ask the AI (an AI that can use tools)
 
@@ -169,7 +186,7 @@ Reliability: Groq sometimes refuses to produce the richer shape (`json_validate_
 
 A **Look something up** step with Where set to **Calendar** can be approved on the Runs page: Hushwork asks Google Calendar for the person's next 10 events in the coming 7 days and saves the list as a "Real" run. An **Ask the AI** step may also be allowed to look at "My Google Calendar" (a tool with no input from the model). It is READ-ONLY twice over: the only permission ever requested is `calendar.readonly` and `lib/connectors/google-calendar.js` only sends GET requests (both are checked by `lib/secrets.test.js`).
 
-Connect works exactly like Linear's (`lib/connections/oauth-flow.js` is shared; `lib/connections/store.js` keeps one encrypted row per person and app and renews tokens; Google keeps the same refresh token when it renews). One-time owner set-up (also on the Connections page with ticks): `supabase/connections-google.sql` if the table already exists (a fresh `connections.sql` already allows Google), then in Google Cloud: a project, the Google Calendar API enabled, an OAuth consent screen in Testing with yourself as a test user, and a Web OAuth client with the redirect address `http://localhost:3100/api/connect/google/callback`; its Client ID and secret go into `.env.local` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. While the app is in Testing, Google makes people connect again every 7 days, and shows a "not verified" warning (Advanced, Go to Hushwork). Not yet tested against the real Google: it is built from Google's published docs and tested with a pretend Google.
+Connect works exactly like Linear's (`lib/connections/oauth-flow.js` is shared; `lib/connections/store.js` keeps one encrypted row per person and app and renews tokens; Google keeps the same refresh token when it renews). One-time owner set-up (also on the Connections page with ticks): `supabase/connections-any-app.sql` if the table already exists (a fresh `connections.sql` already allows Google), then in Google Cloud: a project, the Google Calendar API enabled, an OAuth consent screen in Testing with yourself as a test user, and a Web OAuth client with the redirect address `http://localhost:3100/api/connect/google/callback`; its Client ID and secret go into `.env.local` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. While the app is in Testing, Google makes people connect again every 7 days, and shows a "not verified" warning (Advanced, Go to Hushwork). Not yet tested against the real Google: it is built from Google's published docs and tested with a pretend Google.
 
 ## Deleting runs
 

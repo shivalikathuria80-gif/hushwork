@@ -3,6 +3,7 @@ import { Icon } from "@/components/icons";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { connectorStatus } from "@/lib/connector-status";
+import { APP_LIST } from "@/lib/connectors/app-list";
 import DisconnectApp from "@/components/app/DisconnectApp";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
@@ -35,19 +36,14 @@ export default function ConnectionsPage({ searchParams }) {
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
       <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear, Google Calendar and Google Sheets work, and only after you approve them on the Runs page. The rest are planned.</p>
 
-      <section aria-labelledby="linear-heading" className="mt-8">
-        <h2 id="linear-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Linear</h2>
-        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <Suspense fallback={fallback}><AppCard app="linear" searchParams={searchParams} /></Suspense>
-        </div>
-      </section>
-
-      <section aria-labelledby="google-heading" className="mt-8">
-        <h2 id="google-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Google (Calendar and Sheets)</h2>
-        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <Suspense fallback={fallback}><AppCard app="google" searchParams={searchParams} /></Suspense>
-        </div>
-      </section>
+      {APP_LIST.map((entry) => (
+        <section key={entry.id} aria-labelledby={`${entry.id}-heading`} className="mt-8">
+          <h2 id={`${entry.id}-heading`} className="text-xl font-semibold leading-[1.35] tracking-tight">{entry.heading}</h2>
+          <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+            <Suspense fallback={fallback}><AppCard entry={entry} searchParams={searchParams} /></Suspense>
+          </div>
+        </section>
+      ))}
 
       <section aria-labelledby="web-heading" className="mt-8">
         <h2 id="web-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Web addresses</h2>
@@ -85,17 +81,32 @@ export default function ConnectionsPage({ searchParams }) {
   );
 }
 
+// Turns **bold** and `code` in a line of setup text (from lib/connectors/app-list.js) into real bold and code, and fills in the
+// {callback}, {id} and {secret} placeholders. Text only: nothing in the list is ever treated as HTML.
+function Rich({ text, entry }) {
+  const filled = text
+    .replaceAll("{callback}", `http://localhost:3100/api/connect/${entry.id}/callback`)
+    .replaceAll("{id}", `${entry.envPrefix}_CLIENT_ID`)
+    .replaceAll("{secret}", `${entry.envPrefix}_CLIENT_SECRET`);
+  return filled.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, index) =>
+    part.startsWith("**") ? <b key={index} className="font-medium text-ink">{part.slice(2, -2)}</b>
+      : part.startsWith("`") ? <code key={index} className={code}>{part.slice(1, -1)}</code>
+      : part,
+  );
+}
+
 const Done = ({ yes }) => <Icon name={yes ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${yes ? "text-success" : "text-mute"}`} />;
 
-// One app's box (Linear or Google). It reads the session and the database, so it sits inside <Suspense>.
-async function AppCard({ app, searchParams }) {
+// One app's box (one entry of lib/connectors/app-list.js). It reads the session and the database, so it sits inside <Suspense>.
+async function AppCard({ entry, searchParams }) {
+  const app = entry.id;
   const user = await requireUser();
   const params = await searchParams;
   const status = (await connectorStatus(await createClient(), user.id))[app];
   const result = params[app];
   const note = typeof result === "string" && Object.hasOwn(RESULTS, result) ? RESULTS[result] : null;
   const ready = status.hasApp && status.hasKey && !status.tableMissing; // the one-time setup is done
-  const name = app === "linear" ? "Linear" : "Google";
+  const name = entry.name;
 
   return (
     <div>
@@ -122,32 +133,22 @@ async function AppCard({ app, searchParams }) {
       )}
 
       <p className="mt-3 text-sm text-mute">
-        {app === "linear"
-          ? "Hushwork can read your open Linear tasks. It can only look. It cannot change anything in Linear. You press Allow on Linear’s own page, and you can press Disconnect any time."
-          : "Google shows you two permissions before you press Allow: reading your calendar events (it cannot change the calendar) and adding rows to Google Sheets (a step can only add one row at the bottom of a sheet you name; Hushwork never reads or changes the other cells). You can press Disconnect any time."}
+        {entry.about}
       </p>
 
       {!ready && !status.connected && (
         <div className="mt-4 rounded-xl border border-line bg-raised p-3">
           <h3 className="text-sm font-medium">One-time setup (the owner does this once, then everybody just presses Connect)</h3>
           <ol className="mt-2 space-y-3 text-sm text-mute">
-            <li className="flex gap-2"><Done yes={!status.tableMissing} /><span><b className="font-medium text-ink">1. A place to keep connections.</b> In Supabase open <b className="font-medium text-ink">SQL Editor</b>, paste everything from the file <code className={code}>supabase/connections.sql</code>, and press Run.{app === "google" && <> If you already did this for Linear, paste <code className={code}>supabase/connections-google.sql</code> instead (a small change that lets the table hold Google too).</>}</span></li>
+            <li className="flex gap-2"><Done yes={!status.tableMissing} /><span><b className="font-medium text-ink">1. A place to keep connections.</b> In Supabase open <b className="font-medium text-ink">SQL Editor</b>, paste everything from the file <code className={code}>supabase/connections.sql</code>, and press Run.{app !== "linear" && <> If the table already exists from an earlier app, paste <code className={code}>supabase/connections-any-app.sql</code> instead (a small change that lets the table hold more apps).</>}</span></li>
             <li className="flex gap-2"><Done yes={status.hasKey} /><span><b className="font-medium text-ink">2. A secret to lock the connections.</b> In the terminal run <code className={code}>npm run secret</code>, copy the line it prints (it starts with <code className={code}>CONNECTIONS_KEY=</code>) into <code className={code}>hushwork-app/.env.local</code>.</span></li>
-            {app === "linear" ? (
-              <li className="flex gap-2"><Done yes={status.hasApp} /><span><b className="font-medium text-ink">3. Hushwork{"’"}s own app in Linear.</b> In Linear open Settings, then <b className="font-medium text-ink">API</b>, then <b className="font-medium text-ink">OAuth applications</b>, then <b className="font-medium text-ink">New</b>. Name it Hushwork. As the callback address type <code className={code}>http://localhost:3100/api/connect/linear/callback</code>. After saving, copy the <b className="font-medium text-ink">Client ID</b> and <b className="font-medium text-ink">Client secret</b> into <code className={code}>.env.local</code> as <code className={code}>LINEAR_CLIENT_ID=...</code> and <code className={code}>LINEAR_CLIENT_SECRET=...</code>. The secret is private.</span></li>
-            ) : (
-              <li className="flex gap-2"><Done yes={status.hasApp} /><span>
-                <b className="font-medium text-ink">3. Hushwork{"’"}s own app in Google.</b> Open <code className={code}>console.cloud.google.com</code> and sign in.
-                <ol className="mt-1 list-decimal space-y-1 pl-5">
-                  <li>Make a <b className="font-medium text-ink">New project</b> called Hushwork.</li>
-                  <li>Open <b className="font-medium text-ink">APIs &amp; Services</b>, then <b className="font-medium text-ink">Library</b>, and <b className="font-medium text-ink">Enable</b> two things: <b className="font-medium text-ink">Google Calendar API</b> and <b className="font-medium text-ink">Google Sheets API</b>.</li>
-                  <li>Open <b className="font-medium text-ink">OAuth consent screen</b> (it may be called Google Auth platform). Choose <b className="font-medium text-ink">External</b>, name it Hushwork, add your email, and under <b className="font-medium text-ink">Test users</b> add your own Google email. Keep it in <b className="font-medium text-ink">Testing</b>.</li>
-                  <li>Open <b className="font-medium text-ink">Credentials</b>, then <b className="font-medium text-ink">Create credentials</b>, then <b className="font-medium text-ink">OAuth client ID</b>. Type: <b className="font-medium text-ink">Web application</b>. Under Authorized redirect URIs add <code className={code}>http://localhost:3100/api/connect/google/callback</code>.</li>
-                  <li>Copy the <b className="font-medium text-ink">Client ID</b> and <b className="font-medium text-ink">Client secret</b> into <code className={code}>.env.local</code> as <code className={code}>GOOGLE_CLIENT_ID=...</code> and <code className={code}>GOOGLE_CLIENT_SECRET=...</code>. The secret is private.</li>
-                </ol>
-                <span className="mt-1 block">Google will warn {"“"}Google hasn{"’"}t verified this app{"”"} because it is your own test app. Press <b className="font-medium text-ink">Advanced</b>, then <b className="font-medium text-ink">Go to Hushwork</b>. While the app is in Testing, Google asks you to connect again every 7 days.</span>
-              </span></li>
-            )}
+            <li className="flex gap-2"><Done yes={status.hasApp} /><span>
+              <b className="font-medium text-ink">3. Hushwork{"’"}s own app in {name}.</b> <Rich text={entry.setup.intro} entry={entry} />
+              <ol className="mt-1 list-decimal space-y-1 pl-5">
+                {entry.setup.steps.map((line) => <li key={line}><Rich text={line} entry={entry} /></li>)}
+              </ol>
+              {entry.setup.note && <span className="mt-1 block"><Rich text={entry.setup.note} entry={entry} /></span>}
+            </span></li>
             <li className="flex gap-2"><Done yes={ready} /><span><b className="font-medium text-ink">4.</b> Stop the app and start it again with <code className={code}>npm run dev</code>. The Connect {name} button then appears here.</span></li>
           </ol>
         </div>

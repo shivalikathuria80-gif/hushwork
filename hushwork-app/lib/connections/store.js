@@ -5,16 +5,15 @@
 // database's rules (only my rows) apply on top of the `.eq("user_id", ...)` below. Nothing here ever logs or returns a token
 // except loadAccess, which returns the access token to the one server function that needs it.
 import { decryptText, encryptText } from "./crypto.js";
-import * as linear from "../connectors/linear-oauth.js";
-import * as google from "../connectors/google-oauth.js";
+import { findApp, APP_IDS } from "../connectors/app-list.js";
+import { refreshTokens, revokeToken } from "../connectors/oauth-app.js";
 
 const TABLE = "connections";
 const RENEW_BEFORE_MS = 60_000; // renew a minute early so a token never runs out mid-request
 
-// What differs between apps: how to renew a token and how to cancel one. Only these names can be used.
-const APPS = { linear, google };
-export const APP_NAMES = Object.keys(APPS);
-const known = (provider) => typeof provider === "string" && Object.hasOwn(APPS, provider);
+// Which apps exist is decided by lib/connectors/app-list.js (its addresses say how to renew and cancel a token). Only those names can be used.
+export const APP_NAMES = APP_IDS;
+const known = (provider) => Boolean(findApp(provider));
 
 // tokens: { accessToken, refreshToken, expiresAt (ms or null) }. Returns { ok: true } or { ok: false, code }.
 export async function saveConnection({ supabase, provider, key, tokens }) {
@@ -55,7 +54,7 @@ export async function loadAccess({ supabase, userId, provider, key, app, now = D
   if (!expiresAt || expiresAt - RENEW_BEFORE_MS > now()) return { token: access };
   if (!refresh || !app) return null;
 
-  const renewed = await APPS[provider].refreshTokens({ clientId: app.clientId, clientSecret: app.clientSecret, refreshToken: refresh, fetchImpl, now });
+  const renewed = await refreshTokens(findApp(provider), { clientId: app.clientId, clientSecret: app.clientSecret, refreshToken: refresh, fetchImpl, now });
   if (!renewed.ok) {
     // Two requests can try to renew at the same moment, and the app hands out a new refresh token each time, so the second one
     // fails. Look again: if the other request already saved a fresh token, use that one.
@@ -85,7 +84,7 @@ export async function loadAccess({ supabase, userId, provider, key, app, now = D
 export async function removeConnection({ supabase, userId, provider, key, fetchImpl }) {
   if (!known(provider)) return { ok: false };
   const access = await loadAccess({ supabase, userId, provider, key, app: null, now: () => 0, fetchImpl }).catch(() => null);
-  if (access?.token) await APPS[provider].revokeToken({ token: access.token, fetchImpl });
+  if (access?.token) await revokeToken(findApp(provider), { token: access.token, fetchImpl });
   const { error } = await supabase.from(TABLE).delete().eq("user_id", userId).eq("provider", provider);
   return { ok: !error };
 }

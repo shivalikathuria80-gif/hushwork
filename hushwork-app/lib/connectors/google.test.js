@@ -1,47 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { authorizeUrl, exchangeCode, refreshTokens, revokeToken, GOOGLE_SCOPES } from "./google-oauth.js";
 import { fetchUpcomingEvents, CALENDAR_FAILED } from "./google-calendar.js";
-import { OAUTH_FAILED } from "./oauth-common.js";
 
 const reply = (status, body) => async () => ({ ok: status >= 200 && status < 300, status, json: async () => body });
-
-test("the Google sign-in address asks for exactly two permissions (read the calendar, add rows to sheets), offline renewal and the state", () => {
-  const url = new URL(authorizeUrl({ clientId: "cid", redirectUri: "http://localhost:3100/api/connect/google/callback", state: "abc" }));
-  assert.equal(url.origin + url.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
-  assert.equal(url.searchParams.get("scope"), "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets");
-  assert.deepEqual(GOOGLE_SCOPES, ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets"]);
-  assert.ok(!url.searchParams.get("scope").includes("auth/calendar ") && !/gmail|drive/.test(url.searchParams.get("scope")), "no permission to change the calendar, read mail or reach Drive");
-  assert.equal(url.searchParams.get("access_type"), "offline");
-  assert.equal(url.searchParams.get("prompt"), "consent");
-  assert.equal(url.searchParams.get("state"), "abc");
-  assert.equal(url.searchParams.get("response_type"), "code");
-});
-
-test("swapping the code and renewing talk to Google's token address; a renewal answer without a new refresh token is fine", async () => {
-  const seen = [];
-  const fetchImpl = async (url, init) => { seen.push({ url, body: new URLSearchParams(init.body) }); return { ok: true, status: 200, json: async () => ({ access_token: "A", expires_in: 3599 }) }; };
-  const swapped = await exchangeCode({ clientId: "cid", clientSecret: "sec", redirectUri: "http://x/cb", code: "c1", fetchImpl, now: () => 0 });
-  assert.deepEqual(swapped, { ok: true, accessToken: "A", refreshToken: null, expiresAt: 3599000 });
-  const renewed = await refreshTokens({ clientId: "cid", clientSecret: "sec", refreshToken: "R1", fetchImpl, now: () => 0 });
-  assert.equal(renewed.refreshToken, null);
-  assert.equal(seen[0].url, "https://oauth2.googleapis.com/token");
-  assert.equal(seen[0].body.get("grant_type"), "authorization_code");
-  assert.equal(seen[1].body.get("grant_type"), "refresh_token");
-  assert.equal(seen[1].body.get("refresh_token"), "R1");
-});
-
-test("Google errors become fixed sentences without secrets; revoking never throws", async () => {
-  const args = { clientId: "cid", clientSecret: "SECRET", redirectUri: "http://x/cb", code: "c" };
-  assert.deepEqual(await exchangeCode({ ...args, fetchImpl: reply(400, { error: "invalid_grant SECRET" }) }), { ok: false, error: OAUTH_FAILED.failed });
-  assert.deepEqual(await exchangeCode({ ...args, fetchImpl: reply(503, {}) }), { ok: false, error: OAUTH_FAILED.network });
-  const thrown = await exchangeCode({ ...args, fetchImpl: async () => { throw new Error("boom SECRET"); } });
-  assert.ok(!JSON.stringify(thrown).includes("SECRET"));
-  await revokeToken({ token: "T", fetchImpl: async () => { throw new Error("down"); } });
-  let seen;
-  await revokeToken({ token: "T", fetchImpl: async (url, init) => { seen = { url, body: init.body }; return { ok: true }; } });
-  assert.equal(seen.url, "https://oauth2.googleapis.com/revoke");
-});
 
 test("upcoming events: a GET for the next 7 days, soonest first, cut to short plain text", async () => {
   let seen;
