@@ -84,9 +84,9 @@ test("running the read tool: always the tool from the list, with no arguments, f
   assert.deepEqual(await runReadTool({ key: "k", userId: "u", app: todoist, fetchImpl: composio(() => json({ successful: true, data: null })).fetchImpl }), { ok: true, text: "(nothing found)" });
 });
 
-test("a Composio User key (uak_...) is never sent: the owner is told which key to copy, and the 401 sentence says where to find the right one", async () => {
+test("a Composio consumer key (ck_...) or User key (uak_...) is never sent: the owner is told which key to copy, and the 401 sentence says where to find the right one", async () => {
   const sent = composio(() => json({}));
-  assert.deepEqual(await runReadTool({ key: "uak_whatever", userId: "u", app: todoist, fetchImpl: sent.fetchImpl }), { ok: false, error: COMPOSIO_FAILED.wrongKey });
+  for (const wrong of ["uak_whatever", "ck_whatever"]) assert.deepEqual(await runReadTool({ key: wrong, userId: "u", app: todoist, fetchImpl: sent.fetchImpl }), { ok: false, error: COMPOSIO_FAILED.wrongKey }, wrong);
   assert.equal(sent.sent.length, 0, "nothing was sent");
   assert.match(COMPOSIO_FAILED.wrongKey, /Project API key/);
   assert.match(COMPOSIO_FAILED.key, /Project API key.*ak_/);
