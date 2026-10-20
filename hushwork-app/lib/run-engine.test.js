@@ -113,3 +113,9 @@ test("the Add a row summary shows the real words for {answer}, or says to approv
   assert.match(sheetsSummary(row), /2\. \{answer\}/);
   assert.doesNotMatch(sheetsSummary({ ...row, fields: { ...row.fields, values: "a, b" } }, "x"), /Approve the Ask/);
 });
+
+test("a real run remembers the practice run it came from, but only a plain id is read back", () => {
+  const id = "0b3f7c1e-8a52-4d6b-9c41-2f6a7d8e9b10";
+  assert.equal(readSavedResults([{ title: "t", from: id }])[0].from, id);
+  for (const bad of ["../../x", "", 5, null, undefined, `${id}; drop table runs`, "<script>"]) assert.equal("from" in readSavedResults([{ title: "t", from: bad }])[0], false, String(bad));
+});

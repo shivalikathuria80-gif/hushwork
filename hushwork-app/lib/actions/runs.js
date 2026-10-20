@@ -92,7 +92,7 @@ async function loadPracticeStep(supabase, user, input, allowed) {
     step = checked.value ? { ...step, fields: checked.value[0].fields } : null;
   }
   if (!run || run.mode !== "practice" || !allowed(step)) return { error: "That step cannot be sent." };
-  return { run, step };
+  return { run: { ...run, id: id.value }, step };
 }
 
 // Checks the person's limits, without using a slot yet.
@@ -107,7 +107,7 @@ function limitError(limits, userId, now, what) {
 async function saveLiveRun(supabase, run, record) {
   const { data, error } = await supabase
     .from("runs")
-    .insert({ workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [record] })
+    .insert({ workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [{ ...record, from: run.id }] })
     .select("id");
   if (error) {
     console.error("saving the live run failed:", error.code);

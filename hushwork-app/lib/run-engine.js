@@ -3,6 +3,7 @@
 // happens in lib/actions/runs.js after an Approve click, never in this walk.) Plain data in, plain data out, no imports from Next.js or Supabase,
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, isTypedKind } from "./steps.js";
+import { checkId } from "./validate.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
@@ -105,6 +106,7 @@ export function readSavedResults(value) {
   const text = (v) => (typeof v === "string" ? v : "");
   return value.map((r) => {
     const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : "done" };
+    if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
     if (isTypedKind(r?.kind) && r.fields && typeof r.fields === "object") {
       read.kind = r.kind;
       read.fields = {};

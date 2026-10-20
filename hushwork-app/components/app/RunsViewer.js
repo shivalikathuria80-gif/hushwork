@@ -118,6 +118,9 @@ export default async function RunsViewer({ searchParams }) {
         <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveSheets ? "One row was added." : liveCalendar ? "Google Calendar was asked once." : liveGmail ? "Gmail was asked once." : liveDrive ? "Google Drive was asked once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
         {/* key={selected.id}: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
         {/* key: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
+        {selected.live && selected.results[0]?.from && runs.some((run) => run.id === selected.results[0].from) && (
+          <p className="mt-2 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the practice run</Link> to approve the next step.</p>
+        )}
         <div className="mt-2"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
         <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
         <ol className="mt-1 space-y-1">
