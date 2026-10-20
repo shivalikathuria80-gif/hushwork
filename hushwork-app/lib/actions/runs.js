@@ -230,6 +230,12 @@ export async function approveAiStep(input) {
   aiLimits().minute.take(user.id, now);
   aiLimits().day.take(user.id, now);
 
+  // When a built-in tool fails (for example Google refused), the person is told the real reason instead of the AI's vague sentence about it.
+  let toolError = "";
+  const failed = (message) => {
+    toolError = message;
+    return message;
+  };
   const tools = Object.create(null); // no prototype, so a tool called __proto__ is just a name
   if (uses === "linear") {
     const authorization = await linearAuthorization(supabase, user.id);
@@ -238,7 +244,7 @@ export async function approveAiStep(input) {
       description: "Lists the person's open Linear tasks (up to 10) with their status.",
       run: async () => {
         const answer = await fetchLinearIssues({ authorization });
-        if (!answer.ok) return answer.error;
+        if (!answer.ok) return failed(answer.error);
         return answer.issues.length ? answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n") : "There are no open tasks.";
       },
     };
@@ -249,7 +255,7 @@ export async function approveAiStep(input) {
       description: "Lists the person's next events in Google Calendar (up to 10, in the next 7 days).",
       run: async () => {
         const answer = await fetchUpcomingEvents({ authorization });
-        if (!answer.ok) return answer.error;
+        if (!answer.ok) return failed(answer.error);
         return answer.events.length ? answer.events.map((event) => `${event.start}  ${event.title}`).join("\n") : "There are no events in the next 7 days.";
       },
     };
@@ -260,7 +266,7 @@ export async function approveAiStep(input) {
       description: "Lists the latest 10 messages in the person's Gmail inbox: time, sender and subject (never the text of an email).",
       run: async () => {
         const answer = await fetchInbox({ authorization });
-        if (!answer.ok) return answer.error;
+        if (!answer.ok) return failed(answer.error);
         return answer.mails.length ? answer.mails.map((mail) => `${mail.time}  ${mail.from}: ${mail.subject}`).join("\n") : "The inbox is empty.";
       },
     };
@@ -271,7 +277,7 @@ export async function approveAiStep(input) {
       description: "Lists the 10 files in the person's Google Drive that changed most recently: time, kind and name (never what is inside a file).",
       run: async () => {
         const answer = await fetchRecentFiles({ authorization });
-        if (!answer.ok) return answer.error;
+        if (!answer.ok) return failed(answer.error);
         return answer.files.length ? answer.files.map((file) => `${file.time}  ${file.kind}: ${file.name}`).join("\n") : "There are no files.";
       },
     };
@@ -285,7 +291,7 @@ export async function approveAiStep(input) {
       description: `Reads ${app.what} from ${app.name} (read-only).`,
       run: async () => {
         const answer = await runReadTool({ key: composioKey, userId: user.id, app });
-        return answer.ok ? answer.text : answer.error;
+        return answer.ok ? answer.text : failed(answer.error);
       },
     };
   } else if (uses === "mcp") {
@@ -311,6 +317,7 @@ export async function approveAiStep(input) {
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
+  if (toolError) return { error: toolError };
   const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700), answer: answer.text.slice(0, 700) });
 }

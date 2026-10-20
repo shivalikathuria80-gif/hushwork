@@ -318,3 +318,10 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   const page = files.find((file) => file.name === "app/app/connections/page.js").text;
   assert.ok(/<a href=\{`\/api\/composio\/\$\{app\.id\}`\}/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
 });
+
+test("when a built-in tool of an Ask the AI step fails, the person is told the real reason (not the AI's vague paraphrase) and nothing is saved as a success", () => {
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveAiStep"), action.indexOf('// The "Approve and look at my calendar" button'));
+  assert.ok(body.includes("failed(answer.error)") && !/return answer\.error;/.test(body.replace(/\/\/.*$/gm, "")), "every tool failure is recorded");
+  assert.ok(body.indexOf("if (toolError) return { error: toolError };") > body.indexOf("await runAgent(") && body.indexOf("if (toolError) return { error: toolError };") < body.indexOf("saveLiveRun("));
+});
