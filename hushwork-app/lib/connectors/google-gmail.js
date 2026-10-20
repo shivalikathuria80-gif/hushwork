@@ -7,12 +7,16 @@
 // Mail is written by strangers, so every value is cut short and flattened to plain text here. When the AI later reads it, the
 // agent wraps it as data and ignores any instructions inside (lib/ai/agent.js).
 
+import { refusalKind } from "./google-errors.js";
+
 const TIMEOUT_MS = 10_000;
 const HOW_MANY = 10;
 const BASE = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
 
 export const GMAIL_FAILED = {
   auth: "Google refused the connection. Check that the Gmail API is switched on in Google Cloud, then open Connections and press Connect Google again (it asks for the new Gmail permission).",
+  apiOff: "The Gmail API is switched off in your Google Cloud project. Open console.cloud.google.com, then APIs & Services, then Library, find Gmail API and press Enable. Then try again.",
+  scope: "Google did not give Hushwork the Gmail permission. Open Connections, press Disconnect under Google, then Connect Google, and tick every box on Google's screen (including Gmail).",
   busy: "Google is busy right now. Try again in a minute.",
   network: "Could not reach Google. Check your connection and try again.",
 };
@@ -36,7 +40,10 @@ const headerOf = (headers, name) => headers.find((entry) => entry?.name?.toLower
 
 async function getJson(url, authorization, fetchImpl) {
   const response = await fetchImpl(url, { method: "GET", headers: { authorization }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (response.status === 401 || response.status === 403) return { error: GMAIL_FAILED.auth };
+  if (response.status === 401 || response.status === 403) {
+    const kind = await refusalKind(response);
+    return { error: kind === "apiOff" ? GMAIL_FAILED.apiOff : kind === "scope" ? GMAIL_FAILED.scope : GMAIL_FAILED.auth };
+  }
   if (response.status === 429 || response.status >= 500) return { error: GMAIL_FAILED.busy };
   if (!response.ok) return { error: GMAIL_FAILED.network };
   return { body: await response.json() };

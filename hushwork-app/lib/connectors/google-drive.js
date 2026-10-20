@@ -8,11 +8,15 @@
 // File names are written by other people, so every value is flattened and cut short here. When the AI later reads them, the agent
 // wraps them as data and ignores any instructions inside (lib/ai/agent.js).
 
+import { refusalKind } from "./google-errors.js";
+
 const TIMEOUT_MS = 10_000;
 const HOW_MANY = 10;
 
 export const DRIVE_FAILED = {
   auth: "Google refused the connection. Check that the Google Drive API is switched on in Google Cloud, then open Connections and press Connect Google again (it asks for the new Drive permission).",
+  apiOff: "The Google Drive API is switched off in your Google Cloud project. Open console.cloud.google.com, then APIs & Services, then Library, find Google Drive API and press Enable. Then try again.",
+  scope: "Google did not give Hushwork the Drive permission. Open Connections, press Disconnect under Google, then Connect Google, and tick every box on Google's screen (including Drive).",
   busy: "Google is busy right now. Try again in a minute.",
   network: "Could not reach Google. Check your connection and try again.",
 };
@@ -45,7 +49,10 @@ export async function fetchRecentFiles({ authorization, fetchImpl = fetch }) {
   url.searchParams.set("fields", "files(name,mimeType,modifiedTime)");
   try {
     const response = await fetchImpl(url.toString(), { method: "GET", headers: { authorization }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (response.status === 401 || response.status === 403) return { ok: false, error: DRIVE_FAILED.auth };
+    if (response.status === 401 || response.status === 403) {
+      const kind = await refusalKind(response);
+      return { ok: false, error: kind === "apiOff" ? DRIVE_FAILED.apiOff : kind === "scope" ? DRIVE_FAILED.scope : DRIVE_FAILED.auth };
+    }
     if (response.status === 429 || response.status >= 500) return { ok: false, error: DRIVE_FAILED.busy };
     if (!response.ok) return { ok: false, error: DRIVE_FAILED.network };
     const body = await response.json();

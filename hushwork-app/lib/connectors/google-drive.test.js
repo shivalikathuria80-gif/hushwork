@@ -52,3 +52,10 @@ test("errors become fixed sentences that never contain the token", async () => {
   assert.deepEqual(thrown, { ok: false, error: DRIVE_FAILED.network });
   assert.ok(!JSON.stringify(thrown).includes("SECRET"));
 });
+
+test("a refusal says WHY when Google's answer holds a known reason: the API is switched off, or the permission was not given", async () => {
+  const refuse = (body) => async () => ({ ok: false, status: 403, json: async () => body });
+  assert.deepEqual(await fetchRecentFiles({ authorization: "Bearer t", fetchImpl: refuse({ error: { errors: [{ reason: "accessNotConfigured" }] } }) }), { ok: false, error: DRIVE_FAILED.apiOff });
+  assert.deepEqual(await fetchRecentFiles({ authorization: "Bearer t", fetchImpl: refuse({ error: { details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } }) }), { ok: false, error: DRIVE_FAILED.scope });
+  assert.deepEqual(await fetchRecentFiles({ authorization: "Bearer t", fetchImpl: refuse({}) }), { ok: false, error: DRIVE_FAILED.auth });
+});

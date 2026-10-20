@@ -60,3 +60,15 @@ test("errors become fixed sentences that never contain the token", async () => {
   assert.deepEqual(thrown, { ok: false, error: GMAIL_FAILED.network });
   assert.ok(!JSON.stringify(thrown).includes("SECRET"));
 });
+
+test("a refusal says WHY when Google's answer holds a known reason: the API is switched off, or the permission was not given; anything else stays the general sentence", async () => {
+  const refuse = (body) => async () => ({ ok: false, status: 403, json: async () => body });
+  const off = await fetchInbox({ authorization: "Bearer t", fetchImpl: refuse({ error: { status: "PERMISSION_DENIED", details: [{ reason: "SERVICE_DISABLED" }] } }) });
+  assert.deepEqual(off, { ok: false, error: GMAIL_FAILED.apiOff });
+  assert.match(GMAIL_FAILED.apiOff, /Enable/);
+  const scope = await fetchInbox({ authorization: "Bearer t", fetchImpl: refuse({ error: { errors: [{ reason: "insufficientPermissions" }], details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } }) });
+  assert.deepEqual(scope, { ok: false, error: GMAIL_FAILED.scope });
+  assert.match(GMAIL_FAILED.scope, /Disconnect/);
+  assert.deepEqual(await fetchInbox({ authorization: "Bearer t", fetchImpl: refuse({ error: { message: "something SECRET else" } }) }), { ok: false, error: GMAIL_FAILED.auth });
+  assert.deepEqual(await fetchInbox({ authorization: "Bearer t", fetchImpl: async () => ({ ok: false, status: 401, json: async () => { throw new Error("not json"); } }) }), { ok: false, error: GMAIL_FAILED.auth });
+});
