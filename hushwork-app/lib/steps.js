@@ -76,7 +76,7 @@ export const STEP_KINDS = {
     icon: "Table",
     fields: [
       text("to", "Google Sheet address", 120, { hint: "Paste the web address of your Google Sheet (docs.google.com/spreadsheets/...)" }),
-      text("values", "What to add", 80, { hint: "Boxes separated by commas, for example: Ana, 500, 20 Oct" }),
+      text("values", "What to add", 80, { hint: "Boxes separated by commas, for example: Ana, 500, 20 Oct. Write {answer} to add what an Ask the AI step said." }),
     ],
     // A pasted sheet address is long, so the plan just says "your Google Sheet"; a plain name (an older plan) is shown as it is, cut at 50.
     describe: (fields) => {

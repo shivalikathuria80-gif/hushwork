@@ -212,6 +212,10 @@ This is the one action that writes into a person's Google account, so: the sheet
 
 **Permissions:** the Google Allow screen now shows two: `calendar.readonly` and `spreadsheets` (Google has no narrower permission that works on an existing sheet). In Google Cloud also enable the **Google Sheets API**. Someone who connected Google before Sheets was added must press Disconnect and Connect Google again so Google asks for the new permission. Not yet tested against the real Google.
 
+## Passing an answer to the next step: `{answer}`
+
+An **Add a row** step can use what an **Ask the AI** step of the same workflow said: write `{answer}` in one of its boxes (for example `20 Oct, {answer}`). The order is: do a Practice run, press **Approve** on the Ask the AI step (this saves a "Real" run that also keeps the AI's words), go back to the practice run, and the Add a row step now shows the exact row with the real words filled in; press **Approve** to add it. `lib/run-answer.js` finds the newest real AI step of the same workflow saved after that practice run (only your own runs). The words are put into the box after the row was cut at the commas, flattened to one line and cut to 500 characters, so they cannot add extra boxes, and they are written as plain text (never a formula). If there is no answer yet the step says so and nothing is written.
+
 ## Open an AI plan in the Builder
 
 On the workspace page, a plan (written by the AI or the keyword preview) has an **Open in the Builder** button next to Save as draft. A new plan is saved as a draft first (the same save as Save as draft), then the Builder opens it (`/app/builder?draft=<id>`), where its blocks can be dragged around and its blanks filled in (for example the Google Sheet address of an Add a row step). The button is hidden while a saved draft has unsaved step edits (save the changes first).

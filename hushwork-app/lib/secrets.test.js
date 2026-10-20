@@ -201,7 +201,7 @@ test("Google: exactly four permissions are asked for, each address is in one fil
   assert.deepEqual(sheets.match(/method:\s*["'][A-Z]+["']/g), ['method: "POST"'], "the sheets connector sends exactly one kind of request: an append");
   assert.ok(sheets.includes("values/A1:append") && sheets.includes('"RAW"') && !sheets.includes("USER_ENTERED"), "append only, as plain text (never formulas)");
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
-  for (const [fn, steps] of [["approveCalendarLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveGmailLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchInbox("]], ["approveDriveLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchRecentFiles("]], ["approveSheetsRow", ["requireUser(", "loadPracticeStep(", "parseSheetUrl(", "googleAuthorization(", "appendRow("]]]) {
+  for (const [fn, steps] of [["approveCalendarLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveGmailLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchInbox("]], ["approveDriveLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchRecentFiles("]], ["approveSheetsRow", ["requireUser(", "loadPracticeStep(", "parseSheetUrl(", "findAnswer(", "googleAuthorization(", "appendRow("]]]) {
     const body = action.slice(action.indexOf(`export async function ${fn}`));
     const order = steps.map((call) => body.indexOf(call));
     assert.ok(order.every((index) => index > 0), fn);
@@ -269,4 +269,10 @@ test("repository hygiene: .env.local is git-ignored, no Google client secret is 
       assert.ok(!new RegExp(`from\\s+["'][^"']*${stem.split("/").slice(-2).join("/")}(?:\\.js)?["']`).test(file.text), `${file.name} (browser code) must not import ${name}`);
     }
   }
+});
+
+test("the {answer} lookup only reads the signed-in person's own real runs of the same workflow", () => {
+  const text = files.find((file) => file.name === "lib/run-answer.js").text;
+  assert.ok(text.includes('.eq("user_id", userId)') && text.includes('.eq("workflow_id", run.workflow_id)') && text.includes('.eq("mode", "live")'));
+  assert.ok(!/\.(?:insert|update|delete|upsert)\(/.test(text), "it only reads");
 });

@@ -38,6 +38,19 @@ export function parseCells(raw) {
   return { cells };
 }
 
+// A box may contain {answer}: it stands for what an Ask the AI step of the same workflow said (see lib/run-answer.js). The words are
+// put in AFTER the row was cut into boxes, so commas inside the answer never make extra boxes; the answer is flattened to one line,
+// cut short and written as plain text like everything else. Returns { cells } or { error } (no answer yet).
+export const ANSWER_TAG = "{answer}";
+export const MAX_ANSWER_LENGTH = 500;
+export const NO_ANSWER = "This row uses {answer}. Approve the Ask the AI step of this workflow first (from the same practice run), then come back to this step.";
+export function fillAnswer(cells, answer) {
+  if (!cells.some((cell) => cell.includes(ANSWER_TAG))) return { cells };
+  const text = typeof answer === "string" ? answer.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX_ANSWER_LENGTH) : "";
+  if (!text) return { error: NO_ANSWER };
+  return { cells: cells.map((cell) => cell.split(ANSWER_TAG).join(text)) };
+}
+
 // Returns { ok: true } or { ok: false, error }.
 export async function appendRow({ authorization, spreadsheetId, cells, fetchImpl = fetch }) {
   const checked = parseSheetUrl(`https://docs.google.com/spreadsheets/d/${spreadsheetId}`);

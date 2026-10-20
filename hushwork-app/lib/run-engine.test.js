@@ -104,3 +104,12 @@ test("a Look something up step set to Files can be approved, and the summary say
   assert.match(summary, /Your note: reports/);
   assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "drive", address: "" } })), /Google Drive/);
 });
+
+test("the Add a row summary shows the real words for {answer}, or says to approve the AI step first", async () => {
+  const { sheetsSummary } = await import("./run-engine.js");
+  const row = { kind: "row", fields: { to: "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit", values: "20 Oct, {answer}" } };
+  assert.match(sheetsSummary(row, "Three emails need a reply."), /2\. Three emails need a reply\./);
+  assert.match(sheetsSummary(row, ""), /Approve the Ask the AI step of this workflow first/);
+  assert.match(sheetsSummary(row), /2\. \{answer\}/);
+  assert.doesNotMatch(sheetsSummary({ ...row, fields: { ...row.fields, values: "a, b" } }, "x"), /Approve the Ask/);
+});

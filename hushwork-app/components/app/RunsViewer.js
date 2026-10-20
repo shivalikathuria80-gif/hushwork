@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
+import { findAnswer } from "@/lib/run-answer";
+import { ANSWER_TAG } from "@/lib/connectors/google-sheets";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
 // A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A "Real" run is the record of
@@ -48,7 +50,7 @@ export default async function RunsViewer({ searchParams }) {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("runs")
-      .select("id, workflow_name, mode, status, results, created_at")
+      .select("id, workflow_id, workflow_name, mode, status, results, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(30);
@@ -57,7 +59,7 @@ export default async function RunsViewer({ searchParams }) {
       failure = error.code === "42P01" || error.code === "PGRST205" ? SETUP_MESSAGE : "Could not load your runs. Check your connection and try again.";
     } else {
       runs = data.map((row) => ({
-        id: text(row.id), name: text(row.workflow_name), live: row.mode === "live", status: row.status === "failed" ? "failed" : "done",
+        id: text(row.id), workflowId: text(row.workflow_id), name: text(row.workflow_name), live: row.mode === "live", status: row.status === "failed" ? "failed" : "done",
         createdAt: text(row.created_at), results: readSavedResults(row.results),
       }));
     }
@@ -85,6 +87,9 @@ export default async function RunsViewer({ searchParams }) {
   const liveGmail = selected.live && isGmailLookup(selected.results[0]);
   const liveDrive = selected.live && isDriveLookup(selected.results[0]);
   const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) || isAiStep(step));
+  // A row step that uses {answer} shows the real words, so you read exactly what will be written before you press Approve.
+  const needsAnswer = approvals.some(({ step }) => isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG));
+  const answer = needsAnswer ? await findAnswer(await createClient(), user.id, { workflow_id: selected.workflowId, created_at: selected.createdAt }) : "";
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -129,7 +134,7 @@ export default async function RunsViewer({ searchParams }) {
               runId={selected.id} index={index}
               kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isSheetsRow(step) ? "sheets" : "request"}
               connected={isAiStep(step) ? aiOn : isLinearLookup(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true}
-              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isSheetsRow(step) ? sheetsSummary(step) : requestSummary(step)}
+              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}
             />
           </div>
         ))}

@@ -17,7 +17,8 @@ import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox } from "@/lib/connectors/google-gmail";
 import { fetchRecentFiles } from "@/lib/connectors/google-drive";
-import { appendRow, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
+import { appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
+import { findAnswer } from "@/lib/run-answer";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -77,7 +78,7 @@ async function loadPracticeStep(supabase, user, input, allowed) {
   const id = checkId(input?.runId);
   const index = input?.index;
   if (id.error || !Number.isInteger(index) || index < 0 || index > 50) return { error: "That run no longer exists." };
-  const { data: rows, error } = await supabase.from("runs").select("workflow_id, workflow_name, mode, results").eq("id", id.value).eq("user_id", user.id);
+  const { data: rows, error } = await supabase.from("runs").select("workflow_id, workflow_name, mode, results, created_at").eq("id", id.value).eq("user_id", user.id);
   if (error) {
     console.error("loading a run to approve failed:", error.code);
     return { error: "Could not load that run. Check your connection and try again." };
@@ -289,7 +290,7 @@ export async function approveAiStep(input) {
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
   const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700) });
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700), answer: answer.text.slice(0, 700) });
 }
 
 // The "Approve and look at my calendar" button. READ-ONLY (the permission Google gave is read-only, and
@@ -389,8 +390,11 @@ export async function approveSheetsRow(input) {
   if (loaded.error) return loaded;
   const { run, step } = loaded;
   const sheet = parseSheetUrl(step.fields.to);
-  const row = parseCells(step.fields.values);
-  if (sheet.error || row.error) return { error: sheet.error ?? row.error };
+  const parsed = parseCells(step.fields.values);
+  if (sheet.error || parsed.error) return { error: sheet.error ?? parsed.error };
+  // {answer} in a box is replaced by what the Ask the AI step of this workflow said (the same words the Runs page showed before the Approve).
+  const row = fillAnswer(parsed.cells, await findAnswer(supabase, user.id, run));
+  if (row.error) return { error: row.error };
   const authorization = await googleAuthorization(supabase, user.id);
   if (!authorization) return { error: GOOGLE_OFF };
 

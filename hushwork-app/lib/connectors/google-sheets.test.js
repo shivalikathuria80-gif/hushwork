@@ -46,3 +46,14 @@ test("a bad id or empty cells never reach the network, and errors become fixed s
   assert.deepEqual(thrown, { ok: false, error: SHEETS_FAILED.network });
   assert.ok(!JSON.stringify(thrown).includes("SECRET"));
 });
+
+test("{answer} in a box is replaced after the row is cut into boxes, as one plain line, cut short; no answer yet is a clear message", async () => {
+  const { fillAnswer, parseCells, ANSWER_TAG, MAX_ANSWER_LENGTH, NO_ANSWER } = await import("./google-sheets.js");
+  assert.equal(ANSWER_TAG, "{answer}");
+  const cells = parseCells("20 Oct, Summary: {answer}, done").cells;
+  assert.deepEqual(fillAnswer(cells, "Line one,\n with a comma\tand   spaces $& $1").cells, ["20 Oct", "Summary: Line one, with a comma and spaces $& $1", "done"], "commas inside the answer never make extra boxes, and $ patterns are plain text");
+  assert.equal(fillAnswer(cells, "x".repeat(2000)).cells[1].length, "Summary: ".length + MAX_ANSWER_LENGTH);
+  assert.deepEqual(fillAnswer(parseCells("a, b").cells, "unused"), { cells: ["a", "b"] }, "a row without the tag ignores any answer");
+  for (const none of ["", "   ", undefined, null, 5]) assert.deepEqual(fillAnswer(cells, none), { error: NO_ANSWER }, String(none));
+  assert.deepEqual(fillAnswer(parseCells("{answer}, {answer}").cells, "Hi").cells, ["Hi", "Hi"]);
+});
