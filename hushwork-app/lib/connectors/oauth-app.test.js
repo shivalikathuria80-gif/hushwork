@@ -23,10 +23,10 @@ test("the list: ids are short lowercase names, each entry is complete, every add
   for (const bad of ["", "nope", "__proto__", "constructor", "LINEAR", 5, null, undefined, {}]) assert.equal(findApp(bad), null, String(bad));
 });
 
-test("Linear's sign-in address asks for read access only and carries the state", () => {
+test("Linear's sign-in address asks for read and create-task access only (comma between them) and carries the state", () => {
   const url = new URL(authorizeUrl(linear, { clientId: "cid", redirectUri: "http://localhost:3100/api/connect/linear/callback", state: "abc" }));
   assert.equal(url.origin + url.pathname, "https://linear.app/oauth/authorize");
-  assert.equal(url.searchParams.get("scope"), "read");
+  assert.equal(url.searchParams.get("scope"), "read,issues:create");
   assert.equal(url.searchParams.get("state"), "abc");
   assert.equal(url.searchParams.get("response_type"), "code");
   assert.equal(url.searchParams.get("client_id"), "cid");

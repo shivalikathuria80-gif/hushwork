@@ -28,3 +28,24 @@ test("no answer when there is none, the data is odd, the database fails, or the 
   assert.equal(await findAnswer(pretend([{ results: [{ kind: "ai", answer: "x" }] }]).supabase, "u1", { workflow_id: "w1" }), "");
   assert.equal(await findAnswer(pretend([]).supabase, "u1", null), "");
 });
+
+test("{answer} in a piece of text: put in as one plain line, cut to the limit, and a missing answer is an error", async () => {
+  const { fillAnswerText } = await import("./run-answer.js");
+  assert.deepEqual(fillAnswerText("no tag here", "ignored", 50), { text: "no tag here" });
+  assert.deepEqual(fillAnswerText("Do: {answer}", "Call Ana\nback  today $&", 200), { text: "Do: Call Ana back today $&" });
+  assert.equal(fillAnswerText("Do: {answer}", "x".repeat(900), 30).text.length, 30);
+  assert.equal(fillAnswerText("{answer} {answer}", "Hi", 50).text, "Hi Hi");
+  for (const none of ["", "  ", undefined, null, 7]) assert.ok(fillAnswerText("Do: {answer}", none, 50).error, String(none));
+});
+
+test("a step that writes is approved once per practice run and step: the check looks for a real run from that run and step", async () => {
+  const { wasApproved } = await import("./run-answer.js");
+  const seen = [];
+  const make = (rows, error = null) => { const b = { select: () => b, eq: (n, v) => { seen.push([n, v]); return b; }, contains: (n, v) => { seen.push([n, v]); return b; }, limit: async () => ({ data: rows, error }) }; return { from: () => b }; };
+  const run = { id: "r1", stepIndex: 2 };
+  assert.equal(await wasApproved(make([{ id: "x" }]), "u1", run, "issue"), true);
+  assert.deepEqual(seen.at(-1), ["results", [{ kind: "issue", from: "r1", fromStep: 2 }]]);
+  assert.deepEqual(seen.slice(0, 2), [["user_id", "u1"], ["mode", "live"]]);
+  assert.equal(await wasApproved(make([]), "u1", run, "row"), false);
+  assert.equal(await wasApproved(make(null, { code: "x" }), "u1", run, "row"), false);
+});

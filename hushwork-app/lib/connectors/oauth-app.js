@@ -14,7 +14,7 @@ export function authorizeUrl(entry, { clientId, redirectUri, state }) {
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", entry.scopes.join(" "));
+  url.searchParams.set("scope", entry.scopes.join(entry.scopeSeparator ?? " "));
   url.searchParams.set("state", state);
   for (const [name, value] of Object.entries(entry.extraAuthorize ?? {})) url.searchParams.set(name, value);
   return url.toString();

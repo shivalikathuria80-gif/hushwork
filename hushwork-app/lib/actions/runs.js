@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -18,7 +18,8 @@ import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox } from "@/lib/connectors/google-gmail";
 import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
-import { findAnswer } from "@/lib/run-answer";
+import { fillAnswerText, findAnswer, wasApproved } from "@/lib/run-answer";
+import { createIssue } from "@/lib/connectors/linear-create";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -69,6 +70,7 @@ const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
 const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
 const gmailLimits = () => limiters("__hushworkGmailLimits", 5, 30);
 const driveLimits = () => limiters("__hushworkDriveLimits", 5, 30);
+const linearCreateLimits = () => limiters("__hushworkLinearCreateLimits", 3, 15);
 const sheetsLimits = () => limiters("__hushworkSheetsLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
@@ -92,7 +94,7 @@ async function loadPracticeStep(supabase, user, input, allowed) {
     step = checked.value ? { ...step, fields: checked.value[0].fields } : null;
   }
   if (!run || run.mode !== "practice" || !allowed(step)) return { error: "That step cannot be sent." };
-  return { run: { ...run, id: id.value }, step };
+  return { run: { ...run, id: id.value, stepIndex: index }, step };
 }
 
 // Checks the person's limits, without using a slot yet.
@@ -107,7 +109,7 @@ function limitError(limits, userId, now, what) {
 async function saveLiveRun(supabase, run, record) {
   const { data, error } = await supabase
     .from("runs")
-    .insert({ workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [{ ...record, from: run.id }] })
+    .insert({ workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [{ ...record, from: run.id, fromStep: run.stepIndex }] })
     .select("id");
   if (error) {
     console.error("saving the live run failed:", error.code);
@@ -143,6 +145,8 @@ export async function approveWebCall(input) {
 
 // Whose Linear? The person's own connection (the Connect button) first; else the personal key from .env.local (the owner
 // testing on their own computer). Returns the Authorization value for Linear, or null when there is neither.
+// Steps that write somewhere can be approved only once per practice run (go back to Workflows and run again for another copy).
+const ALREADY = "This step was already approved from this practice run, so nothing was added a second time. To do it again, start a new practice run.";
 const LINEAR_OFF = "Linear is not connected yet. Open Connections and press Connect Linear.";
 async function linearAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
@@ -363,6 +367,38 @@ export async function approveDriveLookup(input) {
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 1200) });
 }
 
+// The "Approve and create the task" button. This WRITES one thing: a new task in Linear (lib/connectors/linear-create.js sends one
+// fixed request; what is written travels as separate values). Only a Create a Linear task step with a title qualifies, it can be
+// approved once per practice run, and the title and details the person read on the Runs page are built again here from the saved run.
+export async function approveLinearCreate(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isLinearCreate);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  if (await wasApproved(supabase, user.id, run, "issue")) return { error: ALREADY };
+
+  const usesAnswer = `${step.fields.title}${step.fields.details}`.includes("{answer}");
+  const answer = usesAnswer ? await findAnswer(supabase, user.id, run) : "";
+  const title = fillAnswerText(step.fields.title, answer, 200);
+  const details = fillAnswerText(step.fields.details, answer, 1500);
+  if (title.error || details.error) return { error: title.error ?? details.error };
+  if (looksSensitive(title.text) || looksSensitive(details.text)) return { error: "That looks like it holds a card number or a secret key, so it was not sent to Linear. Remove it and try again." };
+
+  const authorization = await linearAuthorization(supabase, user.id);
+  if (!authorization) return { error: LINEAR_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(linearCreateLimits(), user.id, now, "created tasks");
+  if (tooMany) return { error: tooMany };
+  linearCreateLimits().minute.take(user.id, now);
+  linearCreateLimits().day.take(user.id, now);
+
+  const made = await createIssue({ authorization, title: title.text, details: details.text, team: step.fields.team });
+  if (!made.ok) return { error: made.error };
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Created the task ${made.id} in Linear: ${title.text}${made.url ? ` (${made.url})` : ""}`.slice(0, 700) });
+}
+
 // The "Delete this run" button. A run is only a record, so deleting it changes nothing outside Hushwork. Only the person's
 // own run can go (user_id filter plus the database rules; there is no way to delete somebody else's). Returns { ok: true } or { error }.
 export async function deleteRun(input) {
@@ -389,6 +425,7 @@ export async function approveSheetsRow(input) {
   const loaded = await loadPracticeStep(supabase, user, input, isSheetsRow);
   if (loaded.error) return loaded;
   const { run, step } = loaded;
+  if (await wasApproved(supabase, user.id, run, "row")) return { error: ALREADY };
   const sheet = parseSheetUrl(step.fields.to);
   const parsed = parseCells(step.fields.values);
   if (sheet.error || parsed.error) return { error: sheet.error ?? parsed.error };

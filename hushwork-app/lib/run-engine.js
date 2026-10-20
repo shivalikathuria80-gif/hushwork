@@ -4,6 +4,7 @@
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
+import { fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
@@ -50,6 +51,17 @@ export const sheetsSummary = (step, answer = "") => {
   return ["Hushwork will add ONE row at the bottom of your Google Sheet. It adds a row and changes nothing else.", `The row has ${cells.length} ${cells.length === 1 ? "box" : "boxes"}:`, cells.map((cell, index) => `${index + 1}. ${cell || "(empty)"}`).join(String.fromCharCode(10)), filled.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
 };
 
+// A "Create a Linear task" step with a title can be approved on the Runs page: Hushwork then adds that ONE task in Linear.
+export const isLinearCreate = (step) => step?.kind === "issue" && typeof step?.fields?.title === "string" && step.fields.title.trim() !== "";
+
+// `answer` is what an Ask the AI step of the same workflow said (or ""): it fills in {answer} so you read the exact words first.
+export const linearCreateSummary = (step, answer = "") => {
+  const f = step?.fields ?? {};
+  const title = fillAnswerText(String(f.title ?? ""), answer, 200);
+  const details = fillAnswerText(String(f.details ?? ""), answer, 1500);
+  return ["Hushwork will add ONE new task in Linear. It does not change or delete anything that already exists.", `Title: ${title.text ?? f.title}`, f.details ? `Details: ${details.text ?? f.details}` : "", `Team: ${f.team ? f.team : "your first team"}`, title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
+};
+
 // An "Ask the AI" step can be approved on the Runs page: the AI then does the job, using only the read-only tool the step allows.
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
 
@@ -77,6 +89,7 @@ const WOULD = {
   send: (f, label) => `Would send ${label("how").toLowerCase()} to ${f.to}${f.about ? ` about ${f.about}` : ""}. Nothing was sent.`,
   row: (f) => `Would add a row to ${f.to}: ${f.values}. Nothing was added.`,
   ai: (f, label) => `Would ask the AI: ${f.task}. It could look at: ${label("uses").toLowerCase()}. Nothing was asked.`,
+  issue: (f) => `Would create a Linear task: ${f.title}${f.team ? ` (team ${f.team})` : ""}. Nothing was created.`,
   request: (f) => `Would ask ${f.url} and read the answer${f.why ? ` (${f.why})` : ""}. Nothing was requested.`,
 };
 

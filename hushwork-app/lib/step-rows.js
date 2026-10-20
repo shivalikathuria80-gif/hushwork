@@ -66,6 +66,7 @@ export const BLOCKS = [
   { id: "approve", label: "Ask me first", help: "Wait for your yes", icon: "ShieldCheck" },
   { id: "send", label: "Send a message", help: "Say who gets it", icon: "Send" },
   { id: "row", label: "Add a row", help: "Put a line in a sheet", icon: "Table" },
+  { id: "issue", label: "Create Linear task", help: "Add a task in Linear", icon: "ListTodo" },
   { id: NOTE, label: "Note", help: "Your own words", icon: "FileText" },
 ];
 export const PRESET_BLOCKS = {

@@ -105,6 +105,17 @@ export const STEP_KINDS = {
     ],
     describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),
   },
+  issue: {
+    label: "Create a Linear task",
+    help: "Add one task in Linear. A practice run only describes it; after you connect Linear, you approve the real task on the Runs page. Write {answer} to use what an Ask the AI step said.",
+    icon: "ListTodo",
+    fields: [
+      text("title", "Task title", 100, { hint: "For example: Reply to Ana about the invoice. Write {answer} to use what an Ask the AI step said." }),
+      text("details", "Details", 150, { optional: true, hint: "Optional. More about the task." }),
+      text("team", "Team key", 10, { optional: true, hint: "Optional. The short key of the Linear team, for example ENG. Empty means your first team." }),
+    ],
+    describe: (fields) => ({ title: "Create a Linear task", detail: join(fields.title, fields.team ? `in ${fields.team}` : "") }),
+  },
 };
 
 // The kinds in the order the editor lists them (note, the free-text step, is offered first by the editor itself).

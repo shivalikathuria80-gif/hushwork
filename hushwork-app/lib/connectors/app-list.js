@@ -9,6 +9,7 @@
 //   envPrefix     the settings are <envPrefix>_CLIENT_ID and <envPrefix>_CLIENT_SECRET in .env.local
 //   authorizeUrl  the app's "Allow" screen    tokenUrl  where the one-time code is swapped    revokeUrl  where permission is cancelled
 //   scopes        the permissions asked for (keep them as small as possible: read-only wherever you can)
+//   scopeSeparator  what goes between permissions on the Allow address (optional; a space unless the app wants something else)
 //   extraAuthorize  extra fields this app wants on the Allow address (optional)
 //   about         one plain sentence under the button
 //   setup         { intro, steps[], note? } how the owner makes Hushwork's own app on the other site, once.
@@ -22,9 +23,11 @@ export const APP_LIST = [
     authorizeUrl: "https://linear.app/oauth/authorize",
     tokenUrl: "https://api.linear.app/oauth/token",
     revokeUrl: "https://api.linear.app/oauth/revoke",
-    scopes: ["read"], // read only: Hushwork never asks to change anything in Linear
+    // read: look at tasks. issues:create: add a NEW task (it cannot change or delete anything that already exists).
+    scopes: ["read", "issues:create"],
+    scopeSeparator: ",", // Linear wants commas between permissions (Google wants spaces)
     extraAuthorize: { prompt: "consent" },
-    about: "Hushwork can read your open Linear tasks. It can only look. It cannot change anything in Linear. You press Allow on Linear’s own page, and you can press Disconnect any time.",
+    about: "Hushwork can read your open Linear tasks, and it can add a new task when a step says so and you approve it. It cannot change or delete anything that already exists. If you connected Linear before task creating was added, press Disconnect and Connect Linear again so Linear asks for the new permission. You press Allow on Linear’s own page, and you can press Disconnect any time.",
     setup: {
       intro: "In Linear open Settings, then **API**, then **OAuth applications**, then **New**.",
       steps: [

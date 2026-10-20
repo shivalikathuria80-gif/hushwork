@@ -119,3 +119,21 @@ test("a real run remembers the practice run it came from, but only a plain id is
   assert.equal(readSavedResults([{ title: "t", from: id }])[0].from, id);
   for (const bad of ["../../x", "", 5, null, undefined, `${id}; drop table runs`, "<script>"]) assert.equal("from" in readSavedResults([{ title: "t", from: bad }])[0], false, String(bad));
 });
+
+test("a Create a Linear task step with a title can be approved; the summary shows the exact words, the team and any missing answer", async () => {
+  const { isLinearCreate, linearCreateSummary } = await import("./run-engine.js");
+  const issue = (fields) => ({ kind: "issue", fields: { title: "", details: "", team: "", ...fields } });
+  assert.equal(isLinearCreate(issue({ title: "Reply to Ana" })), true);
+  assert.equal(isLinearCreate(issue({ title: "   " })), false);
+  assert.equal(isLinearCreate({ kind: "find", fields: { title: "x" } }), false);
+  assert.equal(isLinearCreate(null), false);
+  const plain = linearCreateSummary(issue({ title: "Reply to Ana", details: "About the invoice", team: "ENG" }));
+  assert.match(plain, /ONE new task/);
+  assert.match(plain, /Title: Reply to Ana/);
+  assert.match(plain, /Details: About the invoice/);
+  assert.match(plain, /Team: ENG/);
+  assert.match(linearCreateSummary(issue({ title: "x" })), /Team: your first team/);
+  assert.match(linearCreateSummary(issue({ title: "Do: {answer}" }), "Call Ana back"), /Title: Do: Call Ana back/);
+  assert.match(linearCreateSummary(issue({ title: "Do: {answer}" }), ""), /Approve the Ask the AI step of this workflow first/);
+  assert.match(practiceStep({ icon: "", title: "t", detail: "d", kind: "issue", fields: { title: "Reply", details: "", team: "ENG" } }).outcome, /Would create a Linear task: Reply \(team ENG\)\. Nothing was created\./);
+});

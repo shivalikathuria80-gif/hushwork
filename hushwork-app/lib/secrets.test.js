@@ -119,7 +119,7 @@ test("the Linear key is never NEXT_PUBLIC_, no real-looking key is written anywh
   const looksReal = new RegExp("lin_api_" + "[A-Za-z0-9]{30,}");
   assert.deepEqual(files.filter((file) => looksReal.test(file.text)).map((file) => file.name), []);
   const urls = files.filter((file) => /api\.linear\.app/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
-  assert.deepEqual(urls.sort(), ["lib/connectors/app-list.js", "lib/connectors/linear.js"], "Linear's addresses are written in these two files only");
+  assert.deepEqual(urls.sort(), ["lib/connectors/app-list.js", "lib/connectors/linear-create.js", "lib/connectors/linear.js"], "Linear's addresses are written in these three files only");
 });
 
 test("approveLinearLookup asks who is calling first, reads the saved step, finds the person's permission, then asks Linear; Linear queries never change data", () => {
@@ -275,4 +275,18 @@ test("the {answer} lookup only reads the signed-in person's own real runs of the
   const text = files.find((file) => file.name === "lib/run-answer.js").text;
   assert.ok(text.includes('.eq("user_id", userId)') && text.includes('.eq("workflow_id", run.workflow_id)') && text.includes('.eq("mode", "live")'));
   assert.ok(!/\.(?:insert|update|delete|upsert)\(/.test(text), "it only reads");
+});
+
+test("Linear task creating: the only write is one fixed issueCreate request in its own file, the text travels as variables, and approving asks who is calling first and refuses a second copy", () => {
+  const create = files.find((file) => file.name === "lib/connectors/linear-create.js").text.replace(/^\s*\/\/.*$/gm, "");
+  assert.deepEqual(create.match(/mutation\s+\w+/g), ["mutation CreateTask"], "exactly one mutation");
+  assert.deepEqual([...new Set(create.match(/(?:issue|comment|project|team|user|label|cycle)\w*(?:Create|Update|Delete|Archive)\w*|\w+(?:Update|Delete|Archive)/g) ?? [])].filter((name) => name !== "issueCreate"), [], "no other kind of change");
+  assert.ok(create.includes("variables: { input }") && !/\$\{[^}]*title|\+\s*title/.test(create), "what is written is sent as variables, never glued into the request text");
+  const only = files.filter((file) => /mutation\s+\w+\s*\(/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
+  assert.deepEqual(only, ["lib/connectors/linear-create.js"], "no other file sends a change to Linear");
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveLinearCreate"));
+  const order = ["requireUser(", "loadPracticeStep(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "linearAuthorization(", "limitError(", "createIssue("].map((call) => body.indexOf(call));
+  assert.ok(order.every((index) => index > 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
