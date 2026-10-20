@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -16,6 +16,7 @@ import { findApp } from "@/lib/connectors/app-list";
 import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox } from "@/lib/connectors/google-gmail";
+import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { appendRow, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
@@ -66,6 +67,7 @@ const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
 const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
 const gmailLimits = () => limiters("__hushworkGmailLimits", 5, 30);
+const driveLimits = () => limiters("__hushworkDriveLimits", 5, 30);
 const sheetsLimits = () => limiters("__hushworkSheetsLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
@@ -166,6 +168,9 @@ async function googleAuthorization(supabase, userId) {
 // One line per message for the Runs page and the AI: "2026-10-20 03:45  Ana Lopez: Lunch tomorrow?".
 const mailLines = (mails) => mails.map((mail) => `${mail.time ? `${mail.time}  ` : ""}${mail.from}: ${mail.subject}`).join("; ");
 
+// One line per file for the Runs page and the AI: "2026-10-20 03:45  Sheet: Budget 2026".
+const fileLines = (files) => files.map((file) => `${file.time ? `${file.time}  ` : ""}${file.kind}: ${file.name}`).join("; ");
+
 // One line per event for the Runs page and the AI: "Tue 20 Oct, 09:00  Maths test".
 const eventLines = (events) => events.map((event) => `${event.start}  ${event.title}`).join("; ");
 
@@ -249,6 +254,17 @@ export async function approveAiStep(input) {
         return answer.mails.length ? answer.mails.map((mail) => `${mail.time}  ${mail.from}: ${mail.subject}`).join("\n") : "The inbox is empty.";
       },
     };
+  } else if (uses === "drive") {
+    const authorization = await googleAuthorization(supabase, user.id);
+    if (!authorization) return { error: GOOGLE_OFF };
+    tools.drive_recent_files = {
+      description: "Lists the 10 files in the person's Google Drive that changed most recently: time, kind and name (never what is inside a file).",
+      run: async () => {
+        const answer = await fetchRecentFiles({ authorization });
+        if (!answer.ok) return answer.error;
+        return answer.files.length ? answer.files.map((file) => `${file.time}  ${file.kind}: ${file.name}`).join("\n") : "There are no files.";
+      },
+    };
   } else if (uses === "mcp") {
     // The tools come from the ONE server written in the step; only its read-only tools are offered (lib/connectors/mcp.js).
     const checked = checkRequestUrl(address);
@@ -272,7 +288,7 @@ export async function approveAiStep(input) {
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
-  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
+  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700) });
 }
 
@@ -320,6 +336,29 @@ export async function approveGmailLookup(input) {
   const answer = await fetchInbox({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.mails.length ? `Asked Gmail. The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox: ${mailLines(answer.mails)}` : "Asked Gmail. Your inbox is empty.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 1200) });
+}
+
+// The "Approve and look at my files" button. READ-ONLY (the permission Google gave only sees file names and details, and
+// lib/connectors/google-drive.js only sends one GET request). Only a Look something up step set to Files qualifies.
+export async function approveDriveLookup(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isDriveLookup);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const authorization = await googleAuthorization(supabase, user.id);
+  if (!authorization) return { error: GOOGLE_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(driveLimits(), user.id, now, "file lookups");
+  if (tooMany) return { error: tooMany };
+  driveLimits().minute.take(user.id, now);
+  driveLimits().day.take(user.id, now);
+
+  const answer = await fetchRecentFiles({ authorization });
+  if (!answer.ok) return { error: answer.error };
+  const outcome = answer.files.length ? `Asked Google Drive. The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently: ${fileLines(answer.files)}` : "Asked Google Drive. There are no files.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 1200) });
 }
 

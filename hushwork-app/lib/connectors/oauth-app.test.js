@@ -34,13 +34,13 @@ test("Linear's sign-in address asks for read access only and carries the state",
   assert.equal(url.searchParams.get("prompt"), "consent");
 });
 
-test("Google's sign-in address asks for exactly three permissions (read the calendar, add rows to sheets, read the inbox), offline renewal and the state", () => {
+test("Google's sign-in address asks for exactly four permissions (read the calendar, add rows to sheets, read the inbox, see file names), offline renewal and the state", () => {
   const url = new URL(authorizeUrl(google, { clientId: "cid", redirectUri: "http://localhost:3100/api/connect/google/callback", state: "abc" }));
   assert.equal(url.origin + url.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
-  const three = ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/gmail.readonly"];
+  const three = ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/drive.metadata.readonly"];
   assert.equal(url.searchParams.get("scope"), three.join(" "));
   assert.deepEqual(google.scopes, three);
-  assert.ok(!/drive|gmail\.(?:send|modify|compose|insert|labels|settings)|mail\.google\.com/.test(url.searchParams.get("scope")), "no permission to send, change or delete mail, and none for Drive");
+  assert.ok(!/auth\/drive(?:\.|\s|$)(?!metadata\.readonly)|gmail\.(?:send|modify|compose|insert|labels|settings)|mail\.google\.com/.test(url.searchParams.get("scope")), "no permission to send, change or delete mail, and Drive is names only");
   assert.equal(url.searchParams.get("access_type"), "offline");
   assert.equal(url.searchParams.get("prompt"), "consent");
   assert.equal(url.searchParams.get("state"), "abc");

@@ -49,6 +49,7 @@ test("describeStep: good fields become a title and a detail", () => {
     ["ai", { task: "Which task first?", uses: "linear", address: "" }, "Ask the AI", "Which task first?: My Linear tasks"],
     ["ai", { task: "What is on today?", uses: "calendar", address: "" }, "Ask the AI", "What is on today?: My Google Calendar"],
     ["ai", { task: "Which emails first?", uses: "gmail", address: "" }, "Ask the AI", "Which emails first?: My Gmail inbox"],
+    ["ai", { task: "What did I work on?", uses: "drive", address: "" }, "Ask the AI", "What did I work on?: My Google Drive files"],
     ["ai", { task: "Read the React wiki", uses: "mcp", address: "https://mcp.deepwiki.com/mcp" }, "Ask the AI", "Read the React wiki: An MCP server"],
     ["ai", { task: "Write a haiku", uses: "nothing", address: "" }, "Ask the AI", "Write a haiku"],
   ];

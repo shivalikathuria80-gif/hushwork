@@ -46,13 +46,13 @@ test("templates: the three that work for real say what they need, and their step
   const { isAiStep } = await import("./run-engine.js");
   const { checkRequestUrl } = await import("./connectors/http.js");
   const real = TEMPLATES.filter((t) => t.needs);
-  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "weekahead", "siteup"]);
+  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup"]);
   for (const t of real) {
     assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
     const checked = checkSteps(t.steps).value;
     const ai = checked.find((s) => s.kind === "ai");
     assert.ok(ai && isAiStep(ai), `${t.id}: has an Ask the AI step that can be approved`);
-    assert.equal(ai.fields.uses, { Linear: "linear", Google: t.id === "inboxnow" ? "gmail" : "calendar", Nothing: "web" }[t.needs], `${t.id}: the tool matches what it needs`);
+    assert.equal(ai.fields.uses, { Linear: "linear", Google: { inboxnow: "gmail", recentfiles: "drive" }[t.id] ?? "calendar", Nothing: "web" }[t.needs], `${t.id}: the tool matches what it needs`);
     if (ai.fields.uses === "web") assert.ok(checkRequestUrl(ai.fields.address).value, `${t.id}: the starting web address is valid`);
   }
   for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);

@@ -159,6 +159,12 @@ A **Look something up** step set to **Inbox** can now be approved on the Runs pa
 
 **Owner set-up:** in Google Cloud also enable the **Gmail API** (APIs & Services, Library). Anyone who connected Google earlier must press **Disconnect** and **Connect Google** again so Google asks for the new Gmail permission (until then Gmail answers "refused" and the Runs page says so). While the app is in Testing, Google shows the same "not verified" warning. Not yet tested against the real Gmail: built from Google's published docs and tested with a pretend Google.
 
+## Google Drive: your latest files (names only, read-only)
+
+A **Look something up** step set to **Files** can be approved on the Runs page (`approveDriveLookup`): Hushwork asks Google Drive for the 10 files you changed most recently and saves each file's name, kind (Doc, Sheet, PDF...) and time as a "Real" run. An **Ask the AI** step can be set to **My Google Drive files** (template **What did I work on lately?**). `lib/connectors/google-drive.js` sends one GET asking only for `name,mimeType,modifiedTime`; the Google permission `drive.metadata.readonly` can only see file details, never open, change or delete a file. Limits: 5 a minute and 30 a day per person.
+
+**Owner set-up:** in Google Cloud also enable the **Google Drive API**. Anyone who connected Google before must press **Disconnect** and **Connect Google** again (once is enough for both Gmail and Drive) so Google asks for the new permissions. Not yet tested against the real Drive.
+
 ## Adding another app to the Connect buttons
 
 The apps are one list: `lib/connectors/app-list.js`. Linear and Google are the first two entries. Everything shared (the sign-in, the encrypted saved permission, renewing, Disconnect, the two route files, the box with the setup checklist on the Connections page, the status ticks) reads that list, so a new app is **one new entry** and nothing else in the sign-in code:

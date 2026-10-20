@@ -91,3 +91,16 @@ test("a Look something up step set to Inbox can be approved, and the summary say
   assert.match(summary, /Your note: invoices/);
   assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "gmail", address: "" } })), /Gmail inbox/);
 });
+
+test("a Look something up step set to Files can be approved, and the summary says it never opens a file", async () => {
+  const { isDriveLookup, driveSummary } = await import("./run-engine.js");
+  const find = (where, what = "") => ({ kind: "find", fields: { where, what } });
+  assert.equal(isDriveLookup(find("files")), true);
+  assert.equal(isDriveLookup(find("inbox")), false);
+  assert.equal(isDriveLookup({ kind: "write", fields: { where: "files" } }), false);
+  assert.equal(isDriveLookup(undefined), false);
+  const summary = driveSummary(find("files", "reports"));
+  assert.match(summary, /never opens a file/);
+  assert.match(summary, /Your note: reports/);
+  assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "drive", address: "" } })), /Google Drive/);
+});

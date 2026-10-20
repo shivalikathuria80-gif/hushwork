@@ -29,6 +29,15 @@ export const TEMPLATES = [
     ],
   },
   {
+    id: "recentfiles", icon: "FolderOpen", title: "What did I work on lately?", needs: "Google",
+    body: "The AI reads the names of the 10 files you changed most recently in Google Drive and sums up what you worked on. It never opens a file.",
+    request: "When I ask, look at the files I changed most recently in Google Drive and sum up what I worked on.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "From my 10 latest files (names and times only), sum up what I worked on lately in 3 short lines.", uses: "drive", address: "" }),
+    ],
+  },
+  {
     id: "weekahead", icon: "Calendar", title: "My week ahead", needs: "Google",
     body: "The AI reads your Google Calendar and sums up the next 7 days.",
     request: "When I ask, read my Google Calendar for the next 7 days and sum up the week.",

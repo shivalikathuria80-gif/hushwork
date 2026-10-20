@@ -180,14 +180,18 @@ test("the sign-in flow: signed-in people only, the state is checked before the c
   assert.ok(/<a href=\{`\/api\/connect\/\$\{app\}`\}/.test(page) && !/<Link[^>]*api\/connect/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
 });
 
-test("Google: exactly three permissions are asked for, each address is in one file, the calendar, sheets and gmail connectors can only do their one thing, and approvals ask who is calling first", () => {
+test("Google: exactly four permissions are asked for, each address is in one file, the calendar, sheets and gmail connectors can only do their one thing, and approvals ask who is calling first", () => {
   const oauth = files.find((file) => file.name === "lib/connectors/app-list.js").text;
   const scopes = oauth.match(/https:\/\/www\.googleapis\.com\/auth\/[a-z.]+/g) ?? [];
-  assert.deepEqual([...new Set(scopes)].sort(), ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/spreadsheets"]);
+  assert.deepEqual([...new Set(scopes)].sort(), ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/drive.metadata.readonly", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/spreadsheets"]);
   const only = (pattern) => files.filter((file) => pattern.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md");
   assert.deepEqual(only(/googleapis\.com\/calendar/), ["lib/connectors/google-calendar.js"]);
   assert.deepEqual(only(/sheets\.googleapis\.com/), ["lib/connectors/google-sheets.js"]);
   assert.deepEqual(only(/gmail\.googleapis\.com/), ["lib/connectors/google-gmail.js"]);
+  assert.deepEqual(only(/googleapis\.com\/drive\/v3/), ["lib/connectors/google-drive.js"]);
+  const drive = files.find((file) => file.name === "lib/connectors/google-drive.js").text.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(drive) && !/alt=media|\/export|\/copy|\/permissions/.test(drive), "the drive connector only sends GET and never asks for a file's contents");
+  assert.ok(drive.includes('"files(name,mimeType,modifiedTime)"'), "only name, kind and time are asked for");
   const gmail = files.find((file) => file.name === "lib/connectors/google-gmail.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(gmail) && !/\/(?:send|modify|trash|delete|drafts|batch)/i.test(gmail), "the gmail connector only sends GET and never names a send, change or delete address");
   assert.ok(gmail.includes('"metadata"') && !gmail.includes('"full"') && !gmail.includes("format=raw"), "only the headers are asked for, never the body of an email");
@@ -197,7 +201,7 @@ test("Google: exactly three permissions are asked for, each address is in one fi
   assert.deepEqual(sheets.match(/method:\s*["'][A-Z]+["']/g), ['method: "POST"'], "the sheets connector sends exactly one kind of request: an append");
   assert.ok(sheets.includes("values/A1:append") && sheets.includes('"RAW"') && !sheets.includes("USER_ENTERED"), "append only, as plain text (never formulas)");
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
-  for (const [fn, steps] of [["approveCalendarLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveGmailLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchInbox("]], ["approveSheetsRow", ["requireUser(", "loadPracticeStep(", "parseSheetUrl(", "googleAuthorization(", "appendRow("]]]) {
+  for (const [fn, steps] of [["approveCalendarLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveGmailLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchInbox("]], ["approveDriveLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchRecentFiles("]], ["approveSheetsRow", ["requireUser(", "loadPracticeStep(", "parseSheetUrl(", "googleAuthorization(", "appendRow("]]]) {
     const body = action.slice(action.indexOf(`export async function ${fn}`));
     const order = steps.map((call) => body.indexOf(call));
     assert.ok(order.every((index) => index > 0), fn);
