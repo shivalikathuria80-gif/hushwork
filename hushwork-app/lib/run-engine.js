@@ -4,6 +4,7 @@
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
+import { findComposioApp } from "./connectors/composio-apps.js";
 import { fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
@@ -62,11 +63,20 @@ export const linearCreateSummary = (step, answer = "") => {
   return ["Hushwork will add ONE new task in Linear. It does not change or delete anything that already exists.", `Title: ${title.text ?? f.title}`, f.details ? `Details: ${details.text ?? f.details}` : "", `Team: ${f.team ? f.team : "your first team"}`, title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
 };
 
+// A "Look in another app" step can be approved on the Runs page: Hushwork then asks Composio to read one fixed thing from the app
+// (its list entry in lib/connectors/composio-apps.js). Read-only.
+export const isAppLookup = (step) => step?.kind === "app" && Boolean(findComposioApp(step?.fields?.app));
+
+export const appSummary = (step) => {
+  const app = findComposioApp(step?.fields?.app);
+  return [`Hushwork will ask ${app?.name ?? "the app"} for ${app?.what ?? "its information"}. It only reads: nothing in ${app?.name ?? "the app"} is changed.`, "What is read passes through Composio, the company that keeps the connection to the app.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+};
+
 // An "Ask the AI" step can be approved on the Runs page: the AI then does the job, using only the read-only tool the step allows.
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
 
 export const aiSummary = (step) => {
-  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", gmail: "your Gmail inbox (sender, subject and time of the latest 10 messages)", drive: "your Google Drive (names and times of your 10 latest files)", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
+  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", gmail: "your Gmail inbox (sender, subject and time of the latest 10 messages)", drive: "your Google Drive (names and times of your 10 latest files)", app: findComposioApp(step?.fields?.address) ? `${findComposioApp(step.fields.address).name} (${findComposioApp(step.fields.address).what}, through Composio)` : "a connected app", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
   return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI." + (step?.fields?.uses === "mcp" ? " The AI\u2019s questions to the MCP server go to that server. Only its read-only tools can be used." : "")].join(String.fromCharCode(10));
 };
 
@@ -90,6 +100,7 @@ const WOULD = {
   row: (f) => `Would add a row to ${f.to}: ${f.values}. Nothing was added.`,
   ai: (f, label) => `Would ask the AI: ${f.task}. It could look at: ${label("uses").toLowerCase()}. Nothing was asked.`,
   issue: (f) => `Would create a Linear task: ${f.title}${f.team ? ` (team ${f.team})` : ""}. Nothing was created.`,
+  app: (f, label) => `Would look in ${label("app")}. Nothing was opened.`,
   request: (f) => `Would ask ${f.url} and read the answer${f.why ? ` (${f.why})` : ""}. Nothing was requested.`,
 };
 

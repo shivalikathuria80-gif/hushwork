@@ -12,7 +12,7 @@ const UNREADABLE = "That plan could not be read.";
 const bytes = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
 
 test("kinds: each has an icon from the icon list, unique field keys, and sensible limits", () => {
-  assert.deepEqual(STEP_KIND_ORDER, ["trigger", "find", "write", "approve", "send", "row", "request", "ai", "issue"]);
+  assert.deepEqual(STEP_KIND_ORDER, ["trigger", "find", "write", "approve", "send", "row", "request", "ai", "app", "issue"]);
   for (const [kind, spec] of Object.entries(STEP_KINDS)) {
     assert.ok(ICON_NAMES.includes(spec.icon), `${kind}: icon ${spec.icon} is not in the icon list`);
     assert.ok(spec.label && spec.help, `${kind}: needs a label and a help line`);
@@ -140,7 +140,7 @@ test("checkSteps: running it on its own typed output changes nothing", () => {
     trigger: { how: "email", when: "Within an hour" }, find: { where: "payments", what: "unpaid" }, write: { what: "reply", about: "" },
     approve: { what: "" }, send: { how: "other", to: "the client", about: "invoice" }, row: { to: "Tracker", values: "a, b" },
     request: { url: "https://example.com/a", why: "" }, ai: { task: "Think", uses: "nothing", address: "" },
-    issue: { title: "Reply to Ana", details: "", team: "ENG" },
+    app: { app: "todoist", what: "" }, issue: { title: "Reply to Ana", details: "", team: "ENG" },
   };
   const first = checkSteps(STEP_KIND_ORDER.map((kind) => ({ kind, fields: sample[kind] })));
   assert.ok(first.value, first.error);

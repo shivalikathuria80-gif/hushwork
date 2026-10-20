@@ -290,3 +290,31 @@ test("Linear task creating: the only write is one fixed issueCreate request in i
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
+
+test("Composio: the key is read only in composio-env.js (server-only, never NEXT_PUBLIC_), the tool that runs always comes from the list with no arguments, and approving asks who is calling first", () => {
+  const KEY_NAME = "COMPOSIO" + "_API_KEY";
+  // runs.js and composio.js only NAME the setting inside a sentence shown to the owner; only composio-env.js reads it
+  const allowed = new Set(["lib/connectors/composio-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js", "lib/actions/runs.js", "lib/connectors/composio.js"]);
+  assert.ok(!/process\.env/.test(files.find((file) => file.name === "lib/connectors/composio.js").text) && files.find((file) => file.name === "lib/connectors/composio-env.js").text.includes("process.env"), "only the env file reads settings");
+  assert.deepEqual(withText(KEY_NAME).filter((file) => !allowed.has(file)), []);
+  assert.deepEqual(withText("NEXT_PUBLIC_" + KEY_NAME), []);
+  const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
+  assert.match(env, /^import "server-only";/m);
+  const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/composio.js", "lib/actions/runs.js", "lib/connections/composio-flow.js"]);
+  for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
+  const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
+  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}"], "the one tool that runs is the one in the list");
+  assert.ok(client.includes("arguments: {}"), "always called with nothing to fill in");
+  assert.ok(client.includes("restrict_to_following_tools: [app.tool]"), "the sign-in is limited to that one tool at Composio too");
+  assert.deepEqual(files.filter((file) => /backend\.composio\.dev/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md"), ["lib/connectors/composio.js"]);
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const body = action.slice(action.indexOf("export async function approveAppLookup"));
+  const order = ["requireUser(", "loadPracticeStep(", "findComposioApp(", "getComposioKey(", "limitError(", "runReadTool("].map((call) => body.indexOf(call));
+  assert.ok(order.every((index) => index > 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  const flow = files.find((file) => file.name === "lib/connections/composio-flow.js").text;
+  assert.ok(flow.indexOf("findComposioApp(appId)") < flow.indexOf("requireUser("), "an unknown app is a 404 before anything else");
+  const page = files.find((file) => file.name === "app/app/connections/page.js").text;
+  assert.ok(/<a href=\{`\/api\/composio\/\$\{app\.id\}`\}/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");
+});

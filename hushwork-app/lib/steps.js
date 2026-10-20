@@ -10,6 +10,8 @@
 // To add a kind later: add an entry below, keep every text field short (see the worst-case test in steps.test.js), and
 // use an icon from lib/ai/icon-names.js.
 
+import { COMPOSIO_APPS } from "./connectors/composio-apps.js"; // plain data, so the browser and the server still load the same rules
+
 export const NOTE = "note";
 
 // How to read a field description:
@@ -96,14 +98,24 @@ export const STEP_KINDS = {
   },
   ai: {
     label: "Ask the AI",
-    help: "Give the AI a job. It can look at your Linear tasks, your calendar, your Gmail inbox, your Google Drive file list, one web address or the read-only tools of one MCP server first. It can only read. You approve it on the Runs page.",
+    help: "Give the AI a job. It can look at your Linear tasks, your calendar, your Gmail inbox, your Google Drive file list, an app you connected through Composio, one web address or the read-only tools of one MCP server first. It can only read. You approve it on the Runs page.",
     icon: "Sparkles",
     fields: [
       text("task", "What should the AI do?", 110, { hint: "For example: Tell me which task to do first" }),
-      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", gmail: "My Gmail inbox", drive: "My Google Drive files", web: "A web address", mcp: "An MCP server" }),
-      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server. Starts with https://" }),
+      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", gmail: "My Gmail inbox", drive: "My Google Drive files", app: "Another app (Todoist, Notion...)", web: "A web address", mcp: "An MCP server" }),
+      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server (starts with https://), or Another app (its short name: todoist, notion, airtable, hubspot or jira)" }),
     ],
     describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),
+  },
+  app: {
+    label: "Look in another app",
+    help: "Look at something in an app you connected through Composio (Todoist, Notion...). It only reads. A practice run only describes it; you approve the real look on the Runs page.",
+    icon: "Plug",
+    fields: [
+      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.map((app) => [app.id, app.name]))),
+      text("what", "Your note", 120, { optional: true, hint: "Optional. What you want to know, for example: which task is due first" }),
+    ],
+    describe: (fields, label) => ({ title: "Look in another app", detail: join(label("app"), fields.what) }),
   },
   issue: {
     label: "Create a Linear task",

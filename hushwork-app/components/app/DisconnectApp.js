@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { disconnectApp } from "@/lib/actions/connections";
+import { disconnectComposioApp } from "@/lib/actions/composio";
 
-// The Disconnect button on the Connections page, for any app ("linear" or "google"). It asks first, because disconnecting
+// The Disconnect button on the Connections page, for any app in lib/connectors/app-list.js, or (through="composio") an app in composio-apps.js. It asks first, because disconnecting
 // means pressing Connect again later.
-export default function DisconnectApp({ app, label }) {
+export default function DisconnectApp({ app, label, through }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
@@ -18,7 +19,7 @@ export default function DisconnectApp({ app, label }) {
     startTransition(async () => {
       let result;
       try {
-        result = await disconnectApp(app);
+        result = await (through === "composio" ? disconnectComposioApp(app) : disconnectApp(app));
       } catch (problem) {
         unstable_rethrow(problem);
         result = { error: "Could not disconnect. Check your connection and try again." };

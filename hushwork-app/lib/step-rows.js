@@ -67,6 +67,7 @@ export const BLOCKS = [
   { id: "send", label: "Send a message", help: "Say who gets it", icon: "Send" },
   { id: "row", label: "Add a row", help: "Put a line in a sheet", icon: "Table" },
   { id: "issue", label: "Create Linear task", help: "Add a task in Linear", icon: "ListTodo" },
+  { id: "app", label: "Another app", help: "Look in Todoist, Notion...", icon: "Plug" },
   { id: NOTE, label: "Note", help: "Your own words", icon: "FileText" },
 ];
 export const PRESET_BLOCKS = {

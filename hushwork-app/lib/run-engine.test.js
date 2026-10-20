@@ -137,3 +137,21 @@ test("a Create a Linear task step with a title can be approved; the summary show
   assert.match(linearCreateSummary(issue({ title: "Do: {answer}" }), ""), /Approve the Ask the AI step of this workflow first/);
   assert.match(practiceStep({ icon: "", title: "t", detail: "d", kind: "issue", fields: { title: "Reply", details: "", team: "ENG" } }).outcome, /Would create a Linear task: Reply \(team ENG\)\. Nothing was created\./);
 });
+
+test("a Look in another app step naming an app from the list can be approved; the summary names the app, what it reads and Composio", async () => {
+  const { isAppLookup, appSummary } = await import("./run-engine.js");
+  const app = (id, what = "") => ({ kind: "app", fields: { app: id, what } });
+  assert.equal(isAppLookup(app("todoist")), true);
+  assert.equal(isAppLookup(app("notion")), true);
+  for (const bad of ["", "nope", "__proto__", "TODOIST", undefined]) assert.equal(isAppLookup(app(bad)), false, String(bad));
+  assert.equal(isAppLookup({ kind: "find", fields: { app: "todoist" } }), false);
+  assert.equal(isAppLookup(null), false);
+  const summary = appSummary(app("todoist", "what is due first"));
+  assert.match(summary, /Todoist for your open tasks/);
+  assert.match(summary, /only reads/);
+  assert.match(summary, /Composio/);
+  assert.match(summary, /Your note: what is due first/);
+  assert.match(practiceStep({ icon: "", title: "t", detail: "d", kind: "app", fields: { app: "notion", what: "" } }).outcome, /Would look in Notion\. Nothing was opened\./);
+  assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "app", address: "jira" } })), /Jira \(your projects, through Composio\)/);
+  assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "app", address: "nope" } })), /a connected app/);
+});

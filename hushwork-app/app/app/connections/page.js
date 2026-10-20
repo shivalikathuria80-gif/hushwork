@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { connectorStatus } from "@/lib/connector-status";
 import { APP_LIST } from "@/lib/connectors/app-list";
+import { COMPOSIO_APPS } from "@/lib/connectors/composio-apps";
+import { getComposioKey } from "@/lib/connectors/composio-env";
+import { listConnected } from "@/lib/connectors/composio";
 import DisconnectApp from "@/components/app/DisconnectApp";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
@@ -33,7 +36,7 @@ export default function ConnectionsPage({ searchParams }) {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear (reading your tasks and adding a new one), Google Calendar, Google Sheets, reading your Gmail inbox and seeing your recent Drive files work, and only after you approve them on the Runs page. The rest are planned.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear (reading your tasks and adding a new one), Google Calendar, Google Sheets, reading your Gmail inbox, seeing your recent Drive files and a few more apps through Composio work, and only after you approve them on the Runs page. The rest are planned.</p>
 
       {APP_LIST.map((entry) => (
         <section key={entry.id} aria-labelledby={`${entry.id}-heading`} className="mt-8">
@@ -43,6 +46,13 @@ export default function ConnectionsPage({ searchParams }) {
           </div>
         </section>
       ))}
+
+      <section aria-labelledby="more-heading" className="mt-8">
+        <h2 id="more-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">More apps (through Composio)</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <Suspense fallback={fallback}><MoreApps searchParams={searchParams} /></Suspense>
+        </div>
+      </section>
 
       <section aria-labelledby="web-heading" className="mt-8">
         <h2 id="web-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Web addresses</h2>
@@ -91,6 +101,72 @@ function Rich({ text, entry }) {
     part.startsWith("**") ? <b key={index} className="font-medium text-ink">{part.slice(2, -2)}</b>
       : part.startsWith("`") ? <code key={index} className={code}>{part.slice(1, -1)}</code>
       : part,
+  );
+}
+
+// What the short message in the address means after the Composio sign-in page sends the person back (?composio=...).
+const COMPOSIO_RESULTS = {
+  done: ["ok", "Back from the sign-in. If you finished it, the app now says Connected."],
+  setup: ["problem", "More apps is not switched on yet. See the steps below."],
+  failed: ["problem", "Composio could not start that sign-in. Try again in a minute."],
+  slow: ["problem", "You pressed Connect a lot. Wait a minute and try again."],
+};
+
+// "More apps": apps reached through Composio (composio.dev), which keeps each person's sign-in. It reads the session and asks
+// Composio which apps this person connected, so it sits inside <Suspense>.
+async function MoreApps({ searchParams }) {
+  const user = await requireUser();
+  const params = await searchParams;
+  const result = params.composio;
+  const note = typeof result === "string" && Object.hasOwn(COMPOSIO_RESULTS, result) ? COMPOSIO_RESULTS[result] : null;
+  const key = getComposioKey();
+  const listed = key ? await listConnected({ key, userId: user.id }) : null;
+  const connected = new Set((listed?.accounts ?? []).map((account) => account.toolkit));
+
+  return (
+    <div>
+      {note && (
+        <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
+          <Icon name={note[0] === "ok" ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${note[0] === "ok" ? "text-success" : "text-error"}`} />{note[1]}
+        </p>
+      )}
+      <p className="text-sm text-mute">Composio is a company that already holds the sign-in for many apps, so you do not have to make an app for each one. When you press Connect, you sign in on Composio{"’"}s page and Composio keeps the permission. Hushwork can only <b className="font-medium text-ink">read</b> one fixed thing from each app (it also asks Composio to refuse everything else), and what it reads passes through Composio. You can press Disconnect any time.</p>
+
+      {!key ? (
+        <div className="mt-4 rounded-xl border border-line bg-raised p-3">
+          <h3 className="text-sm font-medium">One-time setup (the owner does this once)</h3>
+          <ol className="mt-2 space-y-2 text-sm text-mute">
+            <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">1.</b> Make a free account at <code className={code}>composio.dev</code> (the free plan has 100,000 uses a month).</span></li>
+            <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">2.</b> In Composio open <b className="font-medium text-ink">Settings</b> and copy your <b className="font-medium text-ink">API key</b>. It is private.</span></li>
+            <li className="flex gap-2"><Done yes={false} /><span><b className="font-medium text-ink">3.</b> Put it in <code className={code}>hushwork-app/.env.local</code> as <code className={code}>COMPOSIO_API_KEY=...</code>, then stop the app and start it again with <code className={code}>npm run dev</code>.</span></li>
+          </ol>
+        </div>
+      ) : listed?.error ? (
+        <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{listed.error}</p>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {COMPOSIO_APPS.map((app) => (
+            <li key={app.id} className="rounded-xl border border-line p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{app.name}</p>
+                  <p className="text-sm text-mute">{app.about}</p>
+                </div>
+                {connected.has(app.toolkit) ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="flex items-center gap-2 text-sm font-medium"><Icon name="CircleCheck" className="text-success" />Connected</p>
+                    <DisconnectApp app={app.id} label={app.name} through="composio" />
+                  </div>
+                ) : (
+                  /* A plain link on purpose: it must not be pre-loaded in the background, because opening it starts the sign-in. */
+                  <a href={`/api/composio/${app.id}`} className={buttonLook}>Connect {app.name}</a>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

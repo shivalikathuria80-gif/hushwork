@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -20,6 +20,9 @@ import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
 import { fillAnswerText, findAnswer, wasApproved } from "@/lib/run-answer";
 import { createIssue } from "@/lib/connectors/linear-create";
+import { getComposioKey } from "@/lib/connectors/composio-env";
+import { findComposioApp } from "@/lib/connectors/composio-apps";
+import { runReadTool } from "@/lib/connectors/composio";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -71,6 +74,7 @@ const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
 const gmailLimits = () => limiters("__hushworkGmailLimits", 5, 30);
 const driveLimits = () => limiters("__hushworkDriveLimits", 5, 30);
 const linearCreateLimits = () => limiters("__hushworkLinearCreateLimits", 3, 15);
+const appLimits = () => limiters("__hushworkAppLimits", 5, 30);
 const sheetsLimits = () => limiters("__hushworkSheetsLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
 
@@ -147,6 +151,7 @@ export async function approveWebCall(input) {
 // testing on their own computer). Returns the Authorization value for Linear, or null when there is neither.
 // Steps that write somewhere can be approved only once per practice run (go back to Workflows and run again for another copy).
 const ALREADY = "This step was already approved from this practice run, so nothing was added a second time. To do it again, start a new practice run.";
+const COMPOSIO_OFF = "More apps is not switched on. Add COMPOSIO_API_KEY to .env.local first (see Connections).";
 const LINEAR_OFF = "Linear is not connected yet. Open Connections and press Connect Linear.";
 async function linearAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
@@ -270,6 +275,19 @@ export async function approveAiStep(input) {
         return answer.files.length ? answer.files.map((file) => `${file.time}  ${file.kind}: ${file.name}`).join("\n") : "There are no files.";
       },
     };
+  } else if (uses === "app") {
+    // The app is named in the step's address box and must be one from lib/connectors/composio-apps.js; the tool is always that app's one read-only tool.
+    const app = findComposioApp(typeof address === "string" ? address.trim().toLowerCase() : "");
+    if (!app) return { error: "Write the short name of the app in this step first (todoist, notion, airtable, hubspot or jira)." };
+    const composioKey = getComposioKey();
+    if (!composioKey) return { error: COMPOSIO_OFF };
+    tools.app_read = {
+      description: `Reads ${app.what} from ${app.name} (read-only).`,
+      run: async () => {
+        const answer = await runReadTool({ key: composioKey, userId: user.id, app });
+        return answer.ok ? answer.text : answer.error;
+      },
+    };
   } else if (uses === "mcp") {
     // The tools come from the ONE server written in the step; only its read-only tools are offered (lib/connectors/mcp.js).
     const checked = checkRequestUrl(address);
@@ -293,7 +311,7 @@ export async function approveAiStep(input) {
 
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
-  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
+  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700), answer: answer.text.slice(0, 700) });
 }
 
@@ -397,6 +415,29 @@ export async function approveLinearCreate(input) {
   const made = await createIssue({ authorization, title: title.text, details: details.text, team: step.fields.team });
   if (!made.ok) return { error: made.error };
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Created the task ${made.id} in Linear: ${title.text}${made.url ? ` (${made.url})` : ""}`.slice(0, 700) });
+}
+
+// The "Approve and look in the app" button. READ-ONLY: the tool is always the one written in the app's list entry, called with nothing
+// to fill in, through Composio (lib/connectors/composio.js). Only a Look in another app step naming an app from the list qualifies.
+export async function approveAppLookup(input) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const loaded = await loadPracticeStep(supabase, user, input, isAppLookup);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const app = findComposioApp(step.fields.app);
+  const composioKey = getComposioKey();
+  if (!composioKey) return { error: COMPOSIO_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(appLimits(), user.id, now, "app lookups");
+  if (tooMany) return { error: tooMany };
+  appLimits().minute.take(user.id, now);
+  appLimits().day.take(user.id, now);
+
+  const answer = await runReadTool({ key: composioKey, userId: user.id, app });
+  if (!answer.ok) return { error: answer.error };
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Asked ${app.name} for ${app.what}: ${answer.text}`.slice(0, 1700) });
 }
 
 // The "Delete this run" button. A run is only a record, so deleting it changes nothing outside Hushwork. Only the person's
