@@ -140,7 +140,7 @@ test("the Connect settings' names appear in no code except one setup sentence on
   const env = files.find((file) => file.name === "lib/connectors/oauth-env.js").text;
   assert.ok(env.includes("`${entry.envPrefix}_CLIENT_ID`") && env.includes("`${entry.envPrefix}_CLIENT_SECRET`") && env.includes('read("CONNECTIONS_KEY")'));
   const readers = files.filter((file) => /process\.env\[/.test(file.text) && !file.name.endsWith(".test.js")).map((file) => file.name);
-  assert.deepEqual(readers, ["lib/connectors/oauth-env.js"], "the only code that reads a setting by a built-up name");
+  assert.deepEqual(readers, ["lib/connectors/oauth-env.js", "lib/schedule-env.js"], "the only code that reads a setting by a built-up name (the two settings files)");
 });
 
 test("oauth-env.js is server-only and imported only by server code, never by browser code", () => {
@@ -377,4 +377,34 @@ test("the Server Actions for runs are thin: each works out WHO is asking from th
   assert.ok(!/requireUser\(|createClient\(/.test(core.replace(/\/\/.*$/gm, "")), "the core never decides who is calling; it is told");
   const importers = files.filter((file) => /from\s+["']@\/lib\/run-core["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
+});
+
+test("scheduled runs: the two settings are read only in schedule-env.js, the all-access key has one user, the clock's password is checked before anything runs, and a person's own screens never touch the all-access key", () => {
+  const CRON = "CRON" + "_SECRET";
+  const ROLE = "SUPABASE_SERVICE" + "_ROLE_KEY";
+  const allowed = new Set(["lib/schedule-env.js", "lib/secrets.test.js", ".env.example", "README.md", "docs/deploy.md", "lib/schedule-tick.js", "app/api/cron/tick/route.js", "supabase/schedules.sql", "scripts/make-secret.mjs"]);
+  for (const name of [CRON, ROLE]) {
+    assert.deepEqual(withText(name).filter((file) => !allowed.has(file)), [], name);
+    assert.deepEqual(withText("NEXT_PUBLIC_" + name), [], name);
+  }
+  const env = files.find((file) => file.name === "lib/schedule-env.js").text;
+  assert.match(env, /^import "server-only";/m);
+  assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example"), ["lib/schedule-env.js"], "only schedule-env.js reads them");
+  const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
+  assert.deepEqual(adminImporters, ["lib/schedule-tick.js"], "the all-access client has exactly one user: the clock's handler");
+  assert.match(files.find((file) => file.name === "lib/supabase/admin.js").text, /^import "server-only";/m);
+  const tick = files.find((file) => file.name === "lib/schedule-tick.js").text;
+  assert.ok(tick.indexOf("timingSafeEqual") > 0 && tick.indexOf("same(sent, secret)") < tick.indexOf("runDueSchedules("), "the password is checked (in constant time) before anything runs");
+  assert.ok(tick.indexOf("503") < tick.indexOf("401") && tick.indexOf("401") < tick.indexOf("runDueSchedules("));
+  for (const name of ["lib/actions/schedules.js", "components/app/Drafts.js", "components/app/ScheduleEditor.js"]) assert.ok(!/supabase\/admin|createAdminClient/.test(files.find((file) => file.name === name).text), `${name} never uses the all-access client`);
+  const runner = files.find((file) => file.name === "lib/schedule-runner.js").text;
+  assert.ok(runner.indexOf('.eq("next_run_at", row.next_run_at)') > 0 && runner.indexOf('.eq("next_run_at", row.next_run_at)') < runner.indexOf("await run("), "a schedule is claimed (and only if still due) before it is run");
+  assert.ok(runner.includes("allowWrites: row.allow_writes === true"), "writing is allowed only when the person ticked it");
+  const core = files.find((file) => file.name === "lib/run-core.js").text;
+  assert.ok(core.includes("if (!allowWrites && isWriteStep(step)) continue;") && core.includes("allowWrites: input?.allowWrites !== false"), "writing steps are skipped when writing is not allowed");
+  assert.ok(core.includes("ownerOf(supabase,"), "rows made with the all-access client say whose they are");
+  const sql = files.find((file) => file.name === "supabase/schedules.sql")?.text ?? fs.readFileSync(path.join(root, "..", "supabase", "schedules.sql"), "utf8");
+  assert.match(sql, /enable row level security/);
+  const grants = sql.split("\n").filter((line) => /^grant /.test(line)).join("\n");
+  assert.ok(!/last_run_at|last_status|last_run_id/.test(grants), "a person can never write the runner's bookkeeping columns");
 });

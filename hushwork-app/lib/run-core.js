@@ -87,7 +87,7 @@ export async function startPracticeRun(input, who) {
   revalidatePath("/app", "layout");
   const runId = String(data?.[0]?.id ?? "");
   // Only an explicit true switches Auto on; anything else is the normal, ask-first Manual mode.
-  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results, who) };
+  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results, who, { allowWrites: input?.allowWrites !== false }) };
   return { ok: true, runId };
 }
 

@@ -9,6 +9,7 @@ import { useFillComposer } from "./Workspace";
 import { renameDraft, deleteDraft } from "@/lib/actions/drafts";
 import { startPracticeRun } from "@/lib/actions/runs";
 import { useRunMode } from "./RunMode";
+import ScheduleEditor from "./ScheduleEditor";
 import { LIMITS } from "@/lib/validate";
 
 // One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Practice run" walks its steps and sends nothing.
@@ -42,7 +43,7 @@ async function call(action, input, fallback) {
   }
 }
 
-export default function DraftCard({ draft, onDeleted, openBase }) {
+export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
   const fill = useFillComposer();
   const router = useRouter();
   const [mode, setMode] = useState("view"); // view | rename | delete
@@ -170,6 +171,7 @@ export default function DraftCard({ draft, onDeleted, openBase }) {
           )}
         </div>
       )}
+      {mode === "view" && openBase && scheduling && <ScheduleEditor workflowId={draft.id} schedule={draft.schedule ?? null} tableMissing={scheduling.tableMissing} clockReady={scheduling.clockReady} />}
       {mode === "view" && openBase && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step adds a row or creates a task" : "steps add rows or create tasks"}.</p>}
       {mode === "view" && error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>

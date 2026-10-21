@@ -9,7 +9,7 @@ import DraftCard from "./DraftCard";
 import { RunModeSwitch } from "./RunMode";
 
 // The list part of "Your drafts": the three states (could not load, empty, list) plus the "Draft deleted." notice.
-export default function DraftList({ drafts, loadFailed, openBase }) {
+export default function DraftList({ drafts, loadFailed, openBase, scheduling }) {
   const router = useRouter();
   const [notice, setNotice] = useState("");
 
@@ -59,7 +59,7 @@ export default function DraftList({ drafts, loadFailed, openBase }) {
                 key={draft.id} className="overflow-hidden pb-3"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0, paddingBottom: 0 }} transition={{ duration: 0.2 }}
               >
-                <DraftCard draft={draft} onDeleted={onDeleted} openBase={openBase} />
+                <DraftCard draft={draft} onDeleted={onDeleted} openBase={openBase} scheduling={scheduling} />
               </motion.li>
             ))}
           </AnimatePresence>
