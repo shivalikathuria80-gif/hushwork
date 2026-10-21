@@ -57,7 +57,7 @@ export function RunModeSwitch() {
       <p className="mt-2 px-1 text-sm text-mute">
         {mode === "auto"
           ? "Auto: when you press Run, Hushwork does every step by itself, in order, without asking first. That includes adding a row to your sheet and creating a Linear task. It stops at the first step that does not work."
-          : "Manual: a run first only writes down what each step would do. Then you press Approve on each real step, and you read the exact words before anything is sent, added or created."}
+          : "Manual: a run lists the steps and waits. You press Approve on each step that acts on your apps, and you read the exact words before anything is sent, added or created."}
       </p>
     </div>
   );

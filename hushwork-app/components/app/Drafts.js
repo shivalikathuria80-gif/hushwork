@@ -8,13 +8,13 @@ import { clockReady } from "@/lib/schedule-status";
 // appears first, and this section streams in. It re-checks who you are (requireUser) right next to the data;
 // the database's own rules are the third check.
 
-const intro = "Drafts are saved plans. A practice run only writes down what each step would do. Nothing is sent or connected.";
+const intro = "Drafts are saved plans. Nothing is sent or connected until you run a workflow and approve its steps.";
 
 // What shows while the list loads. The heading is the same, so nothing above or below it moves.
-export function DraftsFallback() {
+export function DraftsFallback({ title = "Your drafts" }) {
   return (
     <div aria-busy="true">
-      <h2 id="drafts-heading" tabIndex={-1} className="text-xl font-semibold leading-[1.35] tracking-tight outline-offset-4">Your drafts</h2>
+      <h2 id="drafts-heading" tabIndex={-1} className="text-xl font-semibold leading-[1.35] tracking-tight outline-offset-4">{title}</h2>
       <p className="mt-1 text-[15px] text-mute">{intro}</p>
       <p role="status" className="sr-only">Loading your drafts</p>
       <div aria-hidden="true" className="mt-3 space-y-3">
@@ -84,7 +84,7 @@ export default async function Drafts({ openBase }) {
   return (
     <div>
       <h2 id="drafts-heading" tabIndex={-1} className="text-xl font-semibold leading-[1.35] tracking-tight outline-offset-4">
-        Your drafts{!loadFailed && drafts.length > 0 && <span className="ml-1 font-normal text-mute">({drafts.length})</span>}
+        {openBase ? "Your workflows" : "Your drafts"}{!loadFailed && drafts.length > 0 && <span className="ml-1 font-normal text-mute">({drafts.length})</span>}
       </h2>
       <p className="mt-1 text-[15px] text-mute">{intro}</p>
       <DraftList drafts={drafts} loadFailed={loadFailed} openBase={openBase} scheduling={scheduling} />

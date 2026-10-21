@@ -181,7 +181,7 @@ export async function approveWebCall(input, who) {
 // Whose Linear? The person's own connection (the Connect button) first; else the personal key from .env.local (the owner
 // testing on their own computer). Returns the Authorization value for Linear, or null when there is neither.
 // Steps that write somewhere can be approved only once per practice run (go back to Workflows and run again for another copy).
-const ALREADY = "This step was already approved from this practice run, so nothing was added a second time. To do it again, start a new practice run.";
+const ALREADY = "This step already ran in this run, so it was not done a second time. To do it again, run the workflow again.";
 const COMPOSIO_OFF = "More apps is not switched on. Add COMPOSIO_API_KEY to .env.local first (see Connections).";
 const LINEAR_OFF = "Linear is not connected yet. Open Connections and press Connect Linear.";
 async function linearAuthorization(supabase, userId) {

@@ -18,6 +18,7 @@ import { ANSWER_TAG } from "@/lib/connectors/google-sheets";
 // one web address really asked after an Approve click. It reads the session and the database, so the page wraps it in <Suspense>.
 
 const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-medium text-ink";
+const chipWaiting = "rounded-md border border-accent bg-accent-subtle px-2 text-xs font-medium text-accent-text";
 const text = (value) => (typeof value === "string" ? value : "");
 const heading = "text-xl font-semibold leading-[1.35] tracking-tight";
 
@@ -111,12 +112,22 @@ export default async function RunsViewer({ searchParams }) {
   if (runs.length === 0) {
     return (
       <Notice icon="History" title="Nothing has run yet.">
-        Open Workflows and choose Practice run on one of your workflows. A practice run walks every step and writes down what it would do. It sends nothing and changes nothing outside Hushwork.
+        Open Workflows and press Run on one of your workflows. Steps that act on your apps wait for your approval, and each run and its results are kept here.
       </Notice>
     );
   }
 
-  const selected = runs.find((run) => run.id === wanted) ?? runs[0];
+  // A run is one go at a workflow; each step that acted on an app saves its result as its own small record that points back to the run. The
+  // list shows the runs (their results appear inside them), and a result whose run is not loaded still shows on its own.
+  const doneByRun = new Map();
+  for (const run of runs) {
+    const first = run.live ? run.results[0] : null;
+    if (first?.from && Number.isInteger(first.fromStep)) doneByRun.set(first.from, (doneByRun.get(first.from) ?? new Set()).add(first.fromStep));
+  }
+  const waitingIn = (run) => (run.live ? 0 : run.results.filter((step, index) => isApprovable(step) && !doneByRun.get(run.id)?.has(index)).length);
+  const runIds = new Set(runs.filter((run) => !run.live).map((run) => run.id));
+  const shown = runs.filter((run) => !(run.live && run.results[0]?.from && runIds.has(run.results[0].from)));
+  const selected = runs.find((run) => run.id === wanted) ?? shown[0] ?? runs[0]; // opens on the newest run in the list
   const { linear, google } = await connectorStatus(await createClient(), user.id);
   const linearConnected = linear.usable;
   const { enabled: aiOn } = await aiStatus();
@@ -152,13 +163,13 @@ export default async function RunsViewer({ searchParams }) {
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
         <h2 className={heading}>Your runs</h2>
         <ul className="mt-3 space-y-1">
-          {runs.map((run) => (
+          {shown.map((run) => (
             <li key={run.id}>
               <Link
                 href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
                 className={`block rounded-xl px-4 py-3 hover:bg-raised ${run.id === selected.id ? "bg-accent-subtle" : ""}`}
               >
-                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chip}>{run.live ? "Real" : "Practice"}</span></span>
+                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={waitingIn(run) > 0 ? chipWaiting : chip}>{waitingIn(run) > 0 ? "Needs approval" : "Completed"}</span></span>
                 <span className="mt-1 block text-sm text-mute"><RunTime iso={run.createdAt} /> · {run.results.length} {run.results.length === 1 ? "step" : "steps"}</span>
               </Link>
             </li>
@@ -168,8 +179,14 @@ export default async function RunsViewer({ searchParams }) {
 
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
-          <span className={chip}>{selected.live ? "Real" : "Practice"}</span>
-          <p className="text-sm">{selected.live ? (liveAi ? "The AI was really asked, after you approved it." : liveSheets ? "A row was really added to your Google Sheet, after you approved it." : liveCalendar ? "Google Calendar was really asked for your next events, after you approved it." : liveGmail ? "Gmail was really asked for your latest messages, after you approved it." : liveDrive ? "Google Drive was really asked for your latest files, after you approved it." : liveIssue ? "A task was really created in Linear, after you approved it." : liveApp ? "Another app was really asked, through Composio, after you approved it." : liveLinear ? "Linear was really asked for your open tasks, after you approved it." : "This web address was really asked, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
+          <span className={!selected.live && approvals.length > 0 ? chipWaiting : chip}>{!selected.live && approvals.length > 0 ? "Needs approval" : "Completed"}</span>
+          <p className="text-sm">
+            {selected.live
+              ? (liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveLinear ? "Linear was read." : "A web address was read.")
+              : approvals.length > 0
+                ? `${approvals.length} ${approvals.length === 1 ? "step is" : "steps are"} waiting for your approval. Nothing is sent, written or changed in your apps until you approve it.`
+                : "All steps are done."}
+          </p>
         </div>
         {!selected.live && (auto === "done" || auto === "stopped") && (
           <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
@@ -180,14 +197,14 @@ export default async function RunsViewer({ searchParams }) {
           </p>
         )}
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveSheets ? "One row was added." : liveCalendar ? "Google Calendar was asked once." : liveGmail ? "Gmail was asked once." : liveDrive ? "Google Drive was asked once." : liveIssue ? "One task was created." : liveApp ? "One app was asked once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
+        <p className="mt-1 text-[15px] text-mute">{selected.live ? <>Ran <RunTime iso={selected.createdAt} /></> : <>Started <RunTime iso={selected.createdAt} /> · {selected.results.length} {selected.results.length === 1 ? "step" : "steps"}</>}</p>
         {/* key={selected.id}: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
         {/* key: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
         {selected.live && selected.results[0]?.from && runs.some((run) => run.id === selected.results[0].from) && (
-          <p className="mt-2 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the practice run</Link> to approve the next step.</p>
+          <p className="mt-2 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the run</Link> to approve the next step.</p>
         )}
         <div className="mt-2"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
-        <h3 className="mt-6 text-sm font-medium">{selected.live ? "Result" : "What each step would do"}</h3>
+        <h3 className="mt-6 text-sm font-medium">{selected.live ? "Result" : "Steps"}</h3>
         {selected.live ? (
           <ol className="mt-2 space-y-4">
             {selected.results.map((step, index) => (
@@ -202,12 +219,12 @@ export default async function RunsViewer({ searchParams }) {
             {selected.results.map((step, index) => (
               <Fragment key={index}>
                 <StepRow
-                  icon={step.icon} title={step.title} sub={step.outcome}
-                  right={<span className="text-success"><Icon name="Check" size={14} /></span>}
+                  icon={step.icon} title={step.title} sub={step.detail}
+                  right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : null}
                 />
                 {doneAt.has(index) && (
                   <li className="list-none pb-3 pt-1">
-                    <p className="flex items-center gap-2 pl-1 text-sm font-medium text-success"><Icon name="CircleCheck" size={16} />Done for real. Here is the result:</p>
+                    <p className="flex items-center gap-2 pl-1 text-sm font-medium text-success"><Icon name="CircleCheck" size={16} />Done. Result:</p>
                     <div className="mt-2 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-5"><ResultText text={doneAt.get(index).outcome} /></div>
                   </li>
                 )}

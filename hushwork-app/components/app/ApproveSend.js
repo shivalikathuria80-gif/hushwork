@@ -54,7 +54,7 @@ const COPY = {
   },
   issue: {
     action: approveLinearCreate,
-    intro: "This step adds a new task in Linear. If you approve, Hushwork creates ONE task with exactly the words below. It cannot change or delete anything that already exists, and it can be approved only once from this practice run.",
+    intro: "This step adds a new task in Linear. If you approve, Hushwork creates ONE task with exactly the words below. It cannot change or delete anything that already exists, and it can be approved only once per run.",
     button: "Approve and create the task",
     icon: "ListTodo",
   },

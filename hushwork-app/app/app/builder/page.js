@@ -15,7 +15,7 @@ export default function BuilderPage({ searchParams }) {
     <main id="main" className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Builder</h1>
       <p className="mt-3 max-w-[62ch] text-[15px] text-mute">
-        Drag blocks into a line, fill in the blanks, and save. Then press Practice run on the Workflows page to try it.
+        Drag blocks into a line, fill in the blanks, and save. Then press Run on the Workflows page.
       </p>
       <div className="mt-8">
         <Suspense fallback={<div aria-busy="true"><p role="status" className="sr-only">Loading the Builder</p><div aria-hidden="true" className="h-72 rounded-2xl border border-line bg-raised" /></div>}>

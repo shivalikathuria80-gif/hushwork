@@ -12,7 +12,7 @@ import { useRunMode } from "./RunMode";
 import ScheduleEditor from "./ScheduleEditor";
 import { LIMITS } from "@/lib/validate";
 
-// One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Practice run" walks its steps and sends nothing.
+// One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Run" lists its steps and waits for approval on each one that acts on an app.
 // Opening it puts its request and steps back into the composer; it does not start anything.
 // On the Workflows page `openBase` is set (for example "/app/builder?draft="): the name is then a link that opens the
 // draft in the Builder instead.
@@ -151,7 +151,7 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
               )}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-mute">
                 <span>{savedText && <>Updated <time dateTime={draft.updatedAt}>{savedText}</time> · </>}{steps}</span>
-                <span className="rounded-md border border-line bg-raised px-2 text-xs font-medium text-ink">Draft</span>
+                {!openBase && <span className="rounded-md border border-line bg-raised px-2 text-xs font-medium text-ink">Draft</span>}
               </p>
             </div>
           )}
@@ -164,7 +164,7 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
             </>
           ) : (
             <>
-              {openBase && <Btn variant={auto ? "primary" : "secondary"} size="sm" icon={auto ? "Zap" : "Play"} loading={pending} onClick={practice} aria-label={auto ? `Run automatically: ${draft.name}` : `Practice run: ${draft.name}`}>{auto ? "Run automatically" : "Practice run"}</Btn>}
+              {openBase && <Btn variant={auto ? "primary" : "secondary"} size="sm" icon={auto ? "Zap" : "Play"} loading={pending} onClick={practice} aria-label={auto ? `Run automatically: ${draft.name}` : `Run: ${draft.name}`}>{auto ? "Run automatically" : "Run"}</Btn>}
               <button type="button" ref={renameRef} aria-label={`Rename draft: ${draft.name}`} onClick={startRename} className={iconButton}><Icon name="Pencil" size={18} /></button>
               <button type="button" ref={deleteRef} aria-label={`Delete draft: ${draft.name}`} onClick={() => { setError(""); setMode("delete"); }} className={iconButton}><Icon name="Trash" size={18} /></button>
             </>

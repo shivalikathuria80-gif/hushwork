@@ -43,7 +43,7 @@ export function parseCells(raw) {
 // cut short and written as plain text like everything else. Returns { cells } or { error } (no answer yet).
 export const ANSWER_TAG = "{answer}";
 export const MAX_ANSWER_LENGTH = 500;
-export const NO_ANSWER = "This row uses {answer}. Approve the Ask the AI step of this workflow first (from the same practice run), then come back to this step.";
+export const NO_ANSWER = "This row uses {answer}. Approve the Ask the AI step of this workflow first (from the same run), then come back to this step.";
 export function fillAnswer(cells, answer) {
   if (!cells.some((cell) => cell.includes(ANSWER_TAG))) return { cells };
   const text = typeof answer === "string" ? answer.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX_ANSWER_LENGTH) : "";

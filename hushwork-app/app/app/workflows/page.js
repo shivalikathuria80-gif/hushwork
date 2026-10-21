@@ -13,9 +13,9 @@ export default function WorkflowsPage() {
         <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Workflows</h1>
         <Btn href="/app/builder" icon="Plus" size="sm">New in the Builder</Btn>
       </div>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Your saved workflows. Open one in the Builder to change its steps. Pick Manual (you approve each real step) or Auto (Hushwork does them all) below, then press the run button. A Manual run is a practice run: it only writes down what each step would do and sends nothing.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Your saved workflows. Open one in the Builder to change its steps. Pick Manual (you approve each step that acts on your apps) or Auto (Hushwork does them all) below, then press the run button.</p>
       <section className="mt-8">
-        <Suspense fallback={<DraftsFallback />}>
+        <Suspense fallback={<DraftsFallback title="Your workflows" />}>
           <Drafts openBase="/app/builder?draft=" />
         </Suspense>
       </section>

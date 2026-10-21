@@ -74,7 +74,7 @@ export const STEP_KINDS = {
   },
   row: {
     label: "Add a row",
-    help: "Add a line to a Google Sheet. A practice run only describes it; after you connect Google, you approve the real row on the Runs page.",
+    help: "Add a line to a Google Sheet. After you connect Google, you approve the row on the Runs page.",
     icon: "Table",
     fields: [
       text("to", "Google Sheet address", 120, { hint: "Paste the web address of your Google Sheet (docs.google.com/spreadsheets/...)" }),
@@ -88,7 +88,7 @@ export const STEP_KINDS = {
   },
   request: {
     label: "Call a web address",
-    help: "Ask a web address for information (a read-only GET). A practice run only describes it; you approve the real call on the Runs page.",
+    help: "Ask a web address for information (a read-only GET). You approve the call on the Runs page.",
     icon: "Plug",
     fields: [
       text("url", "Web address", 120, { hint: "For example: https://api.example.com/status. Starts with https://. Never put a password or key in it." }),
@@ -109,7 +109,7 @@ export const STEP_KINDS = {
   },
   app: {
     label: "Look in another app",
-    help: "Look at something in an app you connected through Composio (Todoist, Notion...). It only reads. A practice run only describes it; you approve the real look on the Runs page.",
+    help: "Look at something in an app you connected through Composio (Todoist, Notion...). It only reads. You approve the look on the Runs page.",
     icon: "Plug",
     fields: [
       choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.map((app) => [app.id, app.name]))),
@@ -119,7 +119,7 @@ export const STEP_KINDS = {
   },
   issue: {
     label: "Create a Linear task",
-    help: "Add one task in Linear. A practice run only describes it; after you connect Linear, you approve the real task on the Runs page. Write {answer} to use what an Ask the AI step said.",
+    help: "Add one task in Linear. After you connect Linear, you approve the task on the Runs page. Write {answer} to use what an Ask the AI step said.",
     icon: "ListTodo",
     fields: [
       text("title", "Task title", 100, { hint: "For example: Reply to Ana about the invoice. Write {answer} to use what an Ask the AI step said." }),
