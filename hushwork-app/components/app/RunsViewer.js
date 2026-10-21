@@ -22,23 +22,38 @@ const heading = "text-xl font-semibold leading-[1.35] tracking-tight";
 
 // The words a real run saved, laid out so they are easy to read: blank lines keep their gaps, lines that start with "- " become bullet
 // points, "Next step:" stands out, and the app's own list is set apart in a quieter style. Plain text only (React never treats it as HTML).
+function Inline({ text }) {
+  // **words** (which the AI sometimes writes) become bold; any stray ** or leading # is dropped so no raw symbols show.
+  return text.replace(/^#{1,6}\s+/, "").split(/(\*\*[^*]+\*\*)/).map((part, index) => (part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={index} className="font-semibold">{part.slice(2, -2)}</strong> : part.replace(/\*\*/g, "")));
+}
+
 function ResultText({ text }) {
   return (
     <div className="space-y-1.5 text-[15px] leading-relaxed">
       {text.split("\n").map((line, index) => {
         if (!line.trim()) return <div key={index} aria-hidden="true" className="h-2" />;
-        if (line.startsWith("- ")) {
+        if (/^\*\*[^*]+\*\*:?$/.test(line.trim()) || /^#{1,6}\s+/.test(line)) return <p key={index} className="mt-2 break-words font-semibold"><Inline text={line.trim().replace(/:$/, "")} /></p>;
+        const numbered = line.match(/^(\d{1,2})[.)]\s+(.*)$/);
+        if (numbered) {
+          return (
+            <p key={index} className="flex gap-2.5 pl-1">
+              <span aria-hidden="true" className="w-4 shrink-0 text-right font-medium text-accent-text">{numbered[1]}.</span>
+              <span className="min-w-0 break-words"><Inline text={numbered[2]} /></span>
+            </p>
+          );
+        }
+        if (line.startsWith("- ") || line.startsWith("* ")) {
           return (
             <p key={index} className="flex gap-2.5 pl-1">
               <span aria-hidden="true" className="mt-[0.62em] h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span className="min-w-0 break-words">{line.slice(2)}</span>
+              <span className="min-w-0 break-words"><Inline text={line.slice(2)} /></span>
             </p>
           );
         }
         if (/^Next step:/.test(line)) return <p key={index} className="mt-1 break-words rounded-xl bg-accent-subtle px-3 py-2 font-medium text-accent-text">{line}</p>;
         if (/^The AI looked at .+\.$/.test(line)) return <p key={index} className="mt-1 text-sm text-mute">{line}</p>;
         if (/^The list from .+:$/.test(line)) return <p key={index} className="mt-1 border-t border-line pt-3 text-sm font-medium text-mute">{line}</p>;
-        return <p key={index} className="break-words">{line}</p>;
+        return <p key={index} className="break-words"><Inline text={line} /></p>;
       })}
     </div>
   );
