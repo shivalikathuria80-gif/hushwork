@@ -20,6 +20,29 @@ const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-
 const text = (value) => (typeof value === "string" ? value : "");
 const heading = "text-xl font-semibold leading-[1.35] tracking-tight";
 
+// The words a real run saved, laid out so they are easy to read: blank lines keep their gaps, lines that start with "- " become bullet
+// points, "Next step:" stands out, and the app's own list is set apart in a quieter style. Plain text only (React never treats it as HTML).
+function ResultText({ text }) {
+  return (
+    <div className="space-y-1.5 text-[15px] leading-relaxed">
+      {text.split("\n").map((line, index) => {
+        if (!line.trim()) return <div key={index} aria-hidden="true" className="h-2" />;
+        if (line.startsWith("- ")) {
+          return (
+            <p key={index} className="flex gap-2.5 pl-1">
+              <span aria-hidden="true" className="mt-[0.62em] h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span className="min-w-0 break-words">{line.slice(2)}</span>
+            </p>
+          );
+        }
+        if (/^Next step:/.test(line)) return <p key={index} className="mt-1 break-words rounded-xl bg-accent-subtle px-3 py-2 font-medium text-accent-text">{line}</p>;
+        if (/^The list from .+:$/.test(line)) return <p key={index} className="mt-1 border-t border-line pt-3 text-sm font-medium text-mute">{line}</p>;
+        return <p key={index} className="break-words">{line}</p>;
+      })}
+    </div>
+  );
+}
+
 export function RunsFallback() {
   return (
     <div aria-busy="true" className="mt-8">
@@ -124,15 +147,26 @@ export default async function RunsViewer({ searchParams }) {
           <p className="mt-2 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the practice run</Link> to approve the next step.</p>
         )}
         <div className="mt-2"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
-        <h3 className="mt-6 text-sm font-medium">{selected.live ? "What was done" : "What each step would do"}</h3>
-        <ol className="mt-1 space-y-1">
-          {selected.results.map((step, index) => (
-            <StepRow
-              key={index} icon={step.icon} title={step.title} sub={step.outcome}
-              right={<span className="text-success"><Icon name="Check" size={14} /></span>}
-            />
-          ))}
-        </ol>
+        <h3 className="mt-6 text-sm font-medium">{selected.live ? "Result" : "What each step would do"}</h3>
+        {selected.live ? (
+          <ol className="mt-2 space-y-4">
+            {selected.results.map((step, index) => (
+              <li key={index}>
+                <p className="flex items-center gap-2 text-sm font-medium"><Icon name={step.icon} fallback="Check" size={16} className="text-accent-text" />{step.title}</p>
+                <div className="mt-2 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-5"><ResultText text={step.outcome} /></div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <ol className="mt-1 space-y-1">
+            {selected.results.map((step, index) => (
+              <StepRow
+                key={index} icon={step.icon} title={step.title} sub={step.outcome}
+                right={<span className="text-success"><Icon name="Check" size={14} /></span>}
+              />
+            ))}
+          </ol>
+        )}
         {approvals.map(({ step, index }) => (
           <div key={index} className="mt-6">
             <ApproveSend

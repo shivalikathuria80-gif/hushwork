@@ -8,7 +8,7 @@ import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalenda
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
-import { runAgent } from "@/lib/ai/agent";
+import { runAgent, summarizeData } from "@/lib/ai/agent";
 import { looksSensitive } from "@/lib/ai/plan";
 import { getLinearKey } from "@/lib/connectors/linear-env";
 import { getApp, getConnectionsKey } from "@/lib/connectors/oauth-env";
@@ -176,13 +176,27 @@ async function googleAuthorization(supabase, userId) {
 }
 
 // One line per message for the Runs page and the AI: "2026-10-20 03:45  Ana Lopez: Lunch tomorrow?".
-const mailLines = (mails) => mails.map((mail) => `${mail.time ? `${mail.time}  ` : ""}${mail.from}: ${mail.subject}`).join("; ");
+const mailLines = (mails) => mails.map((mail) => `- ${mail.time ? `${mail.time}  ` : ""}${mail.from}: ${mail.subject}`).join("\n");
 
 // One line per file for the Runs page and the AI: "2026-10-20 03:45  Sheet: Budget 2026".
-const fileLines = (files) => files.map((file) => `${file.time ? `${file.time}  ` : ""}${file.kind}: ${file.name}`).join("; ");
+const fileLines = (files) => files.map((file) => `- ${file.time ? `${file.time}  ` : ""}${file.kind}: ${file.name}`).join("\n");
 
 // One line per event for the Runs page and the AI: "Tue 20 Oct, 09:00  Maths test".
-const eventLines = (events) => events.map((event) => `${event.start}  ${event.title}`).join("; ");
+const eventLines = (events) => events.map((event) => `- ${event.start}  ${event.title}`).join("\n");
+
+// What a lookup saves as its result: a clear AI summary FIRST, then the app's own list exactly as it answered (so a summary can never
+// hide the facts). The summary is skipped without any error when the AI is off, the person's AI limit is used up, or the AI fails: the
+// result is then just the app's own list. `goal` says what the person wants to know; `note` is the step's own note (the person's words).
+async function withSummary({ userId, appName, header, list, goal, note }) {
+  const plain = `Asked ${appName}. ${header}\n${list}`;
+  const groqKey = getGroqKey();
+  const now = Date.now();
+  if (!groqKey || aiLimits().minute.left(userId, now) < 1 || aiLimits().day.left(userId, now) < 1) return plain;
+  aiLimits().minute.take(userId, now);
+  aiLimits().day.take(userId, now);
+  const summary = await summarizeData({ goal: note ? `${goal} The person's own note: ${note}` : goal, data: `${header}\n${list}`, groqKey });
+  return summary.ok ? `${summary.text}\n\nThe list from ${appName}, exactly as it answered:\n${list}` : plain;
+}
 
 // The "Approve and ask Linear" button. READ-ONLY: lib/connectors/linear.js can only ask, never change. Only a Look something
 // up step set to Linear qualifies, and the key comes from .env.local on the server.
@@ -205,9 +219,11 @@ export async function approveLinearLookup(input) {
   const answer = await fetchLinearIssues({ authorization });
   if (!answer.ok) return { error: answer.error };
 
-  const list = answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("; ");
-  const outcome = answer.issues.length ? `Asked Linear. You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}: ${list}` : "Asked Linear. You have no open tasks.";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
+  const list = answer.issues.map((issue) => `- ${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n");
+  const outcome = answer.issues.length
+    ? await withSummary({ userId: user.id, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why, and say which one to do first." })
+    : "Asked Linear. You have no open tasks.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Approve and ask the AI" button. The AI gets ONE read-only tool at most, decided by the saved step (never by the
@@ -319,7 +335,7 @@ export async function approveAiStep(input) {
   if (!answer.ok) return { error: answer.error };
   if (toolError) return { error: toolError };
   const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}: ${answer.text}`.slice(0, 1700), answer: answer.text.slice(0, 700) });
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}:\n${answer.text}`.slice(0, 4000), answer: answer.text.slice(0, 700) });
 }
 
 // The "Approve and look at my calendar" button. READ-ONLY (the permission Google gave is read-only, and
@@ -341,8 +357,10 @@ export async function approveCalendarLookup(input) {
 
   const answer = await fetchUpcomingEvents({ authorization });
   if (!answer.ok) return { error: answer.error };
-  const outcome = answer.events.length ? `Asked Google Calendar. You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days: ${eventLines(answer.events)}` : "Asked Google Calendar. You have no events in the next 7 days.";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 900) });
+  const outcome = answer.events.length
+    ? await withSummary({ userId: user.id, appName: "Google Calendar", header: `You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days:`, list: eventLines(answer.events), note: step.fields.what, goal: "The person asked Google Calendar for their events in the next 7 days. Summarise the week: how many events there are, which days are busy or free, and what they should prepare." })
+    : "Asked Google Calendar. You have no events in the next 7 days.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Approve and look at my inbox" button. READ-ONLY (the permission Google gave cannot send, change or delete mail, and
@@ -365,8 +383,10 @@ export async function approveGmailLookup(input) {
 
   const answer = await fetchInbox({ authorization });
   if (!answer.ok) return { error: answer.error };
-  const outcome = answer.mails.length ? `Asked Gmail. The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox: ${mailLines(answer.mails)}` : "Asked Gmail. Your inbox is empty.";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 1200) });
+  const outcome = answer.mails.length
+    ? await withSummary({ userId: user.id, appName: "Gmail", header: `The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox (senders, subjects and times only; the text inside each email was not read):`, list: mailLines(answer.mails), note: step.fields.what, goal: "The person asked Gmail for the latest messages in their inbox. Only the sender, subject and time of each message were read, never the text inside, so judge only from those. Summarise who wrote and what each message seems to be about, say which ones probably need an answer first and why, and say clearly that you only saw senders and subjects." })
+    : "Asked Gmail. Your inbox is empty.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Approve and look at my files" button. READ-ONLY (the permission Google gave only sees file names and details, and
@@ -388,8 +408,10 @@ export async function approveDriveLookup(input) {
 
   const answer = await fetchRecentFiles({ authorization });
   if (!answer.ok) return { error: answer.error };
-  const outcome = answer.files.length ? `Asked Google Drive. The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently: ${fileLines(answer.files)}` : "Asked Google Drive. There are no files.";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 1200) });
+  const outcome = answer.files.length
+    ? await withSummary({ userId: user.id, appName: "Google Drive", header: `The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently (names, kinds and times only; nothing inside a file was read):`, list: fileLines(answer.files), note: step.fields.what, goal: "The person asked Google Drive for the files they changed most recently. Only the name, kind and time of each file were read, never what is inside. Summarise what they seem to have worked on lately judging from the names, group them by kind or topic, and say clearly that you only saw names." })
+    : "Asked Google Drive. There are no files.";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Approve and create the task" button. This WRITES one thing: a new task in Linear (lib/connectors/linear-create.js sends one
@@ -444,7 +466,8 @@ export async function approveAppLookup(input) {
 
   const answer = await runReadTool({ key: composioKey, userId: user.id, app });
   if (!answer.ok) return { error: answer.error };
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Asked ${app.name} for ${app.what}: ${answer.text}`.slice(0, 1700) });
+  const outcome = await withSummary({ userId: user.id, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Delete this run" button. A run is only a record, so deleting it changes nothing outside Hushwork. Only the person's

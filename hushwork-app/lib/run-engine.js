@@ -16,28 +16,28 @@ export const isRequestStep = (step) => step?.kind === "request" && typeof step?.
 export const isLinearLookup = (step) => step?.kind === "find" && step?.fields?.where === "linear";
 
 export const linearSummary = (step) =>
-  ["Hushwork will ask Linear for up to 10 open tasks assigned to you (read-only, nothing in Linear is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+  ["Hushwork will ask Linear for up to 10 open tasks assigned to you (read-only, nothing in Linear is changed). If the AI is switched on, what it finds is also sent to Groq, the company that runs the AI, to write a clear summary.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
 // A "Look something up" step set to Calendar can be approved on the Runs page: Hushwork then asks Google Calendar for the
 // person's next events (read-only). The "what to look for" note is kept for reading.
 export const isCalendarLookup = (step) => step?.kind === "find" && step?.fields?.where === "calendar";
 
 export const calendarSummary = (step) =>
-  ["Hushwork will ask Google Calendar for your next 10 events in the coming 7 days (read-only, nothing in your calendar is changed).", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+  ["Hushwork will ask Google Calendar for your next 10 events in the coming 7 days (read-only, nothing in your calendar is changed). If the AI is switched on, what it finds is also sent to Groq, the company that runs the AI, to write a clear summary.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
 // A "Look something up" step set to Inbox can be approved on the Runs page: Hushwork then asks Gmail for the latest mail in the
 // person's inbox (who sent it, the subject and the time; never the text of an email). Read-only.
 export const isGmailLookup = (step) => step?.kind === "find" && step?.fields?.where === "inbox";
 
 export const gmailSummary = (step) =>
-  ["Hushwork will ask Gmail for the latest 10 messages in your inbox: who sent each one, its subject and its time. It never reads the text inside an email, and it cannot send, change or delete anything.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+  ["Hushwork will ask Gmail for the latest 10 messages in your inbox: who sent each one, its subject and its time. It never reads the text inside an email, and it cannot send, change or delete anything. If the AI is switched on, what it finds is also sent to Groq, the company that runs the AI, to write a clear summary.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
 // A "Look something up" step set to Files can be approved on the Runs page: Hushwork then asks Google Drive for the files the
 // person changed most recently (name, kind and time; never what is inside a file). Read-only.
 export const isDriveLookup = (step) => step?.kind === "find" && step?.fields?.where === "files";
 
 export const driveSummary = (step) =>
-  ["Hushwork will ask Google Drive for the 10 files you changed most recently: each file's name, kind and time. It never opens a file or reads what is inside, and it cannot change or delete anything.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+  ["Hushwork will ask Google Drive for the 10 files you changed most recently: each file's name, kind and time. It never opens a file or reads what is inside, and it cannot change or delete anything. If the AI is switched on, what it finds is also sent to Groq, the company that runs the AI, to write a clear summary.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 
 // An "Add a row" step whose Google Sheet address and boxes are valid can be approved on the Runs page: Hushwork then adds that
 // one row at the bottom of the sheet. (An older plan that only names a spreadsheet stays a description.)
@@ -69,7 +69,7 @@ export const isAppLookup = (step) => step?.kind === "app" && Boolean(findComposi
 
 export const appSummary = (step) => {
   const app = findComposioApp(step?.fields?.app);
-  return [`Hushwork will ask ${app?.name ?? "the app"} for ${app?.what ?? "its information"}. It only reads: nothing in ${app?.name ?? "the app"} is changed.`, "What is read passes through Composio, the company that keeps the connection to the app.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
+  return [`Hushwork will ask ${app?.name ?? "the app"} for ${app?.what ?? "its information"}. It only reads: nothing in ${app?.name ?? "the app"} is changed.`, "What is read passes through Composio, the company that keeps the connection to the app. If the AI is switched on, it is also sent to Groq, the company that runs the AI, to write a clear summary.", step?.fields?.what ? `Your note: ${step.fields.what}` : ""].filter(Boolean).join(String.fromCharCode(10));
 };
 
 // An "Ask the AI" step can be approved on the Runs page: the AI then does the job, using only the read-only tool the step allows.

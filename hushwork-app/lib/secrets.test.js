@@ -325,3 +325,18 @@ test("when a built-in tool of an Ask the AI step fails, the person is told the r
   assert.ok(body.includes("failed(answer.error)") && !/return answer\.error;/.test(body.replace(/\/\/.*$/gm, "")), "every tool failure is recorded");
   assert.ok(body.indexOf("if (toolError) return { error: toolError };") > body.indexOf("await runAgent(") && body.indexOf("if (toolError) return { error: toolError };") < body.indexOf("saveLiveRun("));
 });
+
+test("every lookup result is the AI's summary followed by the app's own list; the AI is skipped (not an error) when it is off or limited, and the list is always kept", () => {
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const helper = action.slice(action.indexOf("async function withSummary"), action.indexOf("// One line per event") > 0 ? action.indexOf("// The \"Approve and ask Linear\"") : undefined);
+  assert.ok(helper.includes("return plain") && helper.includes("exactly as it answered"), "the list is always part of the result");
+  assert.ok(helper.indexOf("getGroqKey()") < helper.indexOf("summarizeData("), "the key is checked first");
+  assert.ok(helper.indexOf("aiLimits().minute.left") < helper.indexOf("summarizeData("), "the person's AI limit is checked before anything is sent");
+  for (const fn of ["approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveAppLookup"]) {
+    const body = action.slice(action.indexOf(`export async function ${fn}`));
+    assert.ok(body.slice(0, body.indexOf("\n}\n")).includes("withSummary("), `${fn} uses the summary`);
+  }
+  const agent = files.find((file) => file.name === "lib/ai/agent.js").text;
+  const summarize = agent.slice(agent.indexOf("export async function summarizeData"));
+  assert.ok(!/tools|tool_choice/.test(summarize), "the summariser has no tools");
+});

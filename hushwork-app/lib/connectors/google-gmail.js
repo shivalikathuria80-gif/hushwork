@@ -21,11 +21,30 @@ export const GMAIL_FAILED = {
   network: "Could not reach Google. Check your connection and try again.",
 };
 
+// Mail headers hold accented letters, emoji and non-English text as "encoded words" such as =?UTF-8?B?SGVsbG8=?= or =?UTF-8?Q?Caf=C3=A9?=.
+// Shown as they are they look broken, so they are turned back into the real words. Never throws: a word that cannot be decoded is left as
+// plain text. Spaces between two encoded words are not part of the text (RFC 2047), so they are dropped.
+export function decodeMimeWords(value) {
+  if (typeof value !== "string" || !value.includes("=?")) return typeof value === "string" ? value : "";
+  const word = /=\?([A-Za-z0-9_-]{1,40})\?([BbQq])\?([^?\s]{0,500})\?=/g;
+  const joined = value.replace(/(=\?[^?\s]+\?[BbQq]\?[^?\s]*\?=)\s+(?==\?[^?\s]+\?[BbQq]\?)/g, "$1");
+  return joined.replace(word, (whole, charset, kind, text) => {
+    try {
+      const bytes = kind.toUpperCase() === "B"
+        ? Buffer.from(text, "base64")
+        : Buffer.from(text.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16))), "latin1");
+      return new TextDecoder(charset.toLowerCase(), { fatal: false }).decode(bytes);
+    } catch {
+      return whole;
+    }
+  });
+}
+
 const flat = (value, max) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "");
 
 // '"Ana Lopez" <ana@x.com>' -> 'Ana Lopez'; 'ana@x.com' -> 'ana@x.com'
 export function senderName(header) {
-  const text = flat(header, 200);
+  const text = flat(decodeMimeWords(header), 200);
   const named = text.match(/^"?([^"<]*?)"?\s*<[^>]*>$/);
   return (named && named[1].trim()) || text.replace(/[<>]/g, "").slice(0, 60);
 }
@@ -76,7 +95,7 @@ export async function fetchInbox({ authorization, fetchImpl = fetch }) {
       ok: true,
       mails: mails.map(({ body }) => {
         const headers = Array.isArray(body?.payload?.headers) ? body.payload.headers : [];
-        return { time: mailTime(headerOf(headers, "date")), from: senderName(headerOf(headers, "from")) || "(unknown sender)", subject: flat(headerOf(headers, "subject"), 100) || "(no subject)" };
+        return { time: mailTime(headerOf(headers, "date")), from: senderName(headerOf(headers, "from")) || "(unknown sender)", subject: flat(decodeMimeWords(headerOf(headers, "subject")), 100) || "(no subject)" };
       }),
     };
   } catch {

@@ -72,3 +72,23 @@ test("a refusal says WHY when Google's answer holds a known reason: the API is s
   assert.deepEqual(await fetchInbox({ authorization: "Bearer t", fetchImpl: refuse({ error: { message: "something SECRET else" } }) }), { ok: false, error: GMAIL_FAILED.auth });
   assert.deepEqual(await fetchInbox({ authorization: "Bearer t", fetchImpl: async () => ({ ok: false, status: 401, json: async () => { throw new Error("not json"); } }) }), { ok: false, error: GMAIL_FAILED.auth });
 });
+
+test("coded sender names and subjects (accents, emoji, other languages) are turned back into real words", async () => {
+  const { decodeMimeWords } = await import("./google-gmail.js");
+  assert.equal(decodeMimeWords("=?UTF-8?B?SGVsbG8gd29ybGQ=?="), "Hello world");
+  assert.equal(decodeMimeWords("=?UTF-8?Q?Caf=C3=A9_menu?="), "Café menu");
+  assert.equal(decodeMimeWords("=?utf-8?B?8J+OiSBQYXJ0eSE=?="), "🎉 Party!");
+  assert.equal(decodeMimeWords("=?ISO-8859-1?Q?Andr=E9?= <a@x.com>"), "André <a@x.com>");
+  assert.equal(decodeMimeWords("=?UTF-8?B?SGVsbG8g?= =?UTF-8?B?d29ybGQ=?="), "Hello world", "the space between two coded words is not part of the text");
+  assert.equal(decodeMimeWords("Plain subject"), "Plain subject");
+  assert.equal(decodeMimeWords("Re: =?UTF-8?Q?Caf=C3=A9?= tomorrow"), "Re: Café tomorrow");
+  assert.equal(decodeMimeWords("=?bogus-charset?B?SGk=?="), "=?bogus-charset?B?SGk=?=", "an unknown charset is left as it was, never a crash");
+  for (const odd of [undefined, null, 5, "", "=?"]) assert.doesNotThrow(() => decodeMimeWords(odd));
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    if (u.pathname.endsWith("/messages")) return { ok: true, status: 200, json: async () => ({ messages: [{ id: "abc1" }] }) };
+    return { ok: true, status: 200, json: async () => ({ payload: { headers: [{ name: "From", value: "=?UTF-8?Q?Jos=C3=A9_Garc=C3=ADa?= <jose@x.com>" }, { name: "Subject", value: "=?UTF-8?B?4pyFIFlvdXIgaW52b2ljZQ==?=" }, { name: "Date", value: "Tue, 20 Oct 2026 09:15:00 +0000" }] } }) };
+  };
+  const result = await fetchInbox({ authorization: "Bearer t", fetchImpl });
+  assert.deepEqual(result.mails, [{ time: "2026-10-20 09:15", from: "José García", subject: "✅ Your invoice" }]);
+});
