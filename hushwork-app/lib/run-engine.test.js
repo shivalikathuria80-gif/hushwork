@@ -155,3 +155,22 @@ test("a Look in another app step naming an app from the list can be approved; th
   assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "app", address: "jira" } })), /Jira \(your projects, through Composio\)/);
   assert.match(aiSummary(practiceStep({ icon: "", title: "t", detail: "d", kind: "ai", fields: { task: "x", uses: "app", address: "nope" } })), /a connected app/);
 });
+
+test("Auto mode: the list of steps with a real action is the same one the Runs page offers Approve for, and only adding a row or creating a task counts as writing", async () => {
+  const { isApprovable, isWriteStep } = await import("./run-engine.js");
+  const sheet = "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit";
+  const approvable = [
+    { kind: "request", fields: { url: "https://example.com/a", why: "" } }, { kind: "find", fields: { where: "linear", what: "x" } }, { kind: "find", fields: { where: "calendar", what: "x" } },
+    { kind: "find", fields: { where: "inbox", what: "x" } }, { kind: "find", fields: { where: "files", what: "x" } }, { kind: "issue", fields: { title: "Reply", details: "", team: "" } },
+    { kind: "app", fields: { app: "todoist", what: "" } }, { kind: "row", fields: { to: sheet, values: "a, b" } }, { kind: "ai", fields: { task: "Think", uses: "nothing", address: "" } },
+  ];
+  for (const step of approvable) assert.equal(isApprovable(step), true, step.kind + JSON.stringify(step.fields));
+  for (const step of [{ kind: "trigger", fields: { how: "manual", when: "" } }, { kind: "approve", fields: { what: "" } }, { kind: "write", fields: { what: "email", about: "" } }, { kind: "send", fields: { how: "email", to: "x", about: "" } }, { kind: "find", fields: { where: "other", what: "x" } }, { kind: "row", fields: { to: "Tracker", values: "a" } }, { title: "A note" }, null, undefined]) assert.equal(isApprovable(step), false);
+  assert.deepEqual(approvable.filter(isWriteStep).map((step) => step.kind), ["issue", "row"]);
+});
+
+test("a real run remembers which step of the practice run it did (a small whole number, nothing else)", () => {
+  const id = "0b3f7c1e-8a52-4d6b-9c41-2f6a7d8e9b10";
+  assert.equal(readSavedResults([{ title: "t", from: id, fromStep: 2 }])[0].fromStep, 2);
+  for (const bad of [-1, 100, 1.5, "2", null, undefined, {}, NaN]) assert.equal("fromStep" in readSavedResults([{ title: "t", from: id, fromStep: bad }])[0], false, String(bad));
+});

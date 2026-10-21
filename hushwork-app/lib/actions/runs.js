@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isSheetsRow, isAiStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isSheetsRow, isAiStep, isApprovable, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -34,6 +34,29 @@ import { makeLimiter } from "@/lib/ai/limits";
 // "42P01" / "PGRST205" = the runs table does not exist yet (supabase/runs.sql has not been pasted into Supabase).
 const NO_TABLE = new Set(["42P01", "PGRST205"]);
 
+// AUTO MODE. The person chose "Auto" for this run: instead of waiting for an Approve click on each step, the steps are done now, one after
+// the other, by the very same actions the Approve buttons call (so every check, limit and safety rule applies exactly as before). It stops
+// at the first step that does not work, so a failed step never lets later steps run on top of it. At most 20 steps. Returns
+// { done: how many steps were done, stoppedAt: the step number it stopped at, or 0 }.
+const AUTO_ACTIONS = [
+  [isAiStep, (input) => approveAiStep(input)], [isLinearLookup, (input) => approveLinearLookup(input)], [isCalendarLookup, (input) => approveCalendarLookup(input)],
+  [isGmailLookup, (input) => approveGmailLookup(input)], [isDriveLookup, (input) => approveDriveLookup(input)], [isLinearCreate, (input) => approveLinearCreate(input)],
+  [isAppLookup, (input) => approveAppLookup(input)], [isSheetsRow, (input) => approveSheetsRow(input)], [isRequestStep, (input) => approveWebCall(input)],
+];
+async function runAutomatically(runId, results) {
+  let done = 0;
+  for (let index = 0; index < Math.min(results.length, 20); index += 1) {
+    const step = results[index];
+    if (!isApprovable(step)) continue;
+    const action = AUTO_ACTIONS.find(([matches]) => matches(step))?.[1];
+    if (!action) continue;
+    const outcome = await action({ runId, index });
+    if (outcome?.error) return { done, stoppedAt: index + 1 };
+    done += 1;
+  }
+  return { done, stoppedAt: 0 };
+}
+
 export async function startPracticeRun(input) {
   const user = await requireUser();
   const id = checkId(input?.id);
@@ -60,7 +83,10 @@ export async function startPracticeRun(input) {
     return { error: NO_TABLE.has(error.code) ? SETUP_MESSAGE : "The run finished but could not be saved. Try again." };
   }
   revalidatePath("/app", "layout");
-  return { ok: true, runId: String(data?.[0]?.id ?? "") };
+  const runId = String(data?.[0]?.id ?? "");
+  // Only an explicit true switches Auto on; anything else is the normal, ask-first Manual mode.
+  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results) };
+  return { ok: true, runId };
 }
 
 // Real actions are rare and deliberate, so the limits are small. They live in the server's memory (a restart forgets

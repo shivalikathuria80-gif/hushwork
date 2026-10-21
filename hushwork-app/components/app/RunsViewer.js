@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { Btn, StepRow } from "../ui";
 import { Icon } from "../icons";
@@ -6,7 +7,7 @@ import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 import { findAnswer } from "@/lib/run-answer";
@@ -81,7 +82,7 @@ function Notice({ icon, title, children }) {
 
 export default async function RunsViewer({ searchParams }) {
   const user = await requireUser(); // outside try/catch on purpose: a signed-out visitor is redirected
-  const { run: wanted } = await searchParams;
+  const { run: wanted, auto } = await searchParams;
 
   let runs = [];
   let failure = "";
@@ -127,7 +128,22 @@ export default async function RunsViewer({ searchParams }) {
   const liveDrive = selected.live && isDriveLookup(selected.results[0]);
   const liveIssue = selected.live && isLinearCreate(selected.results[0]);
   const liveApp = selected.live && isAppLookup(selected.results[0]);
-  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step }) => isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isLinearCreate(step) || isAppLookup(step) || isSheetsRow(step) || isAiStep(step));
+  // Real runs that came from this practice run (an Approve click, or Auto mode): each is shown right under the step it did, and that step
+  // no longer offers Approve. (A step that failed saved nothing, so it still offers Approve and the person can try again.)
+  const doneAt = new Map();
+  if (!selected.live) {
+    try {
+      const { data } = await (await createClient()).from("runs").select("results, created_at")
+        .eq("user_id", user.id).eq("mode", "live").contains("results", JSON.stringify([{ from: selected.id }])) /* JSON text on purpose (see wasApproved in lib/run-answer.js) */.order("created_at", { ascending: true }).limit(60);
+      for (const row of data ?? []) {
+        const first = readSavedResults(row.results)[0];
+        if (first && first.from === selected.id && Number.isInteger(first.fromStep)) doneAt.set(first.fromStep, first);
+      }
+    } catch {
+      // the page still works without it: the steps just offer Approve
+    }
+  }
+  const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step, index }) => !doneAt.has(index) && isApprovable(step));
   // A row step that uses {answer} shows the real words, so you read exactly what will be written before you press Approve.
   const needsAnswer = approvals.some(({ step }) => (isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG)) || (isLinearCreate(step) && `${step.fields?.title}${step.fields?.details}`.includes(ANSWER_TAG)));
   const answer = needsAnswer ? await findAnswer(await createClient(), user.id, { workflow_id: selected.workflowId, created_at: selected.createdAt }) : "";
@@ -155,6 +171,14 @@ export default async function RunsViewer({ searchParams }) {
           <span className={chip}>{selected.live ? "Real" : "Practice"}</span>
           <p className="text-sm">{selected.live ? (liveAi ? "The AI was really asked, after you approved it." : liveSheets ? "A row was really added to your Google Sheet, after you approved it." : liveCalendar ? "Google Calendar was really asked for your next events, after you approved it." : liveGmail ? "Gmail was really asked for your latest messages, after you approved it." : liveDrive ? "Google Drive was really asked for your latest files, after you approved it." : liveIssue ? "A task was really created in Linear, after you approved it." : liveApp ? "Another app was really asked, through Composio, after you approved it." : liveLinear ? "Linear was really asked for your open tasks, after you approved it." : "This web address was really asked, after you approved it.") : "This was a practice run. Every step was walked through, but nothing was sent, written or changed outside Hushwork."}</p>
         </div>
+        {!selected.live && (auto === "done" || auto === "stopped") && (
+          <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
+            <Icon name={auto === "done" ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${auto === "done" ? "text-success" : "text-error"}`} />
+            {auto === "done"
+              ? `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} for you, without asking. The results are under each step below.`
+              : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} and then stopped at a step that needs attention. Press Approve on that step to see why.`}
+          </p>
+        )}
         <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
         <p className="mt-1 text-[15px] text-mute">{selected.live ? (liveAi ? "The AI answered once." : liveSheets ? "One row was added." : liveCalendar ? "Google Calendar was asked once." : liveGmail ? "Gmail was asked once." : liveDrive ? "Google Drive was asked once." : liveIssue ? "One task was created." : liveApp ? "One app was asked once." : liveLinear ? "Linear was asked once." : "One web address was asked.") : selected.status === "done" ? "All steps were walked through." : "This run could not finish."}</p>
         {/* key={selected.id}: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
@@ -176,10 +200,18 @@ export default async function RunsViewer({ searchParams }) {
         ) : (
           <ol className="mt-1 space-y-1">
             {selected.results.map((step, index) => (
-              <StepRow
-                key={index} icon={step.icon} title={step.title} sub={step.outcome}
-                right={<span className="text-success"><Icon name="Check" size={14} /></span>}
-              />
+              <Fragment key={index}>
+                <StepRow
+                  icon={step.icon} title={step.title} sub={step.outcome}
+                  right={<span className="text-success"><Icon name="Check" size={14} /></span>}
+                />
+                {doneAt.has(index) && (
+                  <li className="list-none pb-3 pt-1">
+                    <p className="flex items-center gap-2 pl-1 text-sm font-medium text-success"><Icon name="CircleCheck" size={16} />Done for real. Here is the result:</p>
+                    <div className="mt-2 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-5"><ResultText text={doneAt.get(index).outcome} /></div>
+                  </li>
+                )}
+              </Fragment>
             ))}
           </ol>
         )}

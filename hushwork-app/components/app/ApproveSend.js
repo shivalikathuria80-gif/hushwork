@@ -83,8 +83,8 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
         result = { error: "Could not send. Check your connection and try again." };
       }
       if (result.error) setError(result.error);
-      else if (result.runId) router.push(`/app/runs?run=${result.runId}`);
-      else setError(result.note ?? "Done.");
+      else router.refresh(); // the result now shows right under the step on this same page
+      if (!result.error && result.note) setError(result.note);
     });
   }
 

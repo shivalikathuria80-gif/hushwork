@@ -340,3 +340,27 @@ test("every lookup result is the AI's summary followed by the app's own list; th
   const summarize = agent.slice(agent.indexOf("export async function summarizeData"));
   assert.ok(!/tools|tool_choice/.test(summarize), "the summariser has no tools");
 });
+
+test("Auto mode: only an explicit true turns it on; it uses the very same Approve actions (so every check and limit applies), goes in order, stops at the first failure and is capped", () => {
+  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const start = action.slice(action.indexOf("export async function startPracticeRun"), action.indexOf("// Real actions are rare and deliberate"));
+  assert.ok(start.includes("input?.auto === true"), "only a real true");
+  assert.ok(start.indexOf('from("runs")') < start.indexOf("runAutomatically("), "the practice run is saved before anything real happens");
+  const loop = action.slice(action.indexOf("async function runAutomatically"), action.indexOf("export async function startPracticeRun"));
+  assert.ok(loop.includes("Math.min(results.length, 20)") && loop.includes("if (outcome?.error) return"), "capped, and stops at the first failure");
+  assert.ok(loop.includes("await action("), "one step at a time, in order");
+  const table = action.slice(action.indexOf("const AUTO_ACTIONS"), action.indexOf("async function runAutomatically"));
+  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input)`), `${name} is run through its normal Approve action`);
+  assert.ok(!/fetchLinearIssues|createIssue|appendRow|fetchInbox|runReadTool|fetchPublic/.test(table + loop), "Auto mode never reaches a connector without going through an Approve action");
+  const mode = files.find((file) => file.name === "components/app/RunMode.js").text;
+  assert.match(mode, /localStorage\.getItem\(KEY\) === "auto" \? "auto" : "manual"/, "Manual is the default and anything unexpected means Manual");
+});
+
+test("every jsonb containment lookup on saved runs is handed JSON TEXT, never a JavaScript array (the database client would turn an array into a Postgres list that matches nothing)", () => {
+  for (const name of ["lib/run-answer.js", "components/app/RunsViewer.js"]) {
+    const text = files.find((file) => file.name === name).text;
+    const calls = text.match(/\.contains\([^)]*\)/g) ?? [];
+    assert.ok(calls.length > 0, name);
+    for (const call of calls) assert.ok(/\.contains\("results", JSON\.stringify\(/.test(call), `${name}: ${call}`);
+  }
+});

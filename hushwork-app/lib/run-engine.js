@@ -80,6 +80,13 @@ export const aiSummary = (step) => {
   return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI." + (step?.fields?.uses === "mcp" ? " The AI\u2019s questions to the MCP server go to that server. Only its read-only tools can be used." : "")].join(String.fromCharCode(10));
 };
 
+// Steps that WRITE somewhere (add a row, create a task). Auto mode runs them too, so the screens that offer Auto say so in plain words.
+export const isWriteStep = (step) => isSheetsRow(step) || isLinearCreate(step);
+
+// Every step that has a real action to approve (the same list the Runs page offers Approve buttons for).
+export const isApprovable = (step) =>
+  isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isLinearCreate(step) || isAppLookup(step) || isSheetsRow(step) || isAiStep(step);
+
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.
 export const requestSummary = (step) =>
   ["Hushwork will ask this web address (a read-only GET, nothing is posted):", step?.fields?.url ?? "", step?.fields?.why ? `What it is for: ${step.fields.why}` : ""].filter(Boolean).join(String.fromCharCode(10));
@@ -131,6 +138,7 @@ export function readSavedResults(value) {
   return value.map((r) => {
     const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : "done" };
     if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
+    if (Number.isInteger(r?.fromStep) && r.fromStep >= 0 && r.fromStep < 100) read.fromStep = r.fromStep; // which step of that practice run
     if (isTypedKind(r?.kind) && r.fields && typeof r.fields === "object") {
       read.kind = r.kind;
       read.fields = {};

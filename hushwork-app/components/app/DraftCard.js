@@ -8,6 +8,7 @@ import { Icon } from "../icons";
 import { useFillComposer } from "./Workspace";
 import { renameDraft, deleteDraft } from "@/lib/actions/drafts";
 import { startPracticeRun } from "@/lib/actions/runs";
+import { useRunMode } from "./RunMode";
 import { LIMITS } from "@/lib/validate";
 
 // One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Practice run" walks its steps and sends nothing.
@@ -86,13 +87,17 @@ export default function DraftCard({ draft, onDeleted, openBase }) {
     });
   }
 
-  // Walks the steps without sending anything, saves the run, then opens it on the Runs page.
+  // Manual: walks the steps without sending anything, saves the run, then opens it on the Runs page (the person approves each real step there).
+  // Auto: the same, and then every real step is done straight away, in order. The Runs page opens with the results under each step.
+  const runMode = useRunMode();
+  const auto = runMode === "auto";
+  const writes = draft.plan.filter((step) => (Array.isArray(step) ? step[3] : step?.kind) === "row" || (Array.isArray(step) ? step[3] : step?.kind) === "issue").length;
   function practice() {
     setError("");
     startTransition(async () => {
-      const result = await call(startPracticeRun, { id: draft.id }, "Could not start the run. Try again.");
+      const result = await call(startPracticeRun, { id: draft.id, auto }, auto ? "Could not run it. Try again." : "Could not start the run. Try again.");
       if (result.error) setError(result.error);
-      else router.push(`/app/runs?run=${result.runId}`);
+      else router.push(`/app/runs?run=${result.runId}${auto ? `&auto=${result.auto?.stoppedAt ? "stopped" : "done"}` : ""}`);
     });
   }
 
@@ -158,13 +163,14 @@ export default function DraftCard({ draft, onDeleted, openBase }) {
             </>
           ) : (
             <>
-              {openBase && <Btn variant="secondary" size="sm" icon="Play" loading={pending} onClick={practice} aria-label={`Practice run: ${draft.name}`}>Practice run</Btn>}
+              {openBase && <Btn variant={auto ? "primary" : "secondary"} size="sm" icon={auto ? "Zap" : "Play"} loading={pending} onClick={practice} aria-label={auto ? `Run automatically: ${draft.name}` : `Practice run: ${draft.name}`}>{auto ? "Run automatically" : "Practice run"}</Btn>}
               <button type="button" ref={renameRef} aria-label={`Rename draft: ${draft.name}`} onClick={startRename} className={iconButton}><Icon name="Pencil" size={18} /></button>
               <button type="button" ref={deleteRef} aria-label={`Delete draft: ${draft.name}`} onClick={() => { setError(""); setMode("delete"); }} className={iconButton}><Icon name="Trash" size={18} /></button>
             </>
           )}
         </div>
       )}
+      {mode === "view" && openBase && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step adds a row or creates a task" : "steps add rows or create tasks"}.</p>}
       {mode === "view" && error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>
   );

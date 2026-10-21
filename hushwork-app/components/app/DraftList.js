@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import DraftCard from "./DraftCard";
+import { RunModeSwitch } from "./RunMode";
 
 // The list part of "Your drafts": the three states (could not load, empty, list) plus the "Draft deleted." notice.
 export default function DraftList({ drafts, loadFailed, openBase }) {
@@ -49,7 +50,9 @@ export default function DraftList({ drafts, loadFailed, openBase }) {
           <Btn className="mt-3" size="sm" variant="ghost" icon="Pencil" onClick={() => document.getElementById("task")?.focus()}>Write a request</Btn>
         </div>
       ) : (
-        <ul className="mt-1">
+        <>
+        {openBase && <RunModeSwitch />}
+        <ul className="mt-3">
           <AnimatePresence initial={false}>
             {drafts.map((draft) => (
               <motion.li
@@ -61,6 +64,7 @@ export default function DraftList({ drafts, loadFailed, openBase }) {
             ))}
           </AnimatePresence>
         </ul>
+        </>
       )}
     </>
   );

@@ -44,7 +44,7 @@ test("a step that writes is approved once per practice run and step: the check l
   const make = (rows, error = null) => { const b = { select: () => b, eq: (n, v) => { seen.push([n, v]); return b; }, contains: (n, v) => { seen.push([n, v]); return b; }, limit: async () => ({ data: rows, error }) }; return { from: () => b }; };
   const run = { id: "r1", stepIndex: 2 };
   assert.equal(await wasApproved(make([{ id: "x" }]), "u1", run, "issue"), true);
-  assert.deepEqual(seen.at(-1), ["results", [{ kind: "issue", from: "r1", fromStep: 2 }]]);
+  assert.deepEqual(seen.at(-1), ["results", JSON.stringify([{ kind: "issue", from: "r1", fromStep: 2 }])], "handed over as JSON text: an array would be written as a Postgres list and match nothing");
   assert.deepEqual(seen.slice(0, 2), [["user_id", "u1"], ["mode", "live"]]);
   assert.equal(await wasApproved(make([]), "u1", run, "row"), false);
   assert.equal(await wasApproved(make(null, { code: "x" }), "u1", run, "row"), false);

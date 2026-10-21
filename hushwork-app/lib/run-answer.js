@@ -36,6 +36,6 @@ export async function wasApproved(supabase, userId, run, kind) {
   const { data, error } = await supabase
     .from("runs").select("id")
     .eq("user_id", userId).eq("mode", "live")
-    .contains("results", [{ kind, from: run.id, fromStep: run.stepIndex }]).limit(1);
+    .contains("results", JSON.stringify([{ kind, from: run.id, fromStep: run.stepIndex }])).limit(1); // JSON TEXT on purpose: handed an array, the database client would write it as a Postgres list and match nothing
   return !error && Array.isArray(data) && data.length > 0;
 }
