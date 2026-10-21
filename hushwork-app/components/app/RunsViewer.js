@@ -36,6 +36,7 @@ function ResultText({ text }) {
           );
         }
         if (/^Next step:/.test(line)) return <p key={index} className="mt-1 break-words rounded-xl bg-accent-subtle px-3 py-2 font-medium text-accent-text">{line}</p>;
+        if (/^The AI looked at .+\.$/.test(line)) return <p key={index} className="mt-1 text-sm text-mute">{line}</p>;
         if (/^The list from .+:$/.test(line)) return <p key={index} className="mt-1 border-t border-line pt-3 text-sm font-medium text-mute">{line}</p>;
         return <p key={index} className="break-words">{line}</p>;
       })}

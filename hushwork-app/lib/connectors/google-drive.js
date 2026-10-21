@@ -9,6 +9,7 @@
 // wraps them as data and ignores any instructions inside (lib/ai/agent.js).
 
 import { refusalKind } from "./google-errors.js";
+import { niceTime } from "./time-format.js";
 
 const TIMEOUT_MS = 10_000;
 const HOW_MANY = 10;
@@ -33,11 +34,8 @@ const KINDS = {
 };
 export const kindOf = (mimeType) => (typeof mimeType === "string" ? KINDS[mimeType] ?? (mimeType.startsWith("image/") ? "Image" : "File") : "File");
 
-// "2026-10-20T03:45:12.000Z" -> "2026-10-20 03:45"; anything unreadable becomes ""
-const when = (value) => {
-  const time = Date.parse(flat(value, 40));
-  return Number.isFinite(time) ? new Date(time).toISOString().slice(0, 16).replace("T", " ") : "";
-};
+// "2026-10-20T03:45:12.000Z" -> "Tue 20 Oct 2026, 03:45 UTC"; anything unreadable becomes ""
+const when = (value) => niceTime(Date.parse(flat(value, 40)));
 
 // The 10 files changed most recently (not in the bin), newest first.
 // Returns { ok: true, files: [{ time, kind, name }] } or { ok: false, error }.

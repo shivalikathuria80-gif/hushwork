@@ -26,7 +26,7 @@ test("recent files: one GET asking only for name, kind and time, newest first, c
     ] });
   };
   const result = await fetchRecentFiles({ authorization: "Bearer tok", fetchImpl });
-  assert.deepEqual(result.files[0], { time: "2026-10-20 03:45", kind: "Sheet", name: "Budget 2026" });
+  assert.deepEqual(result.files[0], { time: "Tue 20 Oct 2026, 03:45 UTC", kind: "Sheet", name: "Budget 2026" });
   assert.deepEqual(result.files[1], { time: "", kind: "PDF", name: "x".repeat(100) });
   assert.deepEqual(result.files[2], { time: "", kind: "Image", name: "(no name)" });
   assert.deepEqual(result.files[3], { time: "", kind: "File", name: "(no name)" });

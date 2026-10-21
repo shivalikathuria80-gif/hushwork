@@ -8,6 +8,7 @@
 // agent wraps it as data and ignores any instructions inside (lib/ai/agent.js).
 
 import { refusalKind } from "./google-errors.js";
+import { niceTime } from "./time-format.js";
 
 const TIMEOUT_MS = 10_000;
 const HOW_MANY = 10;
@@ -49,10 +50,9 @@ export function senderName(header) {
   return (named && named[1].trim()) || text.replace(/[<>]/g, "").slice(0, 60);
 }
 
-// "Tue, 20 Oct 2026 09:15:00 +0530" -> "2026-10-20 03:45" (UTC); anything unreadable becomes ""
+// "Tue, 20 Oct 2026 09:15:00 +0530" -> "Tue 20 Oct 2026, 03:45 UTC"; anything unreadable becomes ""
 export function mailTime(header) {
-  const time = Date.parse(flat(header, 60));
-  return Number.isFinite(time) ? new Date(time).toISOString().slice(0, 16).replace("T", " ") : "";
+  return niceTime(Date.parse(flat(header, 60)));
 }
 
 const headerOf = (headers, name) => headers.find((entry) => entry?.name?.toLowerCase() === name)?.value;

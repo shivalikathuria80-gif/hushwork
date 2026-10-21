@@ -334,8 +334,8 @@ export async function approveAiStep(input) {
   const answer = await runAgent({ task, tools, groqKey });
   if (!answer.ok) return { error: answer.error };
   if (toolError) return { error: toolError };
-  const looked = answer.calls.length ? ` (it looked at ${uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address"})` : "";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `The AI answered${looked}:\n${answer.text}`.slice(0, 4000), answer: answer.text.slice(0, 700) });
+  const lookedAt = !answer.calls.length ? "" : uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address";
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${answer.text}${lookedAt ? `\n\nThe AI looked at ${lookedAt}.` : ""}`.slice(0, 4000), answer: answer.text.slice(0, 700) });
 }
 
 // The "Approve and look at my calendar" button. READ-ONLY (the permission Google gave is read-only, and
