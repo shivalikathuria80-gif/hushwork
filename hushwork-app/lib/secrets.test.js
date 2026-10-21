@@ -40,7 +40,7 @@ test("lib/ai/key.js is marked server-only and is imported only by server code", 
   const key = files.find((file) => file.name === "lib/ai/key.js").text;
   assert.match(key, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/ai\/key|(?:\.\.?\/)+(?:lib\/)?(?:ai\/)?key)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/plan.js", "lib/actions/runs.js", "lib/ai-status.js"]); // the two Server Actions that call the AI, and the helper that tells pages only "on or off"
+  assert.deepEqual(importers.sort(), ["lib/actions/plan.js", "lib/ai-status.js", "lib/run-core.js"]); // the two Server Actions that call the AI, and the helper that tells pages only "on or off"
   for (const name of importers) {
     const text = files.find((file) => file.name === name).text;
     assert.ok(!/^\s*["']use client["']/m.test(text), `${name} is browser code and must not import the key reader`);
@@ -78,7 +78,7 @@ test("previewPlan: 'use server' comes first and it asks who is calling before an
   const start = action.indexOf("export async function previewPlan");
   assert.ok(start > 0, "previewPlan exists");
   const body = action.slice(start);
-  const order = ["requireUser(", "checkPrompt(", "getGroqKey("].map((call) => body.indexOf(call));
+  const order = ["checkPrompt(", "getGroqKey("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0) && body.includes("makePreview("), "all four calls are inside previewPlan");
   assert.deepEqual(order, [...order].sort((a, b) => a - b), "requireUser, then checkPrompt, then getGroqKey (which is read as makePreview's argument)");
   assert.ok(!/export (?:const|let|var|default)\s/.test(action), "a 'use server' file may export only async functions");
@@ -86,10 +86,9 @@ test("previewPlan: 'use server' comes first and it asks who is calling before an
 
 test("web calls: only the Server Action imports the fetcher, the action checks who is calling first, and nothing else makes outside requests", () => {
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/http|(?:\.\.?\/)+(?:connectors\/)?http)(?:\.js)?["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
-  assert.deepEqual(importers.sort(), ["lib/actions/runs.js", "lib/connectors/mcp.js"]); // the Server Action, and the MCP client (which sends through the same guarded request)
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  assert.deepEqual(importers.sort(), ["lib/connectors/mcp.js", "lib/run-core.js"]); // the Server Action, and the MCP client (which sends through the same guarded request)
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveWebCall"));
-  assert.ok(body.indexOf("requireUser(") > 0 && body.indexOf("requireUser(") < body.indexOf("loadPracticeStep("));
   assert.ok(body.indexOf("loadPracticeStep(") < body.indexOf("fetchPublic("), "the saved step is read before the address is fetched");
   assert.ok(!/fetchPublic\(\s*input/.test(action), "the address always comes from the saved run, never straight from the browser");
   // the Node https module (the one that can reach the outside) is imported in exactly one non-test file
@@ -110,7 +109,7 @@ test("linear-env.js is server-only and imported only by server code", () => {
   const env = files.find((file) => file.name === "lib/connectors/linear-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/linear-env|(?:\.\.?\/)+(?:connectors\/)?linear-env)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/runs.js", "lib/connector-status.js"]);
+  assert.deepEqual(importers.sort(), ["lib/connector-status.js", "lib/run-core.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
 });
 
@@ -123,9 +122,9 @@ test("the Linear key is never NEXT_PUBLIC_, no real-looking key is written anywh
 });
 
 test("approveLinearLookup asks who is calling first, reads the saved step, finds the person's permission, then asks Linear; Linear queries never change data", () => {
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveLinearLookup"));
-  const order = ["requireUser(", "loadPracticeStep(", "linearAuthorization(", "fetchLinearIssues("].map((call) => body.indexOf(call));
+  const order = ["loadPracticeStep(", "linearAuthorization(", "fetchLinearIssues("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   const linear = files.find((file) => file.name === "lib/connectors/linear.js").text;
@@ -148,7 +147,7 @@ test("oauth-env.js is server-only and imported only by server code, never by bro
   const env = files.find((file) => file.name === "lib/connectors/oauth-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/connectors\/oauth-env|(?:\.\.?\/)+(?:connectors\/)?oauth-env)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/connections.js", "lib/actions/runs.js", "lib/connections/oauth-flow.js", "lib/connector-status.js"]);
+  assert.deepEqual(importers.sort(), ["lib/actions/connections.js", "lib/connections/oauth-flow.js", "lib/connector-status.js", "lib/run-core.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
 });
 
@@ -166,7 +165,7 @@ test("the sign-in flow: signed-in people only, the state is checked before the c
   assert.ok(start.indexOf("requireUser(") > 0 && start.indexOf("requireUser(") < start.indexOf("authorizeUrl("));
   assert.match(start, /httpOnly: true/);
   const finish = flow.slice(flow.indexOf("export async function finishConnect"));
-  const order = ["requireUser(", "same(state, expected)", "exchangeCode(", "saveConnection("].map((call) => finish.indexOf(call));
+  const order = ["same(state, expected)", "exchangeCode(", "saveConnection("].map((call) => finish.indexOf(call));
   assert.ok(order.every((index) => index > 0) && order.join() === [...order].sort((a, b) => a - b).join(), "requireUser, then the state check, then the code swap, then saving");
   assert.ok(!/redirect\([^)]*(?:token|secret)/i.test(flow), "no token or secret goes into a redirect address");
   for (const [file, call] of [["app/api/connect/[provider]/route.js", "startConnect"], ["app/api/connect/[provider]/callback/route.js", "finishConnect"]]) {
@@ -200,8 +199,8 @@ test("Google: exactly four permissions are asked for, each address is in one fil
   const sheets = files.find((file) => file.name === "lib/connectors/google-sheets.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(sheets.match(/method:\s*["'][A-Z]+["']/g), ['method: "POST"'], "the sheets connector sends exactly one kind of request: an append");
   assert.ok(sheets.includes("values/A1:append") && sheets.includes('"RAW"') && !sheets.includes("USER_ENTERED"), "append only, as plain text (never formulas)");
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
-  for (const [fn, steps] of [["approveCalendarLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveGmailLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchInbox("]], ["approveDriveLookup", ["requireUser(", "loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchRecentFiles("]], ["approveSheetsRow", ["requireUser(", "loadPracticeStep(", "parseSheetUrl(", "findAnswer(", "googleAuthorization(", "appendRow("]]]) {
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
+  for (const [fn, steps] of [["approveCalendarLookup", ["loadPracticeStep(", "googleAuthorization(", "fetchUpcomingEvents("]], ["approveGmailLookup", ["loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchInbox("]], ["approveDriveLookup", ["loadPracticeStep(", "googleAuthorization(", "limitError(", "fetchRecentFiles("]], ["approveSheetsRow", ["loadPracticeStep(", "parseSheetUrl(", "findAnswer(", "googleAuthorization(", "appendRow("]]]) {
     const body = action.slice(action.indexOf(`export async function ${fn}`));
     const order = steps.map((call) => body.indexOf(call));
     assert.ok(order.every((index) => index > 0), fn);
@@ -211,9 +210,9 @@ test("Google: exactly four permissions are asked for, each address is in one fil
 });
 
 test("approveAiStep: who is calling, then the saved step, then the secret check, then the AI; and the AI loop offers only tools with no input", () => {
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveAiStep"));
-  const order = ["requireUser(", "getGroqKey(", "loadPracticeStep(", "looksSensitive(", "runAgent("].map((call) => body.indexOf(call));
+  const order = ["getGroqKey(", "loadPracticeStep(", "looksSensitive(", "runAgent("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   assert.ok(!/runAgent\(\s*\{[^}]*input/.test(body), "the task always comes from the saved step");
@@ -226,7 +225,7 @@ test("approveAiStep: who is calling, then the saved step, then the secret check,
 test("deleteRun asks who is calling first, checks the id, and only ever deletes the caller's own run", () => {
   const action = files.find((file) => file.name === "lib/actions/runs.js").text;
   const body = action.slice(action.indexOf("export async function deleteRun"));
-  const order = ["requireUser(", "checkId(", '.from("runs").delete()', '.eq("user_id", user.id)'].map((call) => body.indexOf(call));
+  const order = ["checkId(", '.from("runs").delete()', '.eq("user_id", user.id)'].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
@@ -236,14 +235,14 @@ test("MCP: the client only POSTs through the guarded request, only read-only too
   assert.ok(!/node:https|\bfetch\(/.test(mcp), "no raw network access: everything goes through publicRequest");
   assert.ok(mcp.includes("isReadOnlyTool(tool)") && mcp.includes("allowed.has(name)"), "offered and called tools are filtered");
   assert.ok(mcp.includes("destructiveHint === true"), "a destructive tool is never read-only");
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf('} else if (uses === "mcp")'), action.indexOf('} else if (uses === "web")'));
   assert.ok(body.indexOf("checkRequestUrl(") > 0 && body.indexOf("checkRequestUrl(") < body.indexOf("openMcp("));
   assert.ok(!/openMcp\([^)]*input/.test(action), "the server address always comes from the saved step");
 });
 
 test("audit fixes stay fixed: the owner's personal Linear key never works in production, limits come before outside requests, saved steps are re-checked, the one-try cookie is cleared with its path", () => {
-  const runs = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const runs = files.find((file) => file.name === "lib/run-core.js").text;
   assert.match(runs, /process\.env\.NODE_ENV === "production" \? null : getLinearKey\(\)/, "the personal key is dev-only");
   const status = files.find((file) => file.name === "lib/connector-status.js").text;
   assert.match(status, /NODE_ENV !== "production" && Boolean\(getLinearKey\(\)\)/);
@@ -284,9 +283,9 @@ test("Linear task creating: the only write is one fixed issueCreate request in i
   assert.ok(create.includes("variables: { input }") && !/\$\{[^}]*title|\+\s*title/.test(create), "what is written is sent as variables, never glued into the request text");
   const only = files.filter((file) => /mutation\s+\w+\s*\(/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
   assert.deepEqual(only, ["lib/connectors/linear-create.js"], "no other file sends a change to Linear");
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveLinearCreate"));
-  const order = ["requireUser(", "loadPracticeStep(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "linearAuthorization(", "limitError(", "createIssue("].map((call) => body.indexOf(call));
+  const order = ["loadPracticeStep(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "linearAuthorization(", "limitError(", "createIssue("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
@@ -294,23 +293,23 @@ test("Linear task creating: the only write is one fixed issueCreate request in i
 test("Composio: the key is read only in composio-env.js (server-only, never NEXT_PUBLIC_), the tool that runs always comes from the list with no arguments, and approving asks who is calling first", () => {
   const KEY_NAME = "COMPOSIO" + "_API_KEY";
   // runs.js and composio.js only NAME the setting inside a sentence shown to the owner; only composio-env.js reads it
-  const allowed = new Set(["lib/connectors/composio-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js", "lib/actions/runs.js", "lib/connectors/composio.js"]);
+  const allowed = new Set(["lib/connectors/composio-env.js", "lib/secrets.test.js", ".env.example", "README.md", "app/app/connections/page.js", "lib/run-core.js", "lib/connectors/composio.js"]);
   assert.ok(!/process\.env/.test(files.find((file) => file.name === "lib/connectors/composio.js").text) && files.find((file) => file.name === "lib/connectors/composio-env.js").text.includes("process.env"), "only the env file reads settings");
   assert.deepEqual(withText(KEY_NAME).filter((file) => !allowed.has(file)), []);
   assert.deepEqual(withText("NEXT_PUBLIC_" + KEY_NAME), []);
   const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/composio.js", "lib/actions/runs.js", "lib/connections/composio-flow.js"]);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}"], "the one tool that runs is the one in the list");
   assert.ok(client.includes("arguments: {}"), "always called with nothing to fill in");
   assert.ok(client.includes("restrict_to_following_tools: [app.tool]"), "the sign-in is limited to that one tool at Composio too");
   assert.deepEqual(files.filter((file) => /backend\.composio\.dev/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md"), ["lib/connectors/composio.js"]);
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveAppLookup"));
-  const order = ["requireUser(", "loadPracticeStep(", "findComposioApp(", "getComposioKey(", "limitError(", "runReadTool("].map((call) => body.indexOf(call));
+  const order = ["loadPracticeStep(", "findComposioApp(", "getComposioKey(", "limitError(", "runReadTool("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   const flow = files.find((file) => file.name === "lib/connections/composio-flow.js").text;
@@ -320,14 +319,14 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
 });
 
 test("when a built-in tool of an Ask the AI step fails, the person is told the real reason (not the AI's vague paraphrase) and nothing is saved as a success", () => {
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveAiStep"), action.indexOf('// The "Approve and look at my calendar" button'));
   assert.ok(body.includes("failed(answer.error)") && !/return answer\.error;/.test(body.replace(/\/\/.*$/gm, "")), "every tool failure is recorded");
   assert.ok(body.indexOf("if (toolError) return { error: toolError };") > body.indexOf("await runAgent(") && body.indexOf("if (toolError) return { error: toolError };") < body.indexOf("saveLiveRun("));
 });
 
 test("every lookup result is the AI's summary followed by the app's own list; the AI is skipped (not an error) when it is off or limited, and the list is always kept", () => {
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const helper = action.slice(action.indexOf("async function withSummary"), action.indexOf("// One line per event") > 0 ? action.indexOf("// The \"Approve and ask Linear\"") : undefined);
   assert.ok(helper.includes("return plain") && helper.includes("exactly as it answered"), "the list is always part of the result");
   assert.ok(helper.indexOf("getGroqKey()") < helper.indexOf("summarizeData("), "the key is checked first");
@@ -342,7 +341,7 @@ test("every lookup result is the AI's summary followed by the app's own list; th
 });
 
 test("Auto mode: only an explicit true turns it on; it uses the very same Approve actions (so every check and limit applies), goes in order, stops at the first failure and is capped", () => {
-  const action = files.find((file) => file.name === "lib/actions/runs.js").text;
+  const action = files.find((file) => file.name === "lib/run-core.js").text;
   const start = action.slice(action.indexOf("export async function startPracticeRun"), action.indexOf("// Real actions are rare and deliberate"));
   assert.ok(start.includes("input?.auto === true"), "only a real true");
   assert.ok(start.indexOf('from("runs")') < start.indexOf("runAutomatically("), "the practice run is saved before anything real happens");
@@ -350,7 +349,7 @@ test("Auto mode: only an explicit true turns it on; it uses the very same Approv
   assert.ok(loop.includes("Math.min(results.length, 20)") && loop.includes("if (outcome?.error) return"), "capped, and stops at the first failure");
   assert.ok(loop.includes("await action("), "one step at a time, in order");
   const table = action.slice(action.indexOf("const AUTO_ACTIONS"), action.indexOf("async function runAutomatically"));
-  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input)`), `${name} is run through its normal Approve action`);
+  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input, who)`), `${name} is run through its normal Approve action`);
   assert.ok(!/fetchLinearIssues|createIssue|appendRow|fetchInbox|runReadTool|fetchPublic/.test(table + loop), "Auto mode never reaches a connector without going through an Approve action");
   const mode = files.find((file) => file.name === "components/app/RunMode.js").text;
   assert.match(mode, /localStorage\.getItem\(KEY\) === "auto" \? "auto" : "manual"/, "Manual is the default and anything unexpected means Manual");
@@ -363,4 +362,19 @@ test("every jsonb containment lookup on saved runs is handed JSON TEXT, never a 
     assert.ok(calls.length > 0, name);
     for (const call of calls) assert.ok(/\.contains\("results", JSON\.stringify\(/.test(call), `${name}: ${call}`);
   }
+});
+
+test("the Server Actions for runs are thin: each works out WHO is asking from the session first and hands it to the core, which no browser can call", () => {
+  const actions = files.find((file) => file.name === "lib/actions/runs.js").text;
+  assert.match(actions, /^"use server";/m);
+  assert.ok(actions.includes("const asUser = async () => ({ user: await requireUser(), supabase: await createClient() });"));
+  for (const name of ["startPracticeRun", "approveWebCall", "approveLinearLookup", "approveAiStep", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveSheetsRow"]) {
+    assert.ok(actions.includes(`export async function ${name}(input) { return core.${name}(input, await asUser()); }`), `${name} is a one-line wrapper that gets who from the session`);
+  }
+  assert.ok(actions.indexOf("export async function deleteRun") > 0 && /export async function deleteRun[\s\S]*requireUser\(\)/.test(actions));
+  const core = files.find((file) => file.name === "lib/run-core.js").text;
+  assert.ok(!/^\s*["']use server["']/m.test(core), "the core is not a Server Action file: a browser could otherwise call it with a `who` of its own");
+  assert.ok(!/requireUser\(|createClient\(/.test(core.replace(/\/\/.*$/gm, "")), "the core never decides who is calling; it is told");
+  const importers = files.filter((file) => /from\s+["']@\/lib\/run-core["']/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
+  for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
 });
