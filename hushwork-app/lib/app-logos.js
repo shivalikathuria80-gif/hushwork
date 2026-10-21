@@ -5,8 +5,8 @@
 // To give a new app a logo: add a line below under the app's id. An id with no line (or no logo in the package) gets a plain icon from
 // components/icons.js instead (see `fallbackIcon`), so a missing logo never breaks a page.
 import {
-  siAirtable, siGmail, siGoogle, siGooglecalendar, siGoogledrive, siGooglesheets, siHubspot, siJira, siLinear,
-  siModelcontextprotocol, siNotion, siTodoist,
+  siAirtable, siCloudflare, siGithub, siGmail, siGoogle, siGooglecalendar, siGoogledrive, siGooglesheets, siGoogletasks, siHubspot, siJira, siLinear,
+  siMailchimp, siModelcontextprotocol, siNotion, siPagerduty, siSentry, siStripe, siTodoist, siTrello, siVercel, siXero,
 } from "simple-icons";
 
 export const LOGOS = {
@@ -21,6 +21,16 @@ export const LOGOS = {
   airtable: siAirtable,
   hubspot: siHubspot,
   jira: siJira,
+  github: siGithub,
+  vercel: siVercel,
+  sentry: siSentry,
+  cloudflare: siCloudflare,
+  pagerduty: siPagerduty,
+  stripe: siStripe,
+  xero: siXero,
+  mailchimp: siMailchimp,
+  googletasks: siGoogletasks,
+  trello: siTrello,
   mcp: siModelcontextprotocol,
 };
 

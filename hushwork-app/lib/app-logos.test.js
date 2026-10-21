@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { LOGOS, logoFor, fallbackIcon } from "./app-logos.js";
+import { FALLBACK_ICONS, LOGOS, logoFor, fallbackIcon } from "./app-logos.js";
 import { APP_LIST } from "./connectors/app-list.js";
 import { COMPOSIO_APPS } from "./connectors/composio-apps.js";
 
 test("every connection has a logo: each app in the list, each Composio app, and the four Google products", () => {
-  for (const app of [...APP_LIST, ...COMPOSIO_APPS]) assert.ok(logoFor(app.id), `${app.id} has a logo`);
+  // Slack is not in the logo package, so it is the one app shown with a plain icon instead.
+  for (const app of [...APP_LIST, ...COMPOSIO_APPS]) assert.ok(logoFor(app.id) || FALLBACK_ICONS[app.id], `${app.id} has a logo or a plain icon`);
+  assert.deepEqual(COMPOSIO_APPS.filter((app) => !logoFor(app.id)).map((app) => app.id), ["slack"]);
   for (const id of ["calendar", "sheets", "gmail", "drive", "mcp"]) assert.ok(logoFor(id), id);
 });
 

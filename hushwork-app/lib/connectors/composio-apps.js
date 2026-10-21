@@ -17,6 +17,20 @@ export const COMPOSIO_APPS = [
   { id: "airtable", name: "Airtable", toolkit: "airtable", tool: "AIRTABLE_LIST_BASES", what: "your bases", about: "Hushwork can list your Airtable bases. It cannot add, change or delete anything." },
   { id: "hubspot", name: "HubSpot", toolkit: "hubspot", tool: "HUBSPOT_LIST_DEALS", what: "your deals", about: "Hushwork can read your HubSpot deals. It cannot add, change or delete anything." },
   { id: "jira", name: "Jira", toolkit: "jira", tool: "JIRA_GET_ALL_PROJECTS", what: "your projects", about: "Hushwork can list your Jira projects. It cannot add, change or delete anything." },
+  // Code and shipping
+  { id: "github", name: "GitHub", toolkit: "github", tool: "GITHUB_LIST_NOTIFICATIONS_FOR_THE_AUTHENTICATED_USER", what: "your latest notifications (review requests, mentions, issues)", about: "Hushwork can read your GitHub notifications. It cannot comment, merge, push or change anything." },
+  { id: "vercel", name: "Vercel", toolkit: "vercel", tool: "VERCEL_LIST_PROJECTS", what: "your projects", about: "Hushwork can list your Vercel projects. It cannot deploy, change settings or delete anything." },
+  { id: "sentry", name: "Sentry", toolkit: "sentry", tool: "SENTRY_LIST_ORGANIZATIONS", what: "your organizations", about: "Hushwork can list your Sentry organizations. It cannot change or delete anything." },
+  { id: "cloudflare", name: "Cloudflare", toolkit: "cloudflare", tool: "CLOUDFLARE_LIST_ACCOUNTS", what: "your accounts", about: "Hushwork can list your Cloudflare accounts. It cannot change settings or delete anything." },
+  { id: "pagerduty", name: "PagerDuty", toolkit: "pagerduty", tool: "PAGERDUTY_FETCH_INCIDENT_LIST", what: "your latest incidents", about: "Hushwork can read your PagerDuty incidents. It cannot acknowledge, resolve or change anything." },
+  // Talking and money
+  { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels. It cannot post, edit or delete any message." },
+  { id: "stripe", name: "Stripe", toolkit: "stripe", tool: "STRIPE_LIST_CHARGES", what: "your latest payments", about: "Hushwork can read your latest Stripe payments. It cannot charge, refund or change anything." },
+  { id: "xero", name: "Xero", toolkit: "xero", tool: "XERO_GET_CONTACTS", what: "your contacts", about: "Hushwork can read your Xero contacts. It cannot create invoices or change anything." },
+  { id: "mailchimp", name: "Mailchimp", toolkit: "mailchimp", tool: "MAILCHIMP_LIST_CAMPAIGNS", what: "your email campaigns", about: "Hushwork can list your Mailchimp campaigns. It cannot send or change anything." },
+  // Personal
+  { id: "googletasks", name: "Google Tasks", toolkit: "googletasks", tool: "GOOGLETASKS_LIST_ALL_TASKS", what: "your tasks", about: "Hushwork can read your Google Tasks. It cannot add, change or delete anything." },
+  { id: "trello", name: "Trello", toolkit: "trello", tool: "TRELLO_GET_MEMBERS_ME_BOARDS", what: "your boards", about: "Hushwork can list your Trello boards. It cannot add, move or delete cards." },
 ];
 
 // Finds one app by its id, or null. Only a real id from the list works ("__proto__" or a made-up name is just "not found").

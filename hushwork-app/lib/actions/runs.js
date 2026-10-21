@@ -326,7 +326,7 @@ export async function approveAiStep(input) {
   } else if (uses === "app") {
     // The app is named in the step's address box and must be one from lib/connectors/composio-apps.js; the tool is always that app's one read-only tool.
     const app = findComposioApp(typeof address === "string" ? address.trim().toLowerCase() : "");
-    if (!app) return { error: "Write the short name of the app in this step first (todoist, notion, airtable, hubspot or jira)." };
+    if (!app) return { error: "Write the short name of the app in this step first (for example todoist, github or slack: the names are on the Connections page)." };
     const composioKey = getComposioKey();
     if (!composioKey) return { error: COMPOSIO_OFF };
     tools.app_read = {
