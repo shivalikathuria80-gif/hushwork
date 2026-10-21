@@ -8,15 +8,19 @@ import { COMPOSIO_APPS } from "@/lib/connectors/composio-apps";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { listConnected } from "@/lib/connectors/composio";
 import DisconnectApp from "@/components/app/DisconnectApp";
+import AppLogo, { AppLogos } from "@/components/AppLogo";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
 
 // The apps a workflow can act in. Web addresses, Linear and Google Calendar work now. The others are planned and say so:
 // there are no Connect buttons that would not work.
 const APPS = [
-  { name: "Slack", icon: "MessageSquare", does: "Post a message to a channel." },
-  { name: "Gmail (sending)", icon: "Mail", does: "Send email. Reading your inbox already works with Google above." },
+  { name: "Slack", logo: "slack", does: "Post a message to a channel." },
+  { name: "Gmail (sending)", logo: "gmail", does: "Send email. Reading your inbox already works with Google above." },
 ];
+
+// Which logos stand for each connection: Google is four products behind one sign-in. Anything else uses its own id (lib/app-logos.js).
+const LOGO_IDS = { google: ["calendar", "sheets", "gmail", "drive"] };
 
 // What the short message in the address means (the Connect button sends the person back with ?linear=... or ?google=...).
 const RESULTS = {
@@ -40,7 +44,10 @@ export default function ConnectionsPage({ searchParams }) {
 
       {APP_LIST.map((entry) => (
         <section key={entry.id} aria-labelledby={`${entry.id}-heading`} className="mt-8">
-          <h2 id={`${entry.id}-heading`} className="text-xl font-semibold leading-[1.35] tracking-tight">{entry.heading}</h2>
+          <div className="flex items-center gap-3">
+            <AppLogos ids={LOGO_IDS[entry.id] ?? [entry.id]} />
+            <h2 id={`${entry.id}-heading`} className="text-xl font-semibold leading-[1.35] tracking-tight">{entry.heading}</h2>
+          </div>
           <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
             <Suspense fallback={fallback}><AppCard entry={entry} searchParams={searchParams} /></Suspense>
           </div>
@@ -48,14 +55,20 @@ export default function ConnectionsPage({ searchParams }) {
       ))}
 
       <section aria-labelledby="more-heading" className="mt-8">
-        <h2 id="more-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">More apps (through Composio)</h2>
+        <div className="flex items-center gap-3">
+          <AppLogos ids={COMPOSIO_APPS.map((app) => app.id)} size={32} />
+          <h2 id="more-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">More apps (through Composio)</h2>
+        </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <Suspense fallback={fallback}><MoreApps searchParams={searchParams} /></Suspense>
         </div>
       </section>
 
       <section aria-labelledby="web-heading" className="mt-8">
-        <h2 id="web-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Web addresses</h2>
+        <div className="flex items-center gap-3">
+          <AppLogo id="web" label="Web addresses" />
+          <h2 id="web-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Web addresses</h2>
+        </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <p className="flex items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Works now. Nothing to set up.</p>
           <p className="mt-2 text-sm text-mute">A {"“"}Call a web address{"”"} step asks one https address for information (a read-only request) after you approve it on the Runs page. Private and internal addresses are refused. Never put a password or key in the address.</p>
@@ -63,7 +76,10 @@ export default function ConnectionsPage({ searchParams }) {
       </section>
 
       <section aria-labelledby="mcp-heading" className="mt-8">
-        <h2 id="mcp-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">MCP servers</h2>
+        <div className="flex items-center gap-3">
+          <AppLogo id="mcp" label="MCP servers" />
+          <h2 id="mcp-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">MCP servers</h2>
+        </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <p className="flex items-center gap-2 font-medium"><Icon name="CircleCheck" className="text-success" />Works now. Nothing to set up.</p>
           <p className="mt-2 text-sm text-mute">MCP is a standard way for apps to offer tools to an AI. Drag the {"“"}MCP server{"”"} block into a workflow, paste the https address of a server that needs no login (for example <code className="rounded bg-sunken px-1 py-0.5 text-[13px]">https://mcp.deepwiki.com/mcp</code>), and after you approve it on the Runs page the AI may use that server{"’"}s read-only tools. Tools that could change or delete anything are never used.</p>
@@ -75,7 +91,7 @@ export default function ConnectionsPage({ searchParams }) {
         <ul className="mt-3 space-y-3">
           {APPS.map((app) => (
             <li key={app.name} className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name={app.icon} size={18} /></span>
+              <AppLogo id={app.logo} label={app.name} size={36} />
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{app.name}</p>
                 <p className="text-sm text-mute">{app.does}</p>
@@ -148,6 +164,7 @@ async function MoreApps({ searchParams }) {
           {COMPOSIO_APPS.map((app) => (
             <li key={app.id} className="rounded-xl border border-line p-3">
               <div className="flex flex-wrap items-center gap-3">
+                <AppLogo id={app.id} label={app.name} />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{app.name}</p>
                   <p className="text-sm text-mute">{app.about}</p>
