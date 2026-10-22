@@ -56,20 +56,18 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "testall", icon: "ShieldCheck", title: "Test all my connections", needs: "Linear, Google, Todoist",
-    body: "A check-up. It reads your Calendar, Gmail, Drive, Linear and Todoist, calls one web address, writes a one-line report, then creates ONE Linear task and ONE Todoist task from it. Connect those first, run it on Manual, and delete the two test tasks afterwards.",
-    request: "When I ask, test every connection: read my calendar, inbox, files, Linear and Todoist, call one web address, write a one-line report, and add a test task in Linear and in Todoist.",
+    id: "testall", icon: "ShieldCheck", title: "Test all my connections", needs: "Linear, Google",
+    body: "A check-up. It reads your Calendar, Gmail, Drive and Linear, calls one web address, writes a one-line report, then creates ONE Linear task from it. Connect Google and Linear first, run it on Manual, and delete the test task afterwards.",
+    request: "When I ask, test every connection: read my calendar, inbox, files and Linear, call one web address, write a one-line report, and add a test task in Linear.",
     steps: [
       step("trigger", { how: "manual", when: "" }),
       step("ai", { task: "Say in one line what is on my calendar this week.", uses: "calendar", address: "" }),
       step("ai", { task: "Say in one line who wrote to me last.", uses: "gmail", address: "" }),
       step("ai", { task: "Say in one line which file I changed last.", uses: "drive", address: "" }),
       step("ai", { task: "Say in one line what my top Linear task is.", uses: "linear", address: "" }),
-      step("app", { app: "todoist", what: "which task is due first" }),
       step("request", { url: "https://example.com/", why: "check the web call works" }),
       step("ai", { task: "Write ONE short line: Hushwork connection test passed.", uses: "nothing", address: "" }),
       step("issue", { title: "{answer}", details: "Test task made by Hushwork. Safe to delete.", team: "" }),
-      step("action", { action: "todoist_task", target: "", title: "{answer}", details: "Test task made by Hushwork. Safe to delete." }),
     ],
   },
   {

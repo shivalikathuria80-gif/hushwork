@@ -59,8 +59,8 @@ test("templates: the three that work for real say what they need, and their step
   const { isAppLookup, isActionStep, isLinearCreate, isRequestStep } = await import("./run-engine.js");
   const all = checkSteps(real.find((x) => x.id === "testall").steps).value;
   for (const s of all.filter((x) => x.kind !== "trigger")) assert.ok(isAiStep(s) || isAppLookup(s) || isActionStep(s) || isLinearCreate(s) || isRequestStep(s), `testall: ${s.kind} can be approved`);
-  assert.equal(all.filter(isActionStep).length + all.filter(isLinearCreate).length, 2, "exactly two test tasks are written");
-  assert.ok(all.findLast(isAiStep) === all[7] && all[8].fields.title === "{answer}" && all[9].fields.title === "{answer}", "the writes use the last AI line");
+  assert.equal(all.filter(isActionStep).length + all.filter(isLinearCreate).length, 1, "exactly one test task is written");
+  assert.ok(all.findLast(isAiStep) === all[6] && all[7].fields.title === "{answer}", "the write uses the last AI line");
   const hello = checkSteps(real.find((x) => x.id === "hellomail").steps).value;
   assert.ok(isActionStep(hello[1]) && hello[1].fields.action === "gmail_send", "the hello email is a real send step, approved on the Runs page");
   for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);
