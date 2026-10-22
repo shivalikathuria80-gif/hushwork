@@ -46,8 +46,8 @@ test("templates: the three that work for real say what they need, and their step
   const { isAiStep } = await import("./run-engine.js");
   const { checkRequestUrl } = await import("./connectors/http.js");
   const real = TEMPLATES.filter((t) => t.needs);
-  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup"]);
-  for (const t of real) {
+  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail"]);
+  for (const t of real.filter((x) => !["testall", "hellomail"].includes(x.id))) {
     assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
     const checked = checkSteps(t.steps).value;
     const ai = checked.find((s) => s.kind === "ai");
@@ -55,5 +55,13 @@ test("templates: the three that work for real say what they need, and their step
     assert.equal(ai.fields.uses, { Linear: "linear", Google: { inboxnow: "gmail", recentfiles: "drive" }[t.id] ?? "calendar", Nothing: "web" }[t.needs], `${t.id}: the tool matches what it needs`);
     if (ai.fields.uses === "web") assert.ok(checkRequestUrl(ai.fields.address).value, `${t.id}: the starting web address is valid`);
   }
+  // the check-up uses several apps at once: every step must be one that can really be approved, and its writes must read the AI's line
+  const { isAppLookup, isActionStep, isLinearCreate, isRequestStep } = await import("./run-engine.js");
+  const all = checkSteps(real.find((x) => x.id === "testall").steps).value;
+  for (const s of all.filter((x) => x.kind !== "trigger")) assert.ok(isAiStep(s) || isAppLookup(s) || isActionStep(s) || isLinearCreate(s) || isRequestStep(s), `testall: ${s.kind} can be approved`);
+  assert.equal(all.filter(isActionStep).length + all.filter(isLinearCreate).length, 2, "exactly two test tasks are written");
+  assert.ok(all.findLast(isAiStep) === all[7] && all[8].fields.title === "{answer}" && all[9].fields.title === "{answer}", "the writes use the last AI line");
+  const hello = checkSteps(real.find((x) => x.id === "hellomail").steps).value;
+  assert.ok(isActionStep(hello[1]) && hello[1].fields.action === "gmail_send", "the hello email is a real send step, approved on the Runs page");
   for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);
 });

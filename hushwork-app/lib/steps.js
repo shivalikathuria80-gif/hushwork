@@ -131,13 +131,13 @@ export const STEP_KINDS = {
   },
   action: {
     label: "Do something in another app",
-    help: "Send a Slack message, create a GitHub issue or add a Todoist task, in an app you connected through Composio. It does exactly that one thing. You read what will be sent and approve it on the Runs page. Write {answer} to use what an Ask the AI step said.",
+    help: "Send an email, send a Slack message, create a GitHub issue or add a Todoist task, in an app you connected through Composio. It does exactly that one thing. You read what will be sent and approve it on the Runs page. Write {answer} to use what an Ask the AI step said.",
     icon: "Send",
     fields: [
       choice("action", "What to do", Object.fromEntries(COMPOSIO_ACTIONS.map((action) => [action.id, action.name]))),
-      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Todoist: leave empty." }),
+      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Email: the address it goes to. Todoist: leave empty." }),
       text("title", "Message or title", 80, { hint: "For example: Deploy finished. Write {answer} to use what an Ask the AI step said." }),
-      text("details", "More details", 80, { optional: true, hint: "Optional. More words for the message or the issue." }),
+      text("details", "More details", 120, { optional: true, hint: "Optional. More words for the message or the issue. For an email this is the text of the email." }),
     ],
     describe: (fields, label) => ({ title: label("action"), detail: join(fields.title, fields.target ? `in ${fields.target}` : "") }),
   },

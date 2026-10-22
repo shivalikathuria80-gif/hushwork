@@ -33,6 +33,13 @@ export const COMPOSIO_ACTIONS = [
     done: (v) => `Created a GitHub issue in ${v.target}`,
   },
   {
+    id: "gmail_send", app: "gmailsend", name: "Send an email (Gmail)", tool: "GMAIL_SEND_EMAIL", needsTarget: true,
+    target: { pattern: /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}$/, hint: "Write the email address it goes to, for example name@example.com." },
+    candidates: { recipient_email: ["recipient_email", "to"], subject: ["subject"], body: ["body"] },
+    meaning: (v) => ({ recipient_email: v.target, subject: v.title, body: v.details || v.title }),
+    done: (v) => `Sent an email to ${v.target}`,
+  },
+  {
     id: "todoist_task", app: "todoist", name: "Add a Todoist task", tool: "TODOIST_CREATE_TASK", needsTarget: false,
     target: null,
     candidates: { content: ["content"], description: ["description"] },

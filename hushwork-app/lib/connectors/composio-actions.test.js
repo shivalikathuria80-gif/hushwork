@@ -30,7 +30,7 @@ test("the list: each action belongs to a real app, names one tool written Compos
     assert.match(action.tool, new RegExp(`^${app.toolkit.toUpperCase()}_[A-Z0-9_]+$`), `${action.id}: the tool belongs to the toolkit`);
     assert.notEqual(action.tool, app.tool);
     assert.ok(action.name && typeof action.done === "function" && typeof action.meaning === "function");
-    const meant = action.meaning({ target: action.needsTarget ? (action.id === "github_issue" ? "acme/site" : "general") : "", title: "T", details: "D" });
+    const meant = action.meaning({ target: action.needsTarget ? (action.id === "github_issue" ? "acme/site" : action.id === "gmail_send" ? "a@b.co" : "general") : "", title: "T", details: "D" });
     for (const meaning of Object.keys(meant)) assert.ok(action.candidates[meaning]?.length, `${action.id}: a name for ${meaning}`);
   }
   for (const bad of ["", "nope", "__proto__", "constructor", 5, null, undefined]) assert.equal(findAction(bad), null, String(bad));
@@ -64,6 +64,9 @@ test("where a message or issue goes is checked before any request: a plain chann
   for (const bad of ["", "two words", "a/b", "../x", "<script>", "x".repeat(81), "general\nsecret", 5, null]) assert.ok(checkTarget(slack, bad).error, String(bad));
   for (const good of ["acme/website", "my-org/repo.name", "a/b"]) assert.deepEqual(checkTarget(github, good), { value: good }, good);
   for (const bad of ["acme", "acme/", "/repo", "acme/re po", "acme/repo/extra", "-acme/repo", "ac me/repo", "../../etc/passwd", "acme/..%2f"]) assert.ok(checkTarget(github, bad).error, bad);
+  const email = findAction("gmail_send");
+  for (const good of ["arjun.arora30th@gmail.com", "a+b@mail.example.co.uk"]) assert.deepEqual(checkTarget(email, good), { value: good }, good);
+  for (const bad of ["arjun", "a@b", "a b@c.com", "a@@c.com", "a@c.com"+String.fromCharCode(10)+"bcc:x@y.com", "<a@c.com>", "a@c..com", "@c.com"]) assert.ok(checkTarget(email, bad).error, bad);
   assert.deepEqual(checkTarget(todoist, ""), { value: "" });
   assert.ok(checkTarget(todoist, "inbox").error, "an action with no place refuses one");
 });
@@ -88,6 +91,14 @@ test("the request is built only from inputs the tool really has; a missing home 
   assert.deepEqual(buildArguments(github, issue, readToolInputs({ input_parameters: { type: "object", properties: { owner: {}, repo: {}, title: {}, body: {} }, required: ["owner", "repo", "title"] } })).arguments, { owner: "acme", repo: "website", title: "Broken link" });
   assert.deepEqual(buildArguments(github, issue, readToolInputs({ input_parameters: { repo_name: { required: true }, title: { required: true } } })).arguments, { repo_name: "acme/website", title: "Broken link" }, "one box for owner/name");
   assert.deepEqual(buildArguments(todoist, { target: "", title: "Buy milk", details: "2 litres" }, readToolInputs({ input_parameters: { content: { required: true }, description: {}, project_id: {} } })).arguments, { content: "Buy milk", description: "2 litres" });
+});
+
+test("an email: the address, subject and text go to the tool's own boxes, and the subject is the text if there is no text", () => {
+  const email = findAction("gmail_send");
+  const inputs = readToolInputs({ input_parameters: { recipient_email: { required: true }, subject: {}, body: { required: true }, cc: {} } });
+  assert.deepEqual(buildArguments(email, { target: "a@b.co", title: "Greetings", details: "Dear Arjun" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Greetings", body: "Dear Arjun" });
+  assert.deepEqual(buildArguments(email, { target: "a@b.co", title: "Greetings", details: "" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Greetings", body: "Greetings" });
+  assert.deepEqual(allowedTools(findComposioApp("gmailsend")), ["GMAIL_LIST_LABELS", "GMAIL_SEND_EMAIL"]);
 });
 
 test("doing an action: the tool's inputs are asked for first, then ONE request with exactly the built inputs for this person; nothing else is ever sent", async () => {

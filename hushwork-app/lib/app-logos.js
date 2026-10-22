@@ -73,6 +73,8 @@ export const ARTWORK = {
   },
 };
 
+ARTWORK.gmailsend = ARTWORK.gmail; // the same picture, for the send-only Gmail connection through Composio
+
 export const LOGOS = {
   linear: siLinear,
   google: siGoogle,

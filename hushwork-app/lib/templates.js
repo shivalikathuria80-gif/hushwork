@@ -55,6 +55,32 @@ export const TEMPLATES = [
       step("ai", { task: "Does this page look like a normal working website? Answer in one sentence.", uses: "web", address: "https://example.com/" }),
     ],
   },
+  {
+    id: "testall", icon: "ShieldCheck", title: "Test all my connections", needs: "Linear, Google, Todoist",
+    body: "A check-up. It reads your Calendar, Gmail, Drive, Linear and Todoist, calls one web address, writes a one-line report, then creates ONE Linear task and ONE Todoist task from it. Connect those first, run it on Manual, and delete the two test tasks afterwards.",
+    request: "When I ask, test every connection: read my calendar, inbox, files, Linear and Todoist, call one web address, write a one-line report, and add a test task in Linear and in Todoist.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Say in one line what is on my calendar this week.", uses: "calendar", address: "" }),
+      step("ai", { task: "Say in one line who wrote to me last.", uses: "gmail", address: "" }),
+      step("ai", { task: "Say in one line which file I changed last.", uses: "drive", address: "" }),
+      step("ai", { task: "Say in one line what my top Linear task is.", uses: "linear", address: "" }),
+      step("app", { app: "todoist", what: "which task is due first" }),
+      step("request", { url: "https://example.com/", why: "check the web call works" }),
+      step("ai", { task: "Write ONE short line: Hushwork connection test passed.", uses: "nothing", address: "" }),
+      step("issue", { title: "{answer}", details: "Test task made by Hushwork. Safe to delete.", team: "" }),
+      step("action", { action: "todoist_task", target: "", title: "{answer}", details: "Test task made by Hushwork. Safe to delete." }),
+    ],
+  },
+  {
+    id: "hellomail", icon: "Mail", title: "Send a formal hello email", needs: "Gmail (send)",
+    body: "When you ask, it sends one short formal hello email to the address in the step. You read the email and press Approve before anything is sent. Change the address and words to your own.",
+    request: "When I ask, send a short formal hello email to arjun.arora30th@gmail.com. Ask me before it is sent.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("action", { action: "gmail_send", target: "arjun.arora30th@gmail.com", title: "Warm greetings", details: "Dear Arjun, I hope this message finds you well. I am writing to send my warmest greetings. Kind regards, Shivalika" }),
+    ],
+  },
   // ---- these describe a plan only ----
   {
     id: "invoices", icon: "Receipt", title: "Chase unpaid invoices",

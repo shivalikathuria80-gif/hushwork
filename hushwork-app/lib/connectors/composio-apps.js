@@ -13,6 +13,7 @@
 //   about     one plain sentence on the Connections page
 export const COMPOSIO_APPS = [
   { id: "todoist", name: "Todoist", toolkit: "todoist", tool: "TODOIST_GET_ALL_TASKS", what: "your open tasks", about: "Hushwork can read your open Todoist tasks, and add a new task when a step says so and you approve it. It cannot change or delete existing tasks." },
+  { id: "gmailsend", name: "Gmail (send)", toolkit: "gmail", tool: "GMAIL_LIST_LABELS", what: "your Gmail label names", about: "Hushwork can read the names of your Gmail labels, and send one email when a step says so and you approve it. It cannot read your emails, delete or change anything." },
   { id: "notion", name: "Notion", toolkit: "notion", tool: "NOTION_SEARCH_NOTION_PAGE", what: "your recent pages", about: "Hushwork can search your Notion pages and read their titles. It cannot add, change or delete anything." },
   { id: "airtable", name: "Airtable", toolkit: "airtable", tool: "AIRTABLE_LIST_BASES", what: "your bases", about: "Hushwork can list your Airtable bases. It cannot add, change or delete anything." },
   { id: "hubspot", name: "HubSpot", toolkit: "hubspot", tool: "HUBSPOT_LIST_DEALS", what: "your deals", about: "Hushwork can read your HubSpot deals. It cannot add, change or delete anything." },

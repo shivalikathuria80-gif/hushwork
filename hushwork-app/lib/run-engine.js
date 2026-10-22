@@ -94,7 +94,7 @@ export const actionSummary = (step, answer = "") => {
   const f = step?.fields ?? {};
   const title = fillAnswerText(String(f.title ?? ""), answer, 150);
   const details = fillAnswerText(String(f.details ?? ""), answer, 300);
-  return [`Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`, action?.needsTarget ? `Where: ${f.target}` : "", `${action?.id === "slack_message" ? "Message" : "Title"}: ${title.text ?? f.title}`, f.details ? `Details: ${details.text ?? f.details}` : "", "It is sent through Composio, the company that keeps the connection to the app.", title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
+  return [`Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`, action?.needsTarget ? `Where: ${f.target}` : "", `${action?.id === "slack_message" ? "Message" : action?.id === "gmail_send" ? "Subject" : "Title"}: ${title.text ?? f.title}`, f.details ? `${action?.id === "gmail_send" ? "Email text" : "Details"}: ${details.text ?? f.details}` : "", "It is sent through Composio, the company that keeps the connection to the app.", title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
 };
 
 // Steps that WRITE somewhere (add a row, create a task). Auto mode runs them too, so the screens that offer Auto say so in plain words.
