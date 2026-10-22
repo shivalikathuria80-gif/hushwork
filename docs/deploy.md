@@ -67,3 +67,13 @@ A schedule saved on the Workflows page is only a note until something **calls Hu
 
 **Good to know:** a run starts within about a minute of its time (as late as the clock's rhythm); a schedule that was missed because the server was off runs once when it comes back; at most 20 schedules run per call and 10 schedules per person; daylight-saving changes can shift a schedule by an hour twice a year.
 
+
+## 8. Vercel, in order (the short version)
+
+Nobody has done these yet. Steps 1 to 4 need your own accounts, so they can only be done by you.
+
+1. **Put the code on GitHub.** Make a new empty private repository on github.com, then in the project folder run `git remote add origin <the address GitHub shows>` and `git push -u origin main`. (`.env.local` is never pushed: it is in `.gitignore`.)
+2. **Import it in Vercel.** vercel.com, Add New, Project, pick the repository. Set **Root Directory** to `hushwork-app`. Framework: Next.js (it finds it by itself).
+3. **Add the settings from section 2** under Settings, Environment Variables, before the first deploy. At least `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL`, `GROQ_API_KEY` and `CONNECTIONS_KEY`. Without the Supabase ones nobody can sign in.
+4. **Deploy**, copy the address Vercel gives you, put it in `NEXT_PUBLIC_SITE_URL`, then do section 3 (tell Linear, Google and Supabase the new address) and redeploy.
+5. **Sections 6 and 7** (test it, set up the clock).
