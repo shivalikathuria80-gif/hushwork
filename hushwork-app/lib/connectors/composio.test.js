@@ -32,7 +32,7 @@ test("a sign-in blueprint is reused when one limited to the same tool exists, an
   const have = composio(() => json({ items: [
     { id: "ac_other", toolkit: { slug: "todoist" }, is_composio_managed: true, status: "ENABLED", restrict_to_following_tools: ["TODOIST_CREATE_TASK"] },
     { id: "ac_wide", toolkit: { slug: "todoist" }, is_composio_managed: true, status: "ENABLED", restrict_to_following_tools: [] },
-    { id: "ac_good", toolkit: { slug: "todoist" }, is_composio_managed: true, status: "ENABLED", restrict_to_following_tools: ["TODOIST_GET_ALL_TASKS"] },
+    { id: "ac_good", toolkit: { slug: "todoist" }, is_composio_managed: true, status: "ENABLED", restrict_to_following_tools: ["TODOIST_GET_ALL_TASKS", "TODOIST_CREATE_TASK"] },
   ] }));
   assert.deepEqual(await ensureAuthConfig({ key: "k1", app: todoist, fetchImpl: have.fetchImpl }), { id: "ac_good" });
   assert.equal(have.sent.length, 1);
@@ -41,7 +41,7 @@ test("a sign-in blueprint is reused when one limited to the same tool exists, an
 
   const none = composio((method) => (method === "GET" ? json({ items: [] }) : json({ toolkit: { slug: "todoist" }, auth_config: { id: "ac_new" } }, 201)));
   assert.deepEqual(await ensureAuthConfig({ key: "k1", app: todoist, fetchImpl: none.fetchImpl }), { id: "ac_new" });
-  assert.deepEqual(none.sent[1].body, { toolkit: { slug: "todoist" }, auth_config: { type: "use_composio_managed_auth", restrict_to_following_tools: ["TODOIST_GET_ALL_TASKS"] } });
+  assert.deepEqual(none.sent[1].body, { toolkit: { slug: "todoist" }, auth_config: { type: "use_composio_managed_auth", restrict_to_following_tools: ["TODOIST_GET_ALL_TASKS", "TODOIST_CREATE_TASK"] } });
   const broken = composio((method) => (method === "GET" ? json({ items: [] }) : json({}, 201)));
   assert.deepEqual(await ensureAuthConfig({ key: "k", app: todoist, fetchImpl: broken.fetchImpl }), { error: COMPOSIO_FAILED.noSignIn });
   const refused = composio((method) => (method === "GET" ? json({ items: [] }) : json({}, 400)));

@@ -7,7 +7,7 @@ import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 import { findAnswer } from "@/lib/run-answer";
@@ -139,6 +139,7 @@ export default async function RunsViewer({ searchParams }) {
   const liveDrive = selected.live && isDriveLookup(selected.results[0]);
   const liveIssue = selected.live && isLinearCreate(selected.results[0]);
   const liveApp = selected.live && isAppLookup(selected.results[0]);
+  const liveAction = selected.live && isActionStep(selected.results[0]);
   // Real runs that came from this practice run (an Approve click, or Auto mode): each is shown right under the step it did, and that step
   // no longer offers Approve. (A step that failed saved nothing, so it still offers Approve and the person can try again.)
   const doneAt = new Map();
@@ -156,7 +157,7 @@ export default async function RunsViewer({ searchParams }) {
   }
   const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step, index }) => !doneAt.has(index) && isApprovable(step));
   // A row step that uses {answer} shows the real words, so you read exactly what will be written before you press Approve.
-  const needsAnswer = approvals.some(({ step }) => (isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG)) || (isLinearCreate(step) && `${step.fields?.title}${step.fields?.details}`.includes(ANSWER_TAG)));
+  const needsAnswer = approvals.some(({ step }) => (isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG)) || ((isLinearCreate(step) || isActionStep(step)) && `${step.fields?.title}${step.fields?.details}`.includes(ANSWER_TAG)));
   const answer = needsAnswer ? await findAnswer(await createClient(), user.id, { workflow_id: selected.workflowId, created_at: selected.createdAt }) : "";
   return (
     <div className="mt-8 md:flex">
@@ -182,7 +183,7 @@ export default async function RunsViewer({ searchParams }) {
           <span className={!selected.live && approvals.length > 0 ? chipWaiting : chip}>{!selected.live && approvals.length > 0 ? "Needs approval" : "Completed"}</span>
           <p className="text-sm">
             {selected.live
-              ? (liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveLinear ? "Linear was read." : "A web address was read.")
+              ? (liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.")
               : approvals.length > 0
                 ? `${approvals.length} ${approvals.length === 1 ? "step is" : "steps are"} waiting for your approval. Nothing is sent, written or changed in your apps until you approve it.`
                 : "All steps are done."}
@@ -236,9 +237,9 @@ export default async function RunsViewer({ searchParams }) {
           <div key={index} className="mt-6">
             <ApproveSend
               runId={selected.id} index={index}
-              kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isSheetsRow(step) ? "sheets" : "request"}
+              kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isActionStep(step) ? "action" : isSheetsRow(step) ? "sheets" : "request"}
               connected={isAiStep(step) ? aiOn : isLinearLookup(step) || isLinearCreate(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true}
-              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}
+              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}
             />
           </div>
         ))}

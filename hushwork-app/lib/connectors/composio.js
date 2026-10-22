@@ -10,6 +10,8 @@
 //     Composio itself refuses every other tool for it;
 //   - the person is identified to Composio by their Hushwork account id (a random id, never an email).
 
+import { actionsForApp, buildArguments, readToolInputs } from "./composio-actions.js";
+
 const BASE = "https://backend.composio.dev/api/v3.1";
 const TIMEOUT_MS = 15_000;
 
@@ -20,6 +22,7 @@ export const COMPOSIO_FAILED = {
   notConnected: "This app is not connected yet. Open Connections and press Connect for it.",
   noSignIn: "Composio could not make a sign-in for this app. It may not be offered without extra set-up at Composio.",
   failed: "The app did not answer. Try again in a minute.",
+  cannotFill: "Composio asks for something Hushwork does not know how to fill in for this action, so nothing was sent.",
   busy: "Composio is busy right now. Try again in a minute.",
   network: "Could not reach Composio. Check your connection and try again.",
 };
@@ -49,17 +52,23 @@ async function call(key, method, path, { query, body, fetchImpl = fetch, notFoun
   }
 }
 
-// The sign-in blueprint ("auth config") for an app, limited to its one tool. Found if it already exists, made if not.
+// The tools an app's sign-in is limited to at Composio: its ONE read-only lookup, plus the tools of the actions Hushwork can do in it
+// (composio-actions.js). Nothing else can be run with that sign-in, whatever anyone asks.
+export const allowedTools = (app) => [app.tool, ...actionsForApp(app.id).map((action) => action.tool)];
+const sameTools = (list, wanted) => Array.isArray(list) && list.length === wanted.length && wanted.every((tool) => list.includes(tool));
+
+// The sign-in blueprint ("auth config") for an app, limited to its allowed tools. Found if it already exists, made if not.
 // Returns { id } or { error }.
 export async function ensureAuthConfig({ key, app, fetchImpl }) {
+  const allowed = allowedTools(app);
   const found = await call(key, "GET", "/auth_configs", { query: { toolkit_slug: app.toolkit, is_composio_managed: "true", limit: 50 }, fetchImpl });
   if (found.error) return { error: found.error };
   const same = (Array.isArray(found.body?.items) ? found.body.items : []).find((item) =>
     item?.toolkit?.slug === app.toolkit && item?.is_composio_managed === true && item?.status !== "DISABLED" && typeof item?.id === "string"
-    && Array.isArray(item.restrict_to_following_tools) && item.restrict_to_following_tools.length === 1 && item.restrict_to_following_tools[0] === app.tool);
+    && sameTools(item.restrict_to_following_tools, allowed));
   if (same) return { id: same.id };
   const made = await call(key, "POST", "/auth_configs", {
-    body: { toolkit: { slug: app.toolkit }, auth_config: { type: "use_composio_managed_auth", restrict_to_following_tools: [app.tool] } },
+    body: { toolkit: { slug: app.toolkit }, auth_config: { type: "use_composio_managed_auth", restrict_to_following_tools: allowed } },
     fetchImpl, notFound: COMPOSIO_FAILED.noSignIn,
   });
   if (made.error) return { error: made.error === COMPOSIO_FAILED.failed ? COMPOSIO_FAILED.noSignIn : made.error };
@@ -109,4 +118,26 @@ export async function runReadTool({ key, userId, app, fetchImpl }) {
   }
   const answer = flat(text, 1500);
   return { ok: true, text: answer && answer !== "null" ? answer : "(nothing found)" };
+}
+
+// Does ONE write in an app (send a message, create an issue, add a task) for this person. `action` is an entry of composio-actions.js
+// and `values` is { target, title, details } (already checked and cut by the caller). First Composio is asked what inputs the action's tool
+// really takes; the request is built only from those (buildArguments), and if the tool needs something we do not fill in, or has no home
+// for something we want to say, NOTHING is sent. Returns { ok: true, text } (what the app answered, as short plain text) or { ok: false, error }.
+export async function runActionTool({ key, userId, action, values, fetchImpl }) {
+  const described = await call(key, "GET", `/tools/${action.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
+  if (described.error) return { ok: false, error: described.error };
+  const built = buildArguments(action, values, readToolInputs(described.body));
+  if (built.error) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
+
+  const ran = await call(key, "POST", `/tools/execute/${action.tool}`, { body: { user_id: userId, arguments: built.arguments }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
+  if (ran.error) return { ok: false, error: ran.error };
+  if (ran.body?.successful !== true) return { ok: false, error: /connect|account|auth/i.test(String(ran.body?.error ?? "")) ? COMPOSIO_FAILED.notConnected : COMPOSIO_FAILED.failed };
+  let text = "";
+  try {
+    text = flat(JSON.stringify(ran.body.data ?? null), 300);
+  } catch {
+    // the action worked; there is just nothing to show
+  }
+  return { ok: true, text: text && text !== "null" ? text : "" };
 }

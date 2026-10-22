@@ -174,3 +174,22 @@ test("a real run remembers which step of the practice run it did (a small whole 
   assert.equal(readSavedResults([{ title: "t", from: id, fromStep: 2 }])[0].fromStep, 2);
   for (const bad of [-1, 100, 1.5, "2", null, undefined, {}, NaN]) assert.equal("fromStep" in readSavedResults([{ title: "t", from: id, fromStep: bad }])[0], false, String(bad));
 });
+
+test("a Do something in another app step: only a listed action with a good place and a title counts, it is a write, and the summary shows exactly what will be sent", async () => {
+  const { isActionStep, actionSummary, isWriteStep, isApprovable } = await import("./run-engine.js");
+  const step = (fields) => ({ kind: "action", fields });
+  const slack = step({ action: "slack_message", target: "general", title: "Deploy done", details: "" });
+  assert.equal(isActionStep(slack), true);
+  assert.equal(isWriteStep(slack), true);
+  assert.equal(isApprovable(slack), true);
+  assert.equal(isActionStep(step({ action: "todoist_task", target: "", title: "Buy milk", details: "2 litres" })), true);
+  for (const bad of [
+    step({ action: "slack_message", target: "two words", title: "x" }), step({ action: "slack_message", target: "", title: "x" }),
+    step({ action: "todoist_task", target: "inbox", title: "x" }), step({ action: "slack_message", target: "general", title: "  " }),
+    step({ action: "__proto__", target: "", title: "x" }), step({ action: "nope", target: "", title: "x" }), { kind: "find", fields: slack.fields }, null,
+  ]) assert.equal(isActionStep(bad), false);
+  const text = actionSummary(step({ action: "github_issue", target: "acme/website", title: "Broken link", details: "On the pricing page" }));
+  for (const part of ["ONE thing", "Create a GitHub issue", "Where: acme/website", "Title: Broken link", "Details: On the pricing page", "Composio"]) assert.ok(text.includes(part), part);
+  assert.ok(actionSummary(step({ action: "slack_message", target: "general", title: "Hi {answer}" }), "all good").includes("Message: Hi all good"));
+  assert.match(practiceStep({ icon: "Send", title: "t", detail: "d", ...slack }).outcome, /^Would do: .*Nothing was sent\.$/);
+});

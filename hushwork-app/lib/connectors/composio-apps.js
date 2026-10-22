@@ -12,19 +12,19 @@
 //   what      what the lookup returns, in plain words ("your open tasks")
 //   about     one plain sentence on the Connections page
 export const COMPOSIO_APPS = [
-  { id: "todoist", name: "Todoist", toolkit: "todoist", tool: "TODOIST_GET_ALL_TASKS", what: "your open tasks", about: "Hushwork can read your open Todoist tasks. It cannot add, change or delete anything." },
+  { id: "todoist", name: "Todoist", toolkit: "todoist", tool: "TODOIST_GET_ALL_TASKS", what: "your open tasks", about: "Hushwork can read your open Todoist tasks, and add a new task when a step says so and you approve it. It cannot change or delete existing tasks." },
   { id: "notion", name: "Notion", toolkit: "notion", tool: "NOTION_SEARCH_NOTION_PAGE", what: "your recent pages", about: "Hushwork can search your Notion pages and read their titles. It cannot add, change or delete anything." },
   { id: "airtable", name: "Airtable", toolkit: "airtable", tool: "AIRTABLE_LIST_BASES", what: "your bases", about: "Hushwork can list your Airtable bases. It cannot add, change or delete anything." },
   { id: "hubspot", name: "HubSpot", toolkit: "hubspot", tool: "HUBSPOT_LIST_DEALS", what: "your deals", about: "Hushwork can read your HubSpot deals. It cannot add, change or delete anything." },
   { id: "jira", name: "Jira", toolkit: "jira", tool: "JIRA_GET_ALL_PROJECTS", what: "your projects", about: "Hushwork can list your Jira projects. It cannot add, change or delete anything." },
   // Code and shipping
-  { id: "github", name: "GitHub", toolkit: "github", tool: "GITHUB_LIST_NOTIFICATIONS_FOR_THE_AUTHENTICATED_USER", what: "your latest notifications (review requests, mentions, issues)", about: "Hushwork can read your GitHub notifications. It cannot comment, merge, push or change anything." },
+  { id: "github", name: "GitHub", toolkit: "github", tool: "GITHUB_LIST_NOTIFICATIONS_FOR_THE_AUTHENTICATED_USER", what: "your latest notifications (review requests, mentions, issues)", about: "Hushwork can read your GitHub notifications, and create an issue when a step says so and you approve it. It cannot comment, merge, push or delete anything." },
   { id: "vercel", name: "Vercel", toolkit: "vercel", tool: "VERCEL_LIST_PROJECTS", what: "your projects", about: "Hushwork can list your Vercel projects. It cannot deploy, change settings or delete anything." },
   { id: "sentry", name: "Sentry", toolkit: "sentry", tool: "SENTRY_LIST_ORGANIZATIONS", what: "your organizations", about: "Hushwork can list your Sentry organizations. It cannot change or delete anything." },
   { id: "cloudflare", name: "Cloudflare", toolkit: "cloudflare", tool: "CLOUDFLARE_LIST_ACCOUNTS", what: "your accounts", about: "Hushwork can list your Cloudflare accounts. It cannot change settings or delete anything." },
   { id: "pagerduty", name: "PagerDuty", toolkit: "pagerduty", tool: "PAGERDUTY_FETCH_INCIDENT_LIST", what: "your latest incidents", about: "Hushwork can read your PagerDuty incidents. It cannot acknowledge, resolve or change anything." },
   // Talking and money
-  { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels. It cannot post, edit or delete any message." },
+  { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels, and send one message when a step says so and you approve it. It cannot edit or delete messages." },
   { id: "stripe", name: "Stripe", toolkit: "stripe", tool: "STRIPE_LIST_CHARGES", what: "your latest payments", about: "Hushwork can read your latest Stripe payments. It cannot charge, refund or change anything." },
   { id: "xero", name: "Xero", toolkit: "xero", tool: "XERO_GET_CONTACTS", what: "your contacts", about: "Hushwork can read your Xero contacts. It cannot create invoices or change anything." },
   { id: "mailchimp", name: "Mailchimp", toolkit: "mailchimp", tool: "MAILCHIMP_LIST_CAMPAIGNS", what: "your email campaigns", about: "Hushwork can list your Mailchimp campaigns. It cannot send or change anything." },

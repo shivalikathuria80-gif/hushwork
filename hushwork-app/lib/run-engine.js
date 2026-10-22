@@ -5,6 +5,7 @@
 import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
 import { findComposioApp } from "./connectors/composio-apps.js";
+import { checkTarget, findAction } from "./connectors/composio-actions.js";
 import { fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
@@ -80,12 +81,28 @@ export const aiSummary = (step) => {
   return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI." + (step?.fields?.uses === "mcp" ? " The AI\u2019s questions to the MCP server go to that server. Only its read-only tools can be used." : "")].join(String.fromCharCode(10));
 };
 
+// A "Do something in another app" step: an action from lib/connectors/composio-actions.js with its title and, where it needs one, a valid
+// "where". Approved on the Runs page like the other writing steps.
+export const isActionStep = (step) => {
+  const action = findAction(step?.fields?.action);
+  return step?.kind === "action" && Boolean(action) && typeof step.fields.title === "string" && step.fields.title.trim() !== "" && !checkTarget(action, step.fields.target).error;
+};
+
+// What you read before approving: exactly what will be sent. `answer` fills in {answer} (see lib/run-answer.js).
+export const actionSummary = (step, answer = "") => {
+  const action = findAction(step?.fields?.action);
+  const f = step?.fields ?? {};
+  const title = fillAnswerText(String(f.title ?? ""), answer, 150);
+  const details = fillAnswerText(String(f.details ?? ""), answer, 300);
+  return [`Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`, action?.needsTarget ? `Where: ${f.target}` : "", `${action?.id === "slack_message" ? "Message" : "Title"}: ${title.text ?? f.title}`, f.details ? `Details: ${details.text ?? f.details}` : "", "It is sent through Composio, the company that keeps the connection to the app.", title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
+};
+
 // Steps that WRITE somewhere (add a row, create a task). Auto mode runs them too, so the screens that offer Auto say so in plain words.
-export const isWriteStep = (step) => isSheetsRow(step) || isLinearCreate(step);
+export const isWriteStep = (step) => isSheetsRow(step) || isLinearCreate(step) || isActionStep(step);
 
 // Every step that has a real action to approve (the same list the Runs page offers Approve buttons for).
 export const isApprovable = (step) =>
-  isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isLinearCreate(step) || isAppLookup(step) || isSheetsRow(step) || isAiStep(step);
+  isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isLinearCreate(step) || isAppLookup(step) || isActionStep(step) || isSheetsRow(step) || isAiStep(step);
 
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.
 export const requestSummary = (step) =>
@@ -108,6 +125,7 @@ const WOULD = {
   ai: (f, label) => `Would ask the AI: ${f.task}. It could look at: ${label("uses").toLowerCase()}. Nothing was asked.`,
   issue: (f) => `Would create a Linear task: ${f.title}${f.team ? ` (team ${f.team})` : ""}. Nothing was created.`,
   app: (f, label) => `Would look in ${label("app")}. Nothing was opened.`,
+  action: (f, label) => `Would do: ${label("action")}${f.target ? ` in ${f.target}` : ""} (${f.title}). Nothing was sent.`,
   request: (f) => `Would ask ${f.url} and read the answer${f.why ? ` (${f.why})` : ""}. Nothing was requested.`,
 };
 

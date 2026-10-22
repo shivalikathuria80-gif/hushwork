@@ -303,15 +303,19 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
-  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}"], "the one tool that runs is the one in the list");
+  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookup in the apps list and the actions in the actions list");
   assert.ok(client.includes("arguments: {}"), "always called with nothing to fill in");
-  assert.ok(client.includes("restrict_to_following_tools: [app.tool]"), "the sign-in is limited to that one tool at Composio too");
+  assert.ok(client.includes("restrict_to_following_tools: allowed") && client.includes("[app.tool, ...actionsForApp(app.id).map((action) => action.tool)]"), "the sign-in is limited to the lookup plus the listed actions at Composio too");
   assert.deepEqual(files.filter((file) => /backend\.composio\.dev/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md"), ["lib/connectors/composio.js"]);
   const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveAppLookup"));
   const order = ["loadPracticeStep(", "findComposioApp(", "getComposioKey(", "limitError(", "runReadTool("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  const writing = action.slice(action.indexOf("export async function approveActionStep"));
+  const writeOrder = ["loadPracticeStep(", "checkTarget(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "getComposioKey(", "limitError(", "runActionTool("].map((call) => writing.indexOf(call));
+  assert.ok(writeOrder.every((index) => index > 0));
+  assert.deepEqual(writeOrder, [...writeOrder].sort((a, b) => a - b), "a Composio write checks the step, the place, the once-only rule, the words and the limits before anything is sent");
   const flow = files.find((file) => file.name === "lib/connections/composio-flow.js").text;
   assert.ok(flow.indexOf("findComposioApp(appId)") < flow.indexOf("requireUser("), "an unknown app is a 404 before anything else");
   const page = files.find((file) => file.name === "app/app/connections/page.js").text;
@@ -349,7 +353,7 @@ test("Auto mode: only an explicit true turns it on; it uses the very same Approv
   assert.ok(loop.includes("Math.min(results.length, 20)") && loop.includes("if (outcome?.error) return"), "capped, and stops at the first failure");
   assert.ok(loop.includes("await action("), "one step at a time, in order");
   const table = action.slice(action.indexOf("const AUTO_ACTIONS"), action.indexOf("async function runAutomatically"));
-  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input, who)`), `${name} is run through its normal Approve action`);
+  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveActionStep", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input, who)`), `${name} is run through its normal Approve action`);
   assert.ok(!/fetchLinearIssues|createIssue|appendRow|fetchInbox|runReadTool|fetchPublic/.test(table + loop), "Auto mode never reaches a connector without going through an Approve action");
   const mode = files.find((file) => file.name === "components/app/RunMode.js").text;
   assert.match(mode, /localStorage\.getItem\(KEY\) === "auto" \? "auto" : "manual"/, "Manual is the default and anything unexpected means Manual");
@@ -368,7 +372,7 @@ test("the Server Actions for runs are thin: each works out WHO is asking from th
   const actions = files.find((file) => file.name === "lib/actions/runs.js").text;
   assert.match(actions, /^"use server";/m);
   assert.ok(actions.includes("const asUser = async () => ({ user: await requireUser(), supabase: await createClient() });"));
-  for (const name of ["startPracticeRun", "approveWebCall", "approveLinearLookup", "approveAiStep", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveSheetsRow"]) {
+  for (const name of ["startPracticeRun", "approveWebCall", "approveLinearLookup", "approveAiStep", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveActionStep", "approveSheetsRow"]) {
     assert.ok(actions.includes(`export async function ${name}(input) { return core.${name}(input, await asUser()); }`), `${name} is a one-line wrapper that gets who from the session`);
   }
   assert.ok(actions.indexOf("export async function deleteRun") > 0 && /export async function deleteRun[\s\S]*requireUser\(\)/.test(actions));

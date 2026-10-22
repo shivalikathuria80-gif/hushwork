@@ -6,7 +6,7 @@
 // stored schedule row) import it.
 import { revalidatePath } from "next/cache";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isSheetsRow, isAiStep, isApprovable, isWriteStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isActionStep, isSheetsRow, isAiStep, isApprovable, isWriteStep, SETUP_MESSAGE } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -24,7 +24,8 @@ import { fillAnswerText, findAnswer, wasApproved } from "@/lib/run-answer";
 import { createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
-import { runReadTool } from "@/lib/connectors/composio";
+import { runActionTool, runReadTool } from "@/lib/connectors/composio";
+import { checkTarget, findAction } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 
@@ -43,7 +44,7 @@ const NO_TABLE = new Set(["42P01", "PGRST205"]);
 const AUTO_ACTIONS = [
   [isAiStep, (input, who) => approveAiStep(input, who)], [isLinearLookup, (input, who) => approveLinearLookup(input, who)], [isCalendarLookup, (input, who) => approveCalendarLookup(input, who)],
   [isGmailLookup, (input, who) => approveGmailLookup(input, who)], [isDriveLookup, (input, who) => approveDriveLookup(input, who)], [isLinearCreate, (input, who) => approveLinearCreate(input, who)],
-  [isAppLookup, (input, who) => approveAppLookup(input, who)], [isSheetsRow, (input, who) => approveSheetsRow(input, who)], [isRequestStep, (input, who) => approveWebCall(input, who)],
+  [isAppLookup, (input, who) => approveAppLookup(input, who)], [isActionStep, (input, who) => approveActionStep(input, who)], [isSheetsRow, (input, who) => approveSheetsRow(input, who)], [isRequestStep, (input, who) => approveWebCall(input, who)],
 ];
 export async function runAutomatically(runId, results, who, { allowWrites = true } = {}) {
   let done = 0;
@@ -102,6 +103,7 @@ const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
 const gmailLimits = () => limiters("__hushworkGmailLimits", 5, 30);
 const driveLimits = () => limiters("__hushworkDriveLimits", 5, 30);
 const linearCreateLimits = () => limiters("__hushworkLinearCreateLimits", 3, 15);
+const actionLimits = () => limiters("__hushworkActionLimits", 3, 15);
 const appLimits = () => limiters("__hushworkAppLimits", 5, 30);
 const sheetsLimits = () => limiters("__hushworkSheetsLimits", 5, 30);
 const aiLimits = () => limiters("__hushworkAiStepLimits", 3, 15);
@@ -492,6 +494,41 @@ export async function approveAppLookup(input, who) {
   if (!answer.ok) return { error: answer.error };
   const outcome = await withSummary({ userId: user.id, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
+}
+
+// The "Approve and send it" button for a Do something in another app step. This WRITES one thing in an app (a Slack message, a GitHub
+// issue, a Todoist task) through Composio. Only a step naming an action from lib/connectors/composio-actions.js qualifies; its words are
+// built again here from the saved run (never from the browser), checked, and shown in full on the approval card first; it can be approved
+// once per run; and lib/connectors/composio.js sends nothing unless the tool's real inputs match what we fill in.
+export async function approveActionStep(input, who) {
+  const { user, supabase } = who;
+  const loaded = await loadPracticeStep(supabase, user, input, isActionStep);
+  if (loaded.error) return loaded;
+  const { run, step } = loaded;
+  const action = findAction(step.fields.action);
+  const target = checkTarget(action, step.fields.target);
+  if (target.error) return { error: target.error };
+  if (await wasApproved(supabase, user.id, run, "action")) return { error: ALREADY };
+
+  const usesAnswer = `${step.fields.title}${step.fields.details}`.includes("{answer}");
+  const answer = usesAnswer ? await findAnswer(supabase, user.id, run) : "";
+  const title = fillAnswerText(step.fields.title, answer, 150);
+  const details = fillAnswerText(step.fields.details, answer, 300);
+  if (title.error || details.error) return { error: title.error ?? details.error };
+  if (looksSensitive(title.text) || looksSensitive(details.text)) return { error: "That looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
+  const composioKey = getComposioKey();
+  if (!composioKey) return { error: COMPOSIO_OFF };
+
+  const now = Date.now();
+  const tooMany = limitError(actionLimits(), user.id, now, "sent actions");
+  if (tooMany) return { error: tooMany };
+  actionLimits().minute.take(user.id, now);
+  actionLimits().day.take(user.id, now);
+
+  const values = { target: target.value, title: title.text, details: details.text };
+  const done = await runActionTool({ key: composioKey, userId: user.id, action, values });
+  if (!done.ok) return { error: done.error };
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${action.done(values)}: ${title.text}${details.text ? `\n${details.text}` : ""}`.slice(0, 700) });
 }
 
 // The "Approve and add the row" button. The ONE action that writes into somebody's Google account, so: the sheet address and the

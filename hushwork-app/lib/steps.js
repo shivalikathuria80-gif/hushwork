@@ -11,6 +11,7 @@
 // use an icon from lib/ai/icon-names.js.
 
 import { COMPOSIO_APPS } from "./connectors/composio-apps.js"; // plain data, so the browser and the server still load the same rules
+import { COMPOSIO_ACTIONS } from "./connectors/composio-actions.js";
 
 export const NOTE = "note";
 
@@ -127,6 +128,18 @@ export const STEP_KINDS = {
       text("team", "Team key", 10, { optional: true, hint: "Optional. The short key of the Linear team, for example ENG. Empty means your first team." }),
     ],
     describe: (fields) => ({ title: "Create a Linear task", detail: join(fields.title, fields.team ? `in ${fields.team}` : "") }),
+  },
+  action: {
+    label: "Do something in another app",
+    help: "Send a Slack message, create a GitHub issue or add a Todoist task, in an app you connected through Composio. It does exactly that one thing. You read what will be sent and approve it on the Runs page. Write {answer} to use what an Ask the AI step said.",
+    icon: "Send",
+    fields: [
+      choice("action", "What to do", Object.fromEntries(COMPOSIO_ACTIONS.map((action) => [action.id, action.name]))),
+      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Todoist: leave empty." }),
+      text("title", "Message or title", 80, { hint: "For example: Deploy finished. Write {answer} to use what an Ask the AI step said." }),
+      text("details", "More details", 80, { optional: true, hint: "Optional. More words for the message or the issue." }),
+    ],
+    describe: (fields, label) => ({ title: label("action"), detail: join(fields.title, fields.target ? `in ${fields.target}` : "") }),
   },
 };
 

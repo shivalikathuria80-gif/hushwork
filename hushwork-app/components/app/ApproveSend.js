@@ -5,7 +5,7 @@ import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import Link from "next/link";
-import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveGmailLookup, approveDriveLookup, approveLinearCreate, approveAppLookup, approveSheetsRow, approveAiStep } from "@/lib/actions/runs";
+import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveGmailLookup, approveDriveLookup, approveLinearCreate, approveAppLookup, approveActionStep, approveSheetsRow, approveAiStep } from "@/lib/actions/runs";
 
 // The one place a workflow really does something. It shows exactly what will happen and does it only when you press the
 // button. `message` is for reading; the server builds the real thing again from the saved run.
@@ -45,6 +45,12 @@ const COPY = {
     intro: "This step looks at your Google Drive. If you approve, Hushwork asks Google for the files you changed most recently and saves each file's name, kind and time. It never opens a file or reads what is inside, and it cannot change or delete anything.",
     button: "Approve and ask Google Drive",
     icon: "FolderOpen",
+  },
+  action: {
+    action: approveActionStep,
+    intro: "This step does something in another app you connected through Composio (sends a Slack message, creates a GitHub issue or adds a Todoist task). If you approve, Hushwork does exactly the one thing written below and nothing else. It can be approved only once per run.",
+    button: "Approve and send it",
+    icon: "Send",
   },
   app: {
     action: approveAppLookup,
