@@ -129,6 +129,18 @@ export const TEMPLATES = [
       step("issue", { title: "{answer}", details: "Made from my latest emails by Hushwork.", team: "" }),
     ],
   },
+  {
+    id: "briefing", icon: "Clock", title: "Morning briefing by email", needs: "Google, Linear, Gmail (send)",
+    body: "The AI reads your week ahead, your latest emails and your top Linear task, then sends you ONE email with all three summaries. You read the email and press Approve before it is sent. Pair it with a daily schedule for a real morning briefing.",
+    request: "When I ask, look at my calendar, my latest emails and my Linear tasks, and email me one briefing with all three. Ask me before it is sent.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Sum up my next 7 days in 4 short lines. Start with the heading: This week.", uses: "calendar", address: "" }),
+      step("ai", { task: "Which 3 of my latest emails need an answer first? 3 short lines. Start with the heading: Inbox.", uses: "gmail", address: "" }),
+      step("ai", { task: "Which of my open tasks should I do first, and why? 2 short lines. Start with the heading: Tasks.", uses: "linear", address: "" }),
+      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "Your morning briefing", details: "{answers}" }),
+    ],
+  },
   // ---- these describe a plan only ----
   {
     id: "invoices", icon: "Receipt", title: "Chase unpaid invoices",

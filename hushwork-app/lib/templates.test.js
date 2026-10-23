@@ -42,13 +42,13 @@ test("templateById: a known id gives checked steps; anything else gives null", (
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["invoices"], { id: "invoices" }]) assert.equal(templateById(bad), null, String(bad));
 });
 
-const MULTI = ["testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask"];
+const MULTI = ["testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"];
 
 test("templates: the three that work for real say what they need, and their steps can really be approved on the Runs page", async () => {
   const { isAiStep } = await import("./run-engine.js");
   const { checkRequestUrl } = await import("./connectors/http.js");
   const real = TEMPLATES.filter((t) => t.needs);
-  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask"]);
+  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"]);
   for (const t of real.filter((x) => !MULTI.includes(x.id))) {
     assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
     const checked = checkSteps(t.steps).value;
@@ -70,6 +70,9 @@ test("templates: the three that work for real say what they need, and their step
     assert.ok(chain[2].fields.title === "{answer}" || chain[2].fields.details === "{answer}", `${id}: the write uses the AI's line`);
     if (isActionStep(chain[2])) assert.equal(chain[2].fields.action, "gmail_send", id);
   }
+  const briefing = checkSteps(real.find((x) => x.id === "briefing").steps).value;
+  assert.deepEqual(briefing.filter(isAiStep).map((s) => s.fields.uses), ["calendar", "gmail", "linear"], "the briefing reads three sources");
+  assert.ok(isActionStep(briefing[4]) && briefing[4].fields.details === "{answers}", "and sends them in one email");
   const hello = checkSteps(real.find((x) => x.id === "hellomail").steps).value;
   assert.ok(isActionStep(hello[1]) && hello[1].fields.action === "gmail_send", "the hello email is a real send step, approved on the Runs page");
   for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);

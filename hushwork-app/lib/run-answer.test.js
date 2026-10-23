@@ -63,3 +63,27 @@ test("an email's text keeps its line breaks (never more than one blank line), is
   assert.equal(fillActionDetails("github_issue", "{answer}", "y".repeat(900)).text.length, 300);
 });
 
+test("the answers: every Ask the AI step of THIS run, in workflow order, each once (newest wins); records of other runs or other kinds are ignored", async () => {
+  const { findAnswers } = await import("./run-answer.js");
+  const record = (kind, from, fromStep, answer) => ({ results: [{ kind, from, fromStep, answer }] });
+  const rows = [
+    record("ai", "run-1", 3, "tasks NEW"), record("ai", "run-1", 1, "calendar"), record("ai", "run-OTHER", 2, "someone else's run"),
+    record("ai", "run-1", 3, "tasks OLD"), record("gmail", "run-1", 2, "not an AI step"), record("ai", "run-1", 2, "  "), record("ai", "run-1", 2, "inbox"),
+  ];
+  const { supabase: builder } = pretend(rows);
+  assert.deepEqual(await findAnswers(builder, "user-1", { id: "run-1", workflow_id: "w1", created_at: "2026-10-23T10:00:00Z" }), ["calendar", "inbox", "tasks NEW"]);
+  assert.deepEqual(await findAnswers(builder, "user-1", { workflow_id: "w1", created_at: "x" }), [], "without the run's id there is nothing to match");
+  assert.deepEqual(await findAnswers(pretend([], { code: "x" }).supabase, "user-1", { id: "run-1", workflow_id: "w1", created_at: "x" }), []);
+});
+
+test("an email that writes {answers} carries all the AI answers, tidied and joined by a blank line; with none it is a clear message", async () => {
+  const { fillActionDetails } = await import("./run-answer.js");
+  assert.deepEqual(fillActionDetails("gmail_send", "{answers}", "", ["This week\n- Mon", "Inbox\r\n- Ana"]), { text: "This week\n- Mon\n\nInbox\n- Ana" });
+  assert.deepEqual(fillActionDetails("gmail_send", "Hi\n{answers}", "", ["a"]), { text: "Hi\na" });
+  assert.ok(fillActionDetails("gmail_send", "{answers}", "", []).error);
+  assert.ok(fillActionDetails("gmail_send", "{answers}", "", ["  ", 5, null]).error);
+  assert.ok(fillActionDetails("gmail_send", "{answers}", "one answer only").error, "{answers} does not fall back to {answer}");
+  assert.equal(fillActionDetails("gmail_send", "{answers}", "", ["z".repeat(2000), "z".repeat(2000), "z".repeat(2000)]).text.length <= 3000, true);
+  assert.deepEqual(fillActionDetails("slack_message", "{answers}", "", ["a"]), { text: "{answers}" }, "only an email understands {answers}");
+});
+

@@ -20,7 +20,7 @@ import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox } from "@/lib/connectors/google-gmail";
 import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
-import { fillActionDetails, fillAnswerText, findAnswer, wasApproved } from "@/lib/run-answer";
+import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers, wasApproved } from "@/lib/run-answer";
 import { createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
@@ -517,7 +517,8 @@ export async function approveActionStep(input, who) {
   const usesAnswer = `${step.fields.title}${step.fields.details}`.includes("{answer}");
   const answer = usesAnswer ? await findAnswer(supabase, user.id, run) : "";
   const title = fillAnswerText(step.fields.title, answer, 150);
-  const details = fillActionDetails(action.id, step.fields.details, answer);
+  const answers = String(step.fields.details).includes(ANSWERS_TAG) ? await findAnswers(supabase, user.id, run) : [];
+  const details = fillActionDetails(action.id, step.fields.details, answer, answers);
   if (title.error || details.error) return { error: title.error ?? details.error };
   if (looksSensitive(title.text) || looksSensitive(details.text)) return { error: "That looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
   const composioKey = getComposioKey();

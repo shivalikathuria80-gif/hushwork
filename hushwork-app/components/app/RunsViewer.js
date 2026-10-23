@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
-import { findAnswer } from "@/lib/run-answer";
+import { ANSWERS_TAG, findAnswer, findAnswers } from "@/lib/run-answer";
 import { ANSWER_TAG } from "@/lib/connectors/google-sheets";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
@@ -159,6 +159,9 @@ export default async function RunsViewer({ searchParams }) {
   // A row step that uses {answer} shows the real words, so you read exactly what will be written before you press Approve.
   const needsAnswer = approvals.some(({ step }) => (isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG)) || ((isLinearCreate(step) || isActionStep(step)) && `${step.fields?.title}${step.fields?.details}`.includes(ANSWER_TAG)));
   const answer = needsAnswer ? await findAnswer(await createClient(), user.id, { workflow_id: selected.workflowId, created_at: selected.createdAt }) : "";
+  // An email that writes {answers} carries every Ask the AI step of this run, in order.
+  const needsAnswers = approvals.some(({ step }) => isActionStep(step) && String(step.fields?.details).includes(ANSWERS_TAG));
+  const answers = needsAnswers ? await findAnswers(await createClient(), user.id, { id: selected.id, workflow_id: selected.workflowId, created_at: selected.createdAt }) : [];
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -239,7 +242,7 @@ export default async function RunsViewer({ searchParams }) {
               runId={selected.id} index={index}
               kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isActionStep(step) ? "action" : isSheetsRow(step) ? "sheets" : "request"}
               connected={isAiStep(step) ? aiOn : isLinearLookup(step) || isLinearCreate(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true}
-              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}
+              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer, answers) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}
             />
           </div>
         ))}

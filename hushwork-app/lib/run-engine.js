@@ -89,11 +89,11 @@ export const isActionStep = (step) => {
 };
 
 // What you read before approving: exactly what will be sent. `answer` fills in {answer} (see lib/run-answer.js).
-export const actionSummary = (step, answer = "") => {
+export const actionSummary = (step, answer = "", answers = []) => {
   const action = findAction(step?.fields?.action);
   const f = step?.fields ?? {};
   const title = fillAnswerText(String(f.title ?? ""), answer, 150);
-  const details = fillActionDetails(action?.id, String(f.details ?? ""), answer);
+  const details = fillActionDetails(action?.id, String(f.details ?? ""), answer, answers);
   return [`Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`, action?.needsTarget ? `Where: ${f.target}` : "", `${action?.id === "slack_message" ? "Message" : action?.id === "gmail_send" ? "Subject" : "Title"}: ${title.text ?? f.title}`, f.details ? `${action?.id === "gmail_send" ? "Email text" : "Details"}: ${details.text ?? f.details}` : "", "It is sent through Composio, the company that keeps the connection to the app.", title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
 };
 
