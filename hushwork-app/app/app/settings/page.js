@@ -21,7 +21,7 @@ export default function SettingsPage() {
             <AccountEmail />
           </Suspense>
           <p className="mt-3 text-sm text-mute">
-            To delete your account and its drafts, write to <a href="mailto:hello@hushwork.co">hello@hushwork.co</a>. There is no delete button in the app yet. Use Sign out in the sidebar to leave.
+            To delete your account and its drafts, open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> (do not put private details in it; we will reply there). There is no delete button in the app yet. Use Sign out in the sidebar to leave.
           </p>
         </div>
       </section>

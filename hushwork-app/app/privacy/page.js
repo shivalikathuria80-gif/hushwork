@@ -63,12 +63,12 @@ export default function PrivacyPage() {
 
       <h2 className={h2}>Getting your data removed</h2>
       <p className={p}>
-        Write to <a href="mailto:hello@hushwork.co">hello@hushwork.co</a> and we will delete your waitlist email, or your account and all its drafts together.
+        Open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> and say you want your waitlist email, or your account and all its drafts, removed. Please do not put private details in a public issue: we will reply there and tell you how to prove the account is yours.
         There is no delete button in the app yet. We keep waitlist emails until early access opens or you ask us to remove them, and accounts and drafts until you ask or the account is deleted.
       </p>
 
       <hr className="mt-10 border-line" />
-      <p className={p}>Questions about this page: <a href="mailto:hello@hushwork.co">hello@hushwork.co</a></p>
+      <p className={p}>Questions about this page: open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a>.</p>
     </main>
   );
 }
