@@ -2,7 +2,7 @@
 
 The Hushwork landing page plus a first app slice: sign in, a workspace where you preview a plan and save drafts, and a runs page. Next.js 16 (App Router), React 19, Tailwind 4, `motion` for animation, Phosphor icons, Supabase for sign-in and the database. The earlier no-build prototype lives in `../hushwork/` for reference.
 
-Almost nothing runs for real yet: the real actions are a **read-only web call**, a **read-only Linear lookup** and an **Ask the AI** step that may use those two read-only tools, each only when you press Approve on the Runs page (see "Web calls", "Linear" and "Ask the AI" below). A draft is a saved plan, and **Practice run** (on the Workflows page) walks its steps and saves a record of what each step would do, with nothing sent. Practice runs are listed on the Runs page. They need one setup step: paste `../supabase/runs.sql` into the Supabase SQL Editor and run it (until then the Runs page says so).
+Real actions exist, and every one waits for your Approve click (or Auto mode, which you switch on yourself): web calls, Linear, Google (Calendar, Gmail, Drive, Sheets), many more apps through Composio, email, Slack, GitHub and Todoist actions, and scheduled runs. The sections below explain each one and what it is allowed to do.
 
 ## Run it
 
