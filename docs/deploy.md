@@ -1,6 +1,6 @@
 # Putting Hushwork online (checklist)
 
-Hushwork runs only on your computer today (port 3100). This is the list of things to do **before** it goes online, so nothing surprising happens. Nothing here has been done yet.
+Hushwork is online at https://hushwork-six.vercel.app (see section 10 for what is live) and the free clock for scheduled runs works (section 11). This file is the checklist it was put online with; use it again for your own copy.
 
 ## 1. Before you start
 
@@ -70,7 +70,7 @@ A schedule saved on the Workflows page is only a note until something **calls Hu
 
 ## 8. Vercel, in order (the short version)
 
-Nobody has done these yet. Steps 1 to 4 need your own accounts, so they can only be done by you.
+Done for the live copy (see section 10). Steps 1 to 4 need your own accounts, so for your own copy only you can do them.
 
 1. **Put the code on GitHub.** Make a new empty private repository on github.com, then in the project folder run `git remote add origin <the address GitHub shows>` and `git push -u origin main`. (`.env.local` is never pushed: it is in `.gitignore`.)
 2. **Import it in Vercel.** vercel.com, Add New, Project, pick the repository. Set **Root Directory** to `hushwork-app`. Framework: Next.js (it finds it by itself).
