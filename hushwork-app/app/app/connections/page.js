@@ -12,13 +12,6 @@ import AppLogo, { AppLogos } from "@/components/AppLogo";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
 
-// The apps a workflow can act in. Web addresses, Linear and Google Calendar work now. The others are planned and say so:
-// there are no Connect buttons that would not work.
-const APPS = [
-  { name: "Slack", logo: "slack", does: "Post a message to a channel." },
-  { name: "Gmail (sending)", logo: "gmail", does: "Send email. Reading your inbox already works with Google above." },
-];
-
 // Which logos stand for each connection: Google is four products behind one sign-in. Anything else uses its own id (lib/app-logos.js).
 const LOGO_IDS = { google: ["calendar", "sheets", "gmail", "drive"] };
 
@@ -40,7 +33,7 @@ export default function ConnectionsPage({ searchParams }) {
   return (
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear (reading your tasks and adding a new one), Google Calendar, Google Sheets, reading your Gmail inbox, seeing your recent Drive files and a few more apps through Composio work, and only after you approve them on the Runs page. The rest are planned.</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear (reading your tasks and adding a new one), Google Calendar, Google Sheets, reading your Gmail inbox, seeing your recent Drive files and more apps through Composio (including Slack and sending email through Gmail) work, and only after you approve them on the Runs page.</p>
 
       {APP_LIST.map((entry) => (
         <section key={entry.id} aria-labelledby={`${entry.id}-heading`} className="mt-8">
@@ -86,22 +79,6 @@ export default function ConnectionsPage({ searchParams }) {
         </div>
       </section>
 
-      <section aria-labelledby="apps-heading" className="mt-8">
-        <h2 id="apps-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Planned apps</h2>
-        <ul className="mt-3 space-y-3">
-          {APPS.map((app) => (
-            <li key={app.name} className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm">
-              <AppLogo id={app.logo} label={app.name} size={36} />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{app.name}</p>
-                <p className="text-sm text-mute">{app.does}</p>
-              </div>
-              <span className="shrink-0 rounded-md border border-line bg-raised px-2 text-xs font-medium">Not connected</span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-sm text-mute">These are planned. Until one is built, steps for them only describe what would happen.</p>
-      </section>
     </main>
   );
 }
