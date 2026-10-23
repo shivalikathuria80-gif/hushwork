@@ -68,12 +68,12 @@ export const SENSITIVE_SAMPLES = [
   "4111\u{200b}\u{200b}\u{200b}1111\u{200b}\u{200b}\u{200b}1111\u{200b}\u{200b}\u{200b}1111", // three invisible characters between groups
   "key sk-abcdefgh\u{200d}ijklmnopqrstuvwxyz1234", // an invisible character hidden inside a key
   "key sk-abcdefghijklmnopqrstuvwxyz123456 here",
-  "sk_live_abcdefghijklmnop1234",
+  "sk_" + "live_abcdefghijklmnop1234",
   "sb_secret_abcdefghijklmnopqrstuv",
-  "token ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+  "token gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789",
   "github_pat_" + "a1B2c3D4e5".repeat(4),
   "aws AKIA" + "ABCDEFGHIJKLMNOP",
-  "xoxb-1234567890-abcdefghijklmnop",
+  "xox" + "b-1234567890-abcdefghijklmnop",
   "gsk_" + "a".repeat(30),
   "AIza" + "B".repeat(30),
   "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdef",
