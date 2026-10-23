@@ -67,7 +67,7 @@ function DotWord({ word = "hushwork" }) {
 
 const COLUMNS = [
   ["Product", [["How it works", "#how"], ["Automations", "#auto"], ["Features", "#features"], ["Try it", "#agent"], ["Waitlist", "#wait"]]],
-  ["Company", [["Privacy", "/privacy"]]],
+  ["Company", [["Privacy", "/privacy"], ["Terms", "/terms"]]],
 ];
 const linkClass = "inline-flex min-h-11 items-center text-mute transition-colors duration-120 ease-standard hover:text-ink";
 

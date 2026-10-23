@@ -158,7 +158,7 @@ export default function LoginForm() {
 
           <p className="mt-4 text-sm leading-relaxed text-mute">
             {creating ? "Hushwork is in early access. Your workflows and runs are private to your account. " : ""}
-            We store your email and your drafts. <Link href="/privacy">Privacy</Link>
+            We store your email and your drafts. <Link href="/privacy">Privacy</Link> and <Link href="/terms">Terms</Link>
           </p>
         </>
       )}

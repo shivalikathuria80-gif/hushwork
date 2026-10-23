@@ -15,14 +15,14 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-5 pb-20 pt-12">
       <Link href="/" className="inline-flex min-h-11 items-center gap-2 text-[15px]"><Icon name="ArrowLeft" size={16} />Back to Hushwork</Link>
       <h1 className="mt-6 text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em]">Privacy</h1>
-      <p className={p}>Last updated 18 October 2026.</p>
+      <p className={p}>Last updated 23 October 2026.</p>
 
       <h2 className={h2}>What we store</h2>
       <ul className={ul}>
         <li><b className="font-medium text-ink">Waitlist.</b> When you join the waitlist we store your email address and the time you joined.</li>
         <li><b className="font-medium text-ink">Account.</b> If you create an account we store your email address, a one-way scrambled version of your password (never the password itself), and the times you created the account and last signed in. Our sign-in provider, Supabase, also keeps technical records of sign-ups, sign-ins, sign-outs and session renewals, including the time, your IP address and your browser details.</li>
         <li><b className="font-medium text-ink">Drafts.</b> For each draft you save we store its name, the task text you typed, the preview steps, and the times it was saved and changed. Do not type passwords, card numbers or other people{"’"}s personal details into a task.</li>
-        <li><b className="font-medium text-ink">AI plan counts.</b> When AI plans are on, our server keeps a running count of how many AI plans each account has asked for, so that a daily limit can be applied. The count is held in the server{"’"}s memory only. It is not saved in the database and starts again when the server restarts.</li>
+        <li><b className="font-medium text-ink">AI plan counts.</b> When AI plans are on, our server keeps a running count of how many AI plans each account has asked for, so that a daily limit can be applied. The count is saved in the database as a number only (how many times, in which minute or day), never what you asked, and counters older than two days are removed. Some other limits (for example for lookups in other apps) are still kept in the server{"’"}s memory only and start again when the server restarts.</li>
       </ul>
 
       <h2 className={h2}>Why</h2>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
 
       <h2 className={h2}>Getting your data removed</h2>
       <p className={p}>
-        To delete your account, open Settings and press Delete my account. It removes your workflows, runs, schedules and saved connections together, and disconnects the apps you connected through Composio. To have a waitlist email removed, open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> (please leave private details out of it: we will reply there).
+        To keep a copy first, open Settings and press Download my data (your workflows, newest runs and schedules as one file; saved app connections are never included). To delete your account, open Settings and press Delete my account. It removes your workflows, runs, schedules and saved connections together, and disconnects the apps you connected through Composio. To have a waitlist email removed, open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> (please leave private details out of it: we will reply there).
         We keep waitlist emails until early access opens or you ask us to remove them, and accounts and drafts until you ask or the account is deleted.
       </p>
 

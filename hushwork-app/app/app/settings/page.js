@@ -21,6 +21,10 @@ export default function SettingsPage() {
           <Suspense fallback={<span aria-hidden="true" className="mt-1 block h-6 w-56 rounded-md bg-raised" />}>
             <AccountEmail />
           </Suspense>
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="text-sm text-mute">Keep a copy of your workflows, your newest runs and your schedules as one file. Saved app connections are never in it.</p>
+            <a href="/api/export" download className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-field bg-surface px-4 text-sm font-medium shadow-sm hover:bg-raised">Download my data</a>
+          </div>
           <div className="mt-4 border-t border-line pt-4"><DeleteAccount /></div>
         </div>
       </section>
