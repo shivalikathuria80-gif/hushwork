@@ -88,3 +88,11 @@ Nobody has done these yet. Steps 1 to 4 need your own accounts, so they can only
 6. On the Workflows page save a schedule a few minutes ahead (tick "Allow writing" only for a workflow you trust), and watch the Runs page.
 
 The clock only works while the app and the clock terminal are both running. For a clock that runs by itself you need hosting (section 8) and section 7.
+
+## 10. What is live right now (2026-10-23)
+
+- Code: https://github.com/shivalikathuria80-gif/hushwork (public, MIT license). Vercel project `hushwork`, root folder `hushwork-app`, production branch `main`: every push to `main` deploys by itself.
+- Address: https://hushwork-six.vercel.app
+- Settings already added on Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (both public values) and `NEXT_PUBLIC_SITE_URL`.
+- **Still to add by hand** (Vercel project, Settings, Environment Variables; mark secrets "Sensitive"): `GROQ_API_KEY`, `CONNECTIONS_KEY`, `COMPOSIO_API_KEY`, `LINEAR_CLIENT_ID`/`LINEAR_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, and for scheduling `CRON_SECRET` + `SUPABASE_SERVICE_ROLE_KEY`. Redeploy after adding them.
+- **Still to do by hand:** section 3 (tell Supabase, Linear and Google the new address) and section 6 (test it).
