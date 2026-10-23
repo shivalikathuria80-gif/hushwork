@@ -386,14 +386,14 @@ test("the Server Actions for runs are thin: each works out WHO is asking from th
 test("scheduled runs: the two settings are read only in schedule-env.js, the all-access key has one user, the clock's password is checked before anything runs, and a person's own screens never touch the all-access key", () => {
   const CRON = "CRON" + "_SECRET";
   const ROLE = "SUPABASE_SERVICE" + "_ROLE_KEY";
-  const allowed = new Set(["lib/schedule-env.js", "lib/secrets.test.js", ".env.example", "README.md", "docs/deploy.md", "lib/schedule-tick.js", "app/api/cron/tick/route.js", "supabase/schedules.sql", "scripts/make-secret.mjs"]);
+  const allowed = new Set(["lib/schedule-env.js", "lib/secrets.test.js", ".env.example", "README.md", "docs/deploy.md", "lib/schedule-tick.js", "app/api/cron/tick/route.js", "supabase/schedules.sql", "scripts/make-secret.mjs", "scripts/clock.mjs"]);
   for (const name of [CRON, ROLE]) {
     assert.deepEqual(withText(name).filter((file) => !allowed.has(file)), [], name);
     assert.deepEqual(withText("NEXT_PUBLIC_" + name), [], name);
   }
   const env = files.find((file) => file.name === "lib/schedule-env.js").text;
   assert.match(env, /^import "server-only";/m);
-  assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example"), ["lib/schedule-env.js"], "only schedule-env.js reads them");
+  assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example" && name !== "scripts/clock.mjs"), ["lib/schedule-env.js"], "only schedule-env.js reads them (the clock script on your own computer sends the password, it is not server code)");
   const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
   assert.deepEqual(adminImporters, ["lib/schedule-tick.js"], "the all-access client has exactly one user: the clock's handler");
   assert.match(files.find((file) => file.name === "lib/supabase/admin.js").text, /^import "server-only";/m);
