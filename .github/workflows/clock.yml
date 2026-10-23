@@ -1,7 +1,7 @@
 # The clock for scheduled runs. GitHub runs this about every 5 minutes (it can be a few minutes late) and asks Hushwork "is anything due?".
 # It needs ONE secret in the repository (Settings, Secrets and variables, Actions, New repository secret):
 #   CRON_SECRET   the same value as CRON_SECRET on Vercel
-# Until that secret exists the job says so and stops. See docs/deploy.md section 7.
+# Until that secret exists the job fails with a message saying so (a green run means Hushwork really answered 200). See docs/deploy.md section 7.
 name: clock
 on:
   schedule:
@@ -17,7 +17,7 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET is not set in this repository's Actions secrets, so the clock does nothing."; exit 0; fi
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET is not set in this repository's Actions secrets, so the clock cannot work."; exit 1; fi
           status=$(curl -s -o response.txt -w "%{http_code}" -X POST -H "Authorization: Bearer $CRON_SECRET" https://hushwork-six.vercel.app/api/cron/tick)
           echo "Hushwork answered $status"
           head -c 300 response.txt
