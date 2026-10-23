@@ -317,6 +317,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   assert.ok(writeOrder.every((index) => index > 0));
   assert.deepEqual(writeOrder, [...writeOrder].sort((a, b) => a - b), "a Composio write checks the step, the place, the once-only rule, the words and the limits before anything is sent");
   const flow = files.find((file) => file.name === "lib/connections/composio-flow.js").text;
+  assert.ok(flow.indexOf("app.unavailable") > 0 && flow.indexOf("app.unavailable") < flow.indexOf("ensureAuthConfig("), "an app Composio cannot sign in for is refused before anything is asked of Composio");
   assert.ok(flow.indexOf("findComposioApp(appId)") < flow.indexOf("requireUser("), "an unknown app is a 404 before anything else");
   const page = files.find((file) => file.name === "app/app/connections/page.js").text;
   assert.ok(/<a href=\{`\/api\/composio\/\$\{app\.id\}`\}/.test(page), "the Connect button is a plain link (a pre-loaded link would start the sign-in by itself)");

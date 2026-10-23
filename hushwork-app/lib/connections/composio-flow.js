@@ -16,7 +16,8 @@ const back = (result) => redirect(`/app/connections?composio=${result}`);
 export async function startComposioConnect(appId, request) {
   const app = findComposioApp(appId);
   if (!app) notFound();
-  const user = await requireUser(); // signed out -> sent to /login
+  const user = await requireUser();
+  if (app.unavailable) back("unavailable"); // Composio has no ready-made sign-in for it (see composio-apps.js) // signed out -> sent to /login
   const key = getComposioKey();
   if (!key) back("setup");
 

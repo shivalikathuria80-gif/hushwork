@@ -11,6 +11,8 @@
 //             delete or send), and that needs no input from a person (it is always called with nothing to fill in).
 //   what      what the lookup returns, in plain words ("your open tasks")
 //   about     one plain sentence on the Connections page
+//   unavailable  (optional) a plain sentence saying why this app cannot be connected yet. Such an app shows that sentence instead of a Connect
+//             button, and the server refuses to start its sign-in. Checked against Composio's toolkit pages on 2026-10-23.
 export const COMPOSIO_APPS = [
   { id: "todoist", name: "Todoist", toolkit: "todoist", tool: "TODOIST_GET_ALL_TASKS", what: "your open tasks", about: "Hushwork can read your open Todoist tasks, and add a new task when a step says so and you approve it. It cannot change or delete existing tasks." },
   { id: "gmailsend", name: "Gmail (send)", toolkit: "gmail", tool: "GMAIL_LIST_LABELS", what: "your Gmail label names", about: "Hushwork can read the names of your Gmail labels, and send one email when a step says so and you approve it. It cannot read your emails, delete or change anything." },
@@ -20,14 +22,14 @@ export const COMPOSIO_APPS = [
   { id: "jira", name: "Jira", toolkit: "jira", tool: "JIRA_GET_ALL_PROJECTS", what: "your projects", about: "Hushwork can list your Jira projects. It cannot add, change or delete anything." },
   // Code and shipping
   { id: "github", name: "GitHub", toolkit: "github", tool: "GITHUB_LIST_NOTIFICATIONS_FOR_THE_AUTHENTICATED_USER", what: "your latest notifications (review requests, mentions, issues)", about: "Hushwork can read your GitHub notifications, and create an issue when a step says so and you approve it. It cannot comment, merge, push or delete anything." },
-  { id: "vercel", name: "Vercel", toolkit: "vercel", tool: "VERCEL_LIST_PROJECTS", what: "your projects", about: "Hushwork can list your Vercel projects. It cannot deploy, change settings or delete anything." },
+  { id: "vercel", name: "Vercel", toolkit: "vercel", tool: "VERCEL_LIST_PROJECTS", what: "your projects", about: "Hushwork can list your Vercel projects. It cannot deploy, change settings or delete anything.", unavailable: "Composio cannot lend its sign-in for Vercel, so it needs a Vercel access token set up by hand. Not available yet." },
   { id: "sentry", name: "Sentry", toolkit: "sentry", tool: "SENTRY_LIST_ORGANIZATIONS", what: "your organizations", about: "Hushwork can list your Sentry organizations. It cannot change or delete anything." },
-  { id: "cloudflare", name: "Cloudflare", toolkit: "cloudflare", tool: "CLOUDFLARE_LIST_ACCOUNTS", what: "your accounts", about: "Hushwork can list your Cloudflare accounts. It cannot change settings or delete anything." },
+  { id: "cloudflare", name: "Cloudflare", toolkit: "cloudflare", tool: "CLOUDFLARE_LIST_ACCOUNTS", what: "your accounts", about: "Hushwork can list your Cloudflare accounts. It cannot change settings or delete anything.", unavailable: "Cloudflare only works with an API key, and Hushwork never collects keys. Not available yet." },
   { id: "pagerduty", name: "PagerDuty", toolkit: "pagerduty", tool: "PAGERDUTY_FETCH_INCIDENT_LIST", what: "your latest incidents", about: "Hushwork can read your PagerDuty incidents. It cannot acknowledge, resolve or change anything." },
   // Talking and money
   { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels, and send one message when a step says so and you approve it. It cannot edit or delete messages." },
   { id: "stripe", name: "Stripe", toolkit: "stripe", tool: "STRIPE_LIST_CHARGES", what: "your latest payments", about: "Hushwork can read your latest Stripe payments. It cannot charge, refund or change anything." },
-  { id: "xero", name: "Xero", toolkit: "xero", tool: "XERO_GET_CONTACTS", what: "your contacts", about: "Hushwork can read your Xero contacts. It cannot create invoices or change anything." },
+  { id: "xero", name: "Xero", toolkit: "xero", tool: "XERO_GET_CONTACTS", what: "your contacts", about: "Hushwork can read your Xero contacts. It cannot create invoices or change anything.", unavailable: "Composio cannot lend its sign-in for Xero, so it needs a Xero developer app set up by hand. Not available yet." },
   { id: "mailchimp", name: "Mailchimp", toolkit: "mailchimp", tool: "MAILCHIMP_LIST_CAMPAIGNS", what: "your email campaigns", about: "Hushwork can list your Mailchimp campaigns. It cannot send or change anything." },
   // Personal
   { id: "googletasks", name: "Google Tasks", toolkit: "googletasks", tool: "GOOGLETASKS_LIST_ALL_TASKS", what: "your tasks", about: "Hushwork can read your Google Tasks. It cannot add, change or delete anything." },

@@ -121,3 +121,10 @@ test("disconnecting everything: lists this person's connected apps once, removes
   const refused = async () => ({ ok: false, status: 401, json: async () => ({}) });
   assert.ok((await disconnectEverything({ key: "ak_SECRET", userId: "u-1", fetchImpl: refused })).error);
 });
+
+test("apps Composio cannot sign in for are marked with a plain reason, and nothing else is: Vercel, Xero and Cloudflare", async () => {
+  const { COMPOSIO_APPS } = await import("./composio-apps.js");
+  assert.deepEqual(COMPOSIO_APPS.filter((app) => app.unavailable).map((app) => app.id).sort(), ["cloudflare", "vercel", "xero"]);
+  for (const app of COMPOSIO_APPS.filter((one) => one.unavailable)) assert.match(app.unavailable, /Not available yet\.$/, app.id);
+});
+

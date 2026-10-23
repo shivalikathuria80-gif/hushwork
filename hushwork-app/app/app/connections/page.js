@@ -125,6 +125,7 @@ const COMPOSIO_RESULTS = {
   done: ["ok", "Back from the sign-in. If you finished it, the app now says Connected."],
   setup: ["problem", "More apps is not switched on yet. See the steps below."],
   failed: ["problem", "Composio could not start that sign-in. Try again in a minute."],
+  unavailable: ["problem", "That app cannot be connected yet. Its box says why."],
   slow: ["problem", "You pressed Connect a lot. Wait a minute and try again."],
 };
 
@@ -167,9 +168,11 @@ async function MoreApps({ searchParams }) {
                 <AppLogo id={app.id} label={app.name} />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{app.name}</p>
-                  <p className="text-sm text-mute">{app.about}</p>
+                  <p className="text-sm text-mute">{app.unavailable ?? app.about}</p>
                 </div>
-                {connected.has(app.toolkit) ? (
+                {app.unavailable ? (
+                  <p className="max-w-[28ch] text-sm text-mute">Not available yet</p>
+                ) : connected.has(app.toolkit) ? (
                   <div className="flex flex-wrap items-center gap-3">
                     <p className="flex items-center gap-2 text-sm font-medium"><Icon name="CircleCheck" className="text-success" />Connected</p>
                     <DisconnectApp app={app.id} label={app.name} through="composio" />
