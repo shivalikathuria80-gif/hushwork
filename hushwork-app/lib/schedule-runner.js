@@ -12,10 +12,10 @@ import { nextRun } from "./schedule.js";
 // At most `limit` schedules per call, so one call cannot run for ever.
 const toSchedule = (row) => ({ frequency: row.frequency, hour: row.hour, minute: row.minute, weekday: row.weekday, tzOffset: row.tz_offset });
 
-export async function runDueSchedules({ admin, run, now = Date.now(), limit = 20 }) {
+export async function runDueSchedules({ admin, run, notify = async () => {}, now = Date.now(), limit = 20 }) {
   const { data: due, error } = await admin
     .from("schedules")
-    .select("id, user_id, workflow_id, frequency, hour, minute, weekday, tz_offset, allow_writes, next_run_at")
+    .select("id, user_id, workflow_id, frequency, hour, minute, weekday, tz_offset, allow_writes, next_run_at, last_status")
     .eq("enabled", true).lte("next_run_at", new Date(now).toISOString())
     .order("next_run_at", { ascending: true }).limit(limit);
   if (error) {
@@ -46,6 +46,14 @@ export async function runDueSchedules({ admin, run, now = Date.now(), limit = 20
       console.error("a scheduled run crashed"); // no detail: it could hold something private
     }
     await admin.from("schedules").update({ last_status: status, last_run_id: runId }).eq("id", row.id);
+    // Tell the person ONCE when a schedule starts having trouble (it was fine, or never ran, and now it is not). A failing notice never fails the run.
+    if (status !== "ok" && (row.last_status === "ok" || row.last_status == null)) {
+      try {
+        await notify({ userId: row.user_id, workflowId: row.workflow_id, status });
+      } catch {
+        console.error("a failure notice crashed");
+      }
+    }
     if (status === "ok") summary.ran += 1;
     else if (status === "stopped") summary.stopped += 1;
     else summary.failed += 1;

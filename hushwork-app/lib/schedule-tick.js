@@ -4,6 +4,7 @@ import { getCronSecret } from "@/lib/schedule-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runDueSchedules } from "@/lib/schedule-runner";
 import { startPracticeRun } from "@/lib/run-core";
+import { notifyScheduleProblem } from "@/lib/schedule-notify";
 
 // What the clock calls (app/api/cron/tick). It does NOTHING unless the call carries the clock's password in the Authorization header
 // ("Bearer <CRON_SECRET>"; Vercel Cron sends exactly that when CRON_SECRET is set). Answers are small and never hold anyone's data:
@@ -21,6 +22,6 @@ export async function handleTick(request) {
   const sent = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!sent || !same(sent, secret)) return reply(401, { ok: false, error: "Wrong or missing password." });
 
-  const summary = await runDueSchedules({ admin, run: startPracticeRun });
+  const summary = await runDueSchedules({ admin, run: startPracticeRun, notify: (problem) => notifyScheduleProblem({ admin, ...problem }) });
   return reply(summary.ok ? 200 : 500, summary);
 }

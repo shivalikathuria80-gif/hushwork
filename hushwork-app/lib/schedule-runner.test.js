@@ -88,3 +88,28 @@ test("nothing due means nothing runs; a database error is reported without any d
   assert.deepEqual(await runDueSchedules({ admin: pretend({ error: { code: "42P01", message: "SECRET detail" } }).admin, run, now: NOW }), { ok: false });
   assert.equal(ran, false);
 });
+
+test("trouble notices: sent once when a schedule goes from fine (or never run) to stopped or failed, never for ok, never again while it stays broken, and a crashing notice does not fail the run", async () => {
+  const cases = [
+    ["ok", "stopped", true], ["ok", "failed", true], [null, "failed", true], ["failed", "failed", false], ["stopped", "failed", false],
+    ["ok", "ok", false], ["failed", "ok", false], [null, "ok", false],
+  ];
+  for (const [before, after, expected] of cases) {
+    const { admin } = pretend({ rows: [due({ last_status: before })] });
+    const told = [];
+    const run = async () => (after === "failed" ? { ok: false } : { ok: true, runId: "r1", auto: after === "stopped" ? { stoppedAt: 2 } : {} });
+    await runDueSchedules({ admin, run, notify: async (problem) => told.push(problem), now: NOW });
+    assert.equal(told.length === 1, expected, `${before} -> ${after}`);
+    if (expected) assert.deepEqual(told[0], { userId: "u1", workflowId: "w1", status: after });
+  }
+  const { admin, log } = pretend({ rows: [due({ last_status: "ok" })] });
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const summary = await runDueSchedules({ admin, run: async () => ({ ok: false }), notify: async () => { throw new Error("mail is down"); }, now: NOW });
+    assert.equal(summary.failed, 1);
+  } finally {
+    console.error = quiet;
+  }
+  assert.ok(log.updates.some((entry) => entry.values.last_status === "failed"), "the outcome was still written down");
+});

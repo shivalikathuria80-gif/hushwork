@@ -99,8 +99,9 @@ export default function ScheduleEditor({ workflowId, schedule, tableMissing, clo
               </div>
               <label className="mt-3 flex items-start gap-3 text-sm">
                 <input type="checkbox" checked={allowWrites} onChange={(event) => setAllowWrites(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-accent)]" />
-                <span><span className="font-medium">Let it write by itself.</span> If ticked, a scheduled run may add a row to your sheet and create a Linear task while you are away. If not ticked, those steps are skipped and only the reading steps run.</span>
+                <span><span className="font-medium">Let it write by itself.</span> If ticked, a scheduled run may send emails and messages, create tasks and issues, and add rows to your sheet while you are away. If not ticked, those steps are skipped and only the reading steps run.</span>
               </label>
+              <p className="mt-2 text-sm text-mute">If a schedule stops working you get one email about it, as long as Gmail (send) is connected on the Connections page.</p>
               {!clockReady && (
                 <p className="mt-3 flex items-start gap-2 text-sm text-mute"><Icon name="CircleAlert" className="mt-0.5 shrink-0" />The schedule will be saved, but nothing runs it yet: the clock is not set up. It needs Hushwork to be online (see docs/deploy.md).</p>
               )}
