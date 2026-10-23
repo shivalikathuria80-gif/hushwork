@@ -1,0 +1,25 @@
+# Runs the tests and the code check on every push and pull request, so a mistake shows up before anyone depends on it.
+# It uses no secrets and never touches a real service: the tests use pretend answers only.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: hushwork-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: hushwork-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
