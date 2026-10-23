@@ -234,3 +234,14 @@ test("noticeFor: the sentences contain no dashes that read like an AI wrote them
     assert.ok(/keyword preview/.test(text), `${why} says it is a keyword preview`);
   }
 });
+
+test("DATABASE LIMIT: when the database says the person is over the limit, nothing is sent to the AI and the in-memory slot is not used", async () => {
+  const { fetchImpl, state } = desk();
+  const limiters = makeAiLimits();
+  const result = await makePreview({ prompt: "Chase overdue invoices", userId: "user-1", groqKey: KEY, now: () => state.clock, fetchImpl, limiters, log: (line) => state.lines.push(line), dbTake: async () => ({ ok: false, why: "limit_day" }) });
+  assert.equal(result.source, "keyword");
+  assert.equal(result.why, "limit_day");
+  assert.equal(fetchImpl.calls.length, 0, "no request was made");
+  assert.equal(limiters.take("user-1", state.clock).remaining, 19, "the in-memory count was untouched (one slot taken just now)");
+  assert.ok(state.lines.includes("ai-plan skipped why=limit_day"));
+});

@@ -37,7 +37,7 @@ const RETRYABLE = ["busy", "timeout", "rejected", "unusable", "refused"];
 const sharedLimits = () => (globalThis.__hushworkAiLimits ??= makeAiLimits());
 
 // prompt, userId: already checked. groqKey: from key.js (null when there is none). now/fetchImpl/limiters/log: for tests.
-export async function makePreview({ prompt, userId, groqKey, now = Date.now, fetchImpl, limiters = sharedLimits(), log = console.log }) {
+export async function makePreview({ prompt, userId, groqKey, now = Date.now, fetchImpl, limiters = sharedLimits(), log = console.log, dbTake = async () => ({ ok: true }) }) {
   // A keyword answer: no steps, the screen builds the keyword plan itself and shows `notice`.
   const keyword = (why, { status, remaining, retryAfter } = {}) => ({
     source: "keyword",
@@ -54,6 +54,9 @@ export async function makePreview({ prompt, userId, groqKey, now = Date.now, fet
   if (waiting > 0) { log(`ai-plan skipped why=cooling_off retry_after=${waiting}`); return keyword("busy", { status: 429, retryAfter: waiting }); }
 
   // From here a real request will be made, so the attempt is counted even if it fails.
+  // The database count (see supabase/usage.sql) holds across servers; the in-memory one below also keeps the whole-site limits.
+  const dbSlot = await dbTake();
+  if (!dbSlot.ok) { log(`ai-plan skipped why=${dbSlot.why}`); return keyword(dbSlot.why, { remaining: 0 }); }
   const slot = limiters.take(userId, now());
   if (!slot.ok) { log(`ai-plan skipped why=${slot.why}`); return keyword(slot.why, { remaining: slot.remaining }); }
 

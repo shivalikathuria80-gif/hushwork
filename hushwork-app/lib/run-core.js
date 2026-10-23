@@ -28,6 +28,7 @@ import { runActionTool, runReadTool } from "@/lib/connectors/composio";
 import { checkTarget, findAction } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
+import { takeDbSlot } from "@/lib/db-limits";
 
 // Server Action behind the "Practice run" button. It loads the person's own workflow, walks its steps with the
 // practice engine (lib/run-engine.js: nothing leaves the app) and saves the result as a row in the "runs" table.
@@ -220,11 +221,12 @@ const eventLines = (events) => events.map((event) => `- ${event.start}  ${event.
 // What a lookup saves as its result: a clear AI summary FIRST, then the app's own list exactly as it answered (so a summary can never
 // hide the facts). The summary is skipped without any error when the AI is off, the person's AI limit is used up, or the AI fails: the
 // result is then just the app's own list. `goal` says what the person wants to know; `note` is the step's own note (the person's words).
-async function withSummary({ userId, appName, header, list, goal, note }) {
+async function withSummary({ supabase, userId, appName, header, list, goal, note }) {
   const plain = `Asked ${appName}. ${header}\n${list}`;
   const groqKey = getGroqKey();
   const now = Date.now();
   if (!groqKey || aiLimits().minute.left(userId, now) < 1 || aiLimits().day.left(userId, now) < 1) return plain;
+  if (!(await takeDbSlot(supabase, "ai_step", 3, 15)).ok) return plain; // the database count (see supabase/usage.sql) is the one that holds across servers
   aiLimits().minute.take(userId, now);
   aiLimits().day.take(userId, now);
   const summary = await summarizeData({ goal: note ? `${goal} The person's own note: ${note}` : goal, data: `${header}\n${list}`, groqKey });
@@ -253,7 +255,7 @@ export async function approveLinearLookup(input, who) {
 
   const list = answer.issues.map((issue) => `- ${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n");
   const outcome = answer.issues.length
-    ? await withSummary({ userId: user.id, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why, and say which one to do first." })
+    ? await withSummary({ supabase, userId: user.id, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why, and say which one to do first." })
     : "Asked Linear. You have no open tasks.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -274,6 +276,8 @@ export async function approveAiStep(input, who) {
   const now = Date.now();
   const tooMany = limitError(aiLimits(), user.id, now, "AI steps");
   if (tooMany) return { error: tooMany };
+  const dbSlot = await takeDbSlot(supabase, "ai_step", 3, 15);
+  if (!dbSlot.ok) return { error: dbSlot.why === "limit_minute" ? "You did that a moment ago. Try again in a minute." : "You have reached today's limit for AI steps. It resets at midnight UTC." };
   aiLimits().minute.take(user.id, now);
   aiLimits().day.take(user.id, now);
 
@@ -388,7 +392,7 @@ export async function approveCalendarLookup(input, who) {
   const answer = await fetchUpcomingEvents({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.events.length
-    ? await withSummary({ userId: user.id, appName: "Google Calendar", header: `You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days:`, list: eventLines(answer.events), note: step.fields.what, goal: "The person asked Google Calendar for their events in the next 7 days. Summarise the week: how many events there are, which days are busy or free, and what they should prepare." })
+    ? await withSummary({ supabase, userId: user.id, appName: "Google Calendar", header: `You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days:`, list: eventLines(answer.events), note: step.fields.what, goal: "The person asked Google Calendar for their events in the next 7 days. Summarise the week: how many events there are, which days are busy or free, and what they should prepare." })
     : "Asked Google Calendar. You have no events in the next 7 days.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -413,7 +417,7 @@ export async function approveGmailLookup(input, who) {
   const answer = await fetchInbox({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.mails.length
-    ? await withSummary({ userId: user.id, appName: "Gmail", header: `The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox (senders, subjects and times only; the text inside each email was not read):`, list: mailLines(answer.mails), note: step.fields.what, goal: "The person asked Gmail for the latest messages in their inbox. Only the sender, subject and time of each message were read, never the text inside, so judge only from those. Summarise who wrote and what each message seems to be about, say which ones probably need an answer first and why, and say clearly that you only saw senders and subjects." })
+    ? await withSummary({ supabase, userId: user.id, appName: "Gmail", header: `The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox (senders, subjects and times only; the text inside each email was not read):`, list: mailLines(answer.mails), note: step.fields.what, goal: "The person asked Gmail for the latest messages in their inbox. Only the sender, subject and time of each message were read, never the text inside, so judge only from those. Summarise who wrote and what each message seems to be about, say which ones probably need an answer first and why, and say clearly that you only saw senders and subjects." })
     : "Asked Gmail. Your inbox is empty.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -437,7 +441,7 @@ export async function approveDriveLookup(input, who) {
   const answer = await fetchRecentFiles({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.files.length
-    ? await withSummary({ userId: user.id, appName: "Google Drive", header: `The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently (names, kinds and times only; nothing inside a file was read):`, list: fileLines(answer.files), note: step.fields.what, goal: "The person asked Google Drive for the files they changed most recently. Only the name, kind and time of each file were read, never what is inside. Summarise what they seem to have worked on lately judging from the names, group them by kind or topic, and say clearly that you only saw names." })
+    ? await withSummary({ supabase, userId: user.id, appName: "Google Drive", header: `The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently (names, kinds and times only; nothing inside a file was read):`, list: fileLines(answer.files), note: step.fields.what, goal: "The person asked Google Drive for the files they changed most recently. Only the name, kind and time of each file were read, never what is inside. Summarise what they seem to have worked on lately judging from the names, group them by kind or topic, and say clearly that you only saw names." })
     : "Asked Google Drive. There are no files.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -492,7 +496,7 @@ export async function approveAppLookup(input, who) {
 
   const answer = await runReadTool({ key: composioKey, userId: user.id, app });
   if (!answer.ok) return { error: answer.error };
-  const outcome = await withSummary({ userId: user.id, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
+  const outcome = await withSummary({ supabase, userId: user.id, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 

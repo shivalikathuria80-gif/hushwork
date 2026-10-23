@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { checkPrompt } from "@/lib/validate";
 import { getGroqKey } from "@/lib/ai/key";
 import { makePreview } from "@/lib/ai/preview";
+import { AI_LIMITS } from "@/lib/ai/plan";
+import { takeDbSlot } from "@/lib/db-limits";
+import { createClient } from "@/lib/supabase/server";
 
 // The Server Action behind "Preview plan" when AI planning is on. A Server Action is a function the page can call
 // directly while the code runs on the server. It does four things, in this order:
@@ -17,5 +20,6 @@ export async function previewPlan(input) {
   const user = await requireUser();
   const prompt = checkPrompt(input?.prompt);
   if (prompt.error) return { error: prompt.code }; // "empty" or "too_long": the screen has its own wording
-  return makePreview({ prompt: prompt.value, userId: user.id, groqKey: getGroqKey() });
+  const supabase = await createClient();
+  return makePreview({ prompt: prompt.value, userId: user.id, groqKey: getGroqKey(), dbTake: () => takeDbSlot(supabase, "ai_plan", AI_LIMITS.perUserMinute, AI_LIMITS.perUserDay) });
 }
