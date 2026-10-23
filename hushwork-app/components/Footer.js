@@ -68,7 +68,6 @@ function DotWord({ word = "hushwork" }) {
 const COLUMNS = [
   ["Product", [["How it works", "#how"], ["Automations", "#auto"], ["Features", "#features"], ["Try it", "#agent"], ["Waitlist", "#wait"]]],
   ["Company", [["Privacy", "/privacy"]]],
-  ["Contact", [["hello@hushwork.co", "mailto:hello@hushwork.co"]]],
 ];
 const linkClass = "inline-flex min-h-11 items-center text-mute transition-colors duration-120 ease-standard hover:text-ink";
 
@@ -78,7 +77,7 @@ export default function Footer() {
   const seen = useInView(watchRef, { once: true, amount: 0.3 });
   return (
     <footer className="border-t border-line bg-bg px-5 pt-14 text-sm md:px-10">
-      <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 lg:grid-cols-3">
         <div><Logo /><p className="mt-3 max-w-xs text-mute">Describe the task. Hushwork handles it.</p></div>
         {COLUMNS.map(([heading, links]) => (
           <div key={heading}>
