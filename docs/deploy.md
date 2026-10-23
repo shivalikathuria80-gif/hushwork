@@ -96,3 +96,13 @@ The clock only works while the app and the clock terminal are both running. For 
 - Settings already added on Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (both public values) and `NEXT_PUBLIC_SITE_URL`.
 - **Still to add by hand** (Vercel project, Settings, Environment Variables; mark secrets "Sensitive"): `GROQ_API_KEY`, `CONNECTIONS_KEY`, `COMPOSIO_API_KEY`, `LINEAR_CLIENT_ID`/`LINEAR_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, and for scheduling `CRON_SECRET` + `SUPABASE_SERVICE_ROLE_KEY`. Redeploy after adding them.
 - **Still to do by hand:** section 3 (tell Supabase, Linear and Google the new address) and section 6 (test it).
+
+## 11. The free clock on GitHub (already in the repository)
+
+`.github/workflows/clock.yml` asks `https://hushwork-six.vercel.app/api/cron/tick` about every 5 minutes (GitHub can be a few minutes late; Vercel's own free timer can only run once a day). To switch it on:
+
+1. Do section 7 steps 1 and 2 (paste `supabase/schedules.sql`; add `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` on Vercel, then redeploy).
+2. On GitHub open the repository, Settings, Secrets and variables, Actions, New repository secret. Name `CRON_SECRET`, value the same as on Vercel.
+3. Actions tab, **clock**, Run workflow, to try it once. It should say `Hushwork answered 200`.
+
+Because of the 5-minute rhythm, a schedule set to "every minute" will run at most every 5 minutes online.
