@@ -63,8 +63,8 @@ export default function PrivacyPage() {
 
       <h2 className={h2}>Getting your data removed</h2>
       <p className={p}>
-        Open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> and say you want your waitlist email, or your account and all its drafts, removed. Please do not put private details in a public issue: we will reply there and tell you how to prove the account is yours.
-        There is no delete button in the app yet. We keep waitlist emails until early access opens or you ask us to remove them, and accounts and drafts until you ask or the account is deleted.
+        To delete your account, open Settings and press Delete my account. It removes your workflows, runs, schedules and saved connections together, and disconnects the apps you connected through Composio. To have a waitlist email removed, open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> (please leave private details out of it: we will reply there).
+        We keep waitlist emails until early access opens or you ask us to remove them, and accounts and drafts until you ask or the account is deleted.
       </p>
 
       <hr className="mt-10 border-line" />

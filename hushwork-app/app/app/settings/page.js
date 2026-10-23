@@ -3,10 +3,11 @@ import Link from "next/link";
 import ThemeToggle from "@/components/app/ThemeToggle";
 import { requireUser } from "@/lib/auth";
 import { aiStatus } from "@/lib/ai-status";
+import DeleteAccount from "@/components/app/DeleteAccount";
 
 export const metadata = { title: "Settings - Hushwork", robots: { index: false, follow: false } };
 
-// Settings. Nothing here can change an account (there is no password or email form yet); it shows what is true. The page
+// Settings. It shows what is true and has the one irreversible button, Delete my account (it asks first and makes the person type the words). The page
 // shell is built ahead of time. The email and the AI status each need a real request, so each sits in its own <Suspense>.
 export default function SettingsPage() {
   return (
@@ -20,9 +21,7 @@ export default function SettingsPage() {
           <Suspense fallback={<span aria-hidden="true" className="mt-1 block h-6 w-56 rounded-md bg-raised" />}>
             <AccountEmail />
           </Suspense>
-          <p className="mt-3 text-sm text-mute">
-            To delete your account and its drafts, open an issue on <a href="https://github.com/shivalikathuria80-gif/hushwork/issues" className="underline">the project{"’"}s GitHub issues page</a> (do not put private details in it; we will reply there). There is no delete button in the app yet. Use Sign out in the sidebar to leave.
-          </p>
+          <div className="mt-4 border-t border-line pt-4"><DeleteAccount /></div>
         </div>
       </section>
 

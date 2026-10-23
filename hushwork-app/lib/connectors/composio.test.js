@@ -106,3 +106,18 @@ test("every problem becomes a fixed sentence that never holds the key or Composi
   assert.deepEqual(thrown, { ok: false, error: COMPOSIO_FAILED.network });
   assert.ok(!JSON.stringify(thrown).includes("SECRET"));
 });
+
+test("disconnecting everything: lists this person's connected apps once, removes each by its plain id, skips odd ids, and stops with a sentence on a failure", async () => {
+  const { disconnectEverything } = await import("./composio.js");
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    const u = new URL(url);
+    seen.push(`${init.method} ${u.pathname}${u.search}`);
+    if (init.method === "GET") return { ok: true, status: 200, json: async () => ({ items: [{ id: "ca_1", toolkit: { slug: "slack" } }, { id: "../evil", toolkit: { slug: "x" } }, { id: "ca_2", toolkit: { slug: "gmail" } }] }) };
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  assert.deepEqual(await disconnectEverything({ key: "k", userId: "u-1", fetchImpl }), { ok: true });
+  assert.deepEqual(seen, ["GET /api/v3.1/connected_accounts?user_ids=u-1&statuses=ACTIVE&limit=100", "DELETE /api/v3.1/connected_accounts/ca_1", "DELETE /api/v3.1/connected_accounts/ca_2"]);
+  const refused = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  assert.ok((await disconnectEverything({ key: "ak_SECRET", userId: "u-1", fetchImpl: refused })).error);
+});

@@ -300,7 +300,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js"]);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookup in the apps list and the actions in the actions list");
@@ -395,7 +395,12 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   assert.match(env, /^import "server-only";/m);
   assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example" && name !== "scripts/clock.mjs"), ["lib/schedule-env.js"], "only schedule-env.js reads them (the clock script on your own computer sends the password, it is not server code)");
   const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(adminImporters, ["lib/schedule-tick.js"], "the all-access client has exactly one user: the clock's handler");
+  assert.deepEqual(adminImporters, ["lib/actions/account.js", "lib/schedule-tick.js"], "the all-access client has exactly two users: the clock's handler and Delete my account");
+  const account = files.find((file) => file.name === "lib/actions/account.js").text;
+  assert.ok(/^"use server"/.test(account) && account.indexOf("requireUser()") > 0 && account.indexOf("userId: user.id") > account.indexOf("requireUser()"), "the account that is deleted is the signed-in person's, from the session");
+  assert.ok(!/input\??\.(userId|id)/.test(account), "the browser never says which account to delete");
+  const accountCore = files.find((file) => file.name === "lib/account-core.js").text;
+  assert.ok(accountCore.indexOf("CONFIRM_WORDS") < accountCore.indexOf("admin.auth.admin.deleteUser"), "the typed words are checked before anything is deleted");
   assert.match(files.find((file) => file.name === "lib/supabase/admin.js").text, /^import "server-only";/m);
   const tick = files.find((file) => file.name === "lib/schedule-tick.js").text;
   assert.ok(tick.indexOf("timingSafeEqual") > 0 && tick.indexOf("same(sent, secret)") < tick.indexOf("runDueSchedules("), "the password is checked (in constant time) before anything runs");

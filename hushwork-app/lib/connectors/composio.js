@@ -141,3 +141,15 @@ export async function runActionTool({ key, userId, action, values, fetchImpl }) 
   }
   return { ok: true, text: text && text !== "null" ? text : "" };
 }
+
+// Removes EVERY app this person connected through Composio (used when an account is deleted). Returns { ok: true } or { error }.
+export async function disconnectEverything({ key, userId, fetchImpl }) {
+  const listed = await listConnected({ key, userId, fetchImpl });
+  if (listed.error) return { error: listed.error };
+  for (const account of listed.accounts) {
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(account.id)) continue; // an id goes into an address, so only plain ones are used
+    const removed = await call(key, "DELETE", `/connected_accounts/${account.id}`, { fetchImpl });
+    if (removed.error) return { error: removed.error };
+  }
+  return { ok: true };
+}
