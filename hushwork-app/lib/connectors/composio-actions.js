@@ -17,6 +17,8 @@
 //   candidates   for each thing we send, the names the tool may call that input (the first one the tool really has is used)
 //   meaning      turns the step's words into the things we send
 //   done         how a finished action is described in the result ("Sent a Slack message")
+//   labels       (optional) the words the approval card uses for the three boxes: { target, title, details }; the default is Where / Title / Details
+//   noDetails    (optional) true when the tool has no place for the "details" box: it is then never shown or sent
 export const COMPOSIO_ACTIONS = [
   {
     id: "slack_message", app: "slack", name: "Send a Slack message", tool: "SLACK_SEND_MESSAGE", needsTarget: true,
@@ -24,6 +26,7 @@ export const COMPOSIO_ACTIONS = [
     candidates: { channel: ["channel", "channel_id"], message: ["markdown_text", "text"] },
     meaning: (v) => ({ channel: v.target.replace(/^#/, ""), message: v.details ? `${v.title}\n${v.details}` : v.title }),
     done: (v) => `Sent a Slack message to #${v.target.replace(/^#/, "")}`,
+    labels: { title: "Message" },
   },
   {
     id: "github_issue", app: "github", name: "Create a GitHub issue", tool: "GITHUB_CREATE_AN_ISSUE", needsTarget: true,
@@ -38,6 +41,23 @@ export const COMPOSIO_ACTIONS = [
     candidates: { recipient_email: ["recipient_email", "to"], subject: ["subject"], body: ["body"] },
     meaning: (v) => ({ recipient_email: v.target, subject: v.title, body: v.details || v.title }),
     done: (v) => `Sent an email to ${v.target}`,
+    labels: { target: "To", title: "Subject", details: "Email text" },
+  },
+  {
+    id: "calendar_event", app: "gcalwrite", name: "Add a Google Calendar event", tool: "GOOGLECALENDAR_CREATE_EVENT", needsTarget: true,
+    target: { pattern: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):[0-5]\d$/, hint: "Write when it starts as year-month-day hour:minute, for example 2026-11-05 15:00 (24-hour clock, in your calendar's own time zone)." },
+    candidates: { start_datetime: ["start_datetime", "start_time"], summary: ["summary", "title"], description: ["description"] },
+    meaning: (v) => ({ start_datetime: `${v.target.replace(" ", "T")}:00`, summary: v.title, description: v.details }),
+    done: (v) => `Added a calendar event at ${v.target}`,
+    labels: { target: "Starts", title: "Event", details: "Notes" },
+  },
+  {
+    id: "notion_page", app: "notion", name: "Create a Notion page", tool: "NOTION_CREATE_NOTION_PAGE", needsTarget: true, noDetails: true,
+    target: { pattern: /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/, hint: "Write the id of the Notion page it goes under: the long code (32 letters and numbers) at the end of that page's address." },
+    candidates: { parent_id: ["parent_id"], title: ["title"] },
+    meaning: (v) => ({ parent_id: v.target, title: v.title }),
+    done: () => "Created a Notion page",
+    labels: { target: "Under page", title: "Page title" },
   },
   {
     id: "todoist_task", app: "todoist", name: "Add a Todoist task", tool: "TODOIST_CREATE_TASK", needsTarget: false,
@@ -48,6 +68,7 @@ export const COMPOSIO_ACTIONS = [
   },
 ];
 
+export const labelFor = (action, box) => action?.labels?.[box] ?? { target: "Where", title: "Title", details: "Details" }[box];
 export const findAction = (id) => (typeof id === "string" ? COMPOSIO_ACTIONS.find((action) => action.id === id) ?? null : null);
 export const COMPOSIO_ACTION_IDS = COMPOSIO_ACTIONS.map((action) => action.id);
 export const actionsForApp = (appId) => COMPOSIO_ACTIONS.filter((action) => action.app === appId);

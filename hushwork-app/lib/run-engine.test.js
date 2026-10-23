@@ -193,3 +193,15 @@ test("a Do something in another app step: only a listed action with a good place
   assert.ok(actionSummary(step({ action: "slack_message", target: "general", title: "Hi {answer}" }), "all good").includes("Message: Hi all good"));
   assert.match(practiceStep({ icon: "Send", title: "t", detail: "d", ...slack }).outcome, /^Would do: .*Nothing was sent\.$/);
 });
+
+test("the approval card uses each action's own words (an email says To, Subject and Email text; an event says Starts; a Notion page never shows details)", async () => {
+  const { actionSummary } = await import("./run-engine.js");
+  const mail = actionSummary({ kind: "action", fields: { action: "gmail_send", target: "a@b.co", title: "Hello", details: "Dear A" } });
+  for (const part of ["To: a@b.co", "Subject: Hello", "Email text: Dear A"]) assert.ok(mail.includes(part), part);
+  const event = actionSummary({ kind: "action", fields: { action: "calendar_event", target: "2026-11-05 15:00", title: "Dentist", details: "Bring card" } });
+  for (const part of ["Starts: 2026-11-05 15:00", "Event: Dentist", "Notes: Bring card"]) assert.ok(event.includes(part), part);
+  const page = actionSummary({ kind: "action", fields: { action: "notion_page", target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "never sent" } });
+  assert.ok(page.includes("Under page:") && page.includes("Page title: Notes"));
+  assert.ok(!page.includes("never sent"), "the details box is not shown for a tool that cannot take it");
+});
+

@@ -30,17 +30,18 @@ test("the list: each action belongs to a real app, names one tool written Compos
     assert.match(action.tool, new RegExp(`^${app.toolkit.toUpperCase()}_[A-Z0-9_]+$`), `${action.id}: the tool belongs to the toolkit`);
     assert.notEqual(action.tool, app.tool);
     assert.ok(action.name && typeof action.done === "function" && typeof action.meaning === "function");
-    const meant = action.meaning({ target: action.needsTarget ? (action.id === "github_issue" ? "acme/site" : action.id === "gmail_send" ? "a@b.co" : "general") : "", title: "T", details: "D" });
+    const meant = action.meaning({ target: action.needsTarget ? ({ github_issue: "acme/site", gmail_send: "a@b.co", calendar_event: "2026-11-05 15:00", notion_page: "0123456789abcdef0123456789abcdef" }[action.id] ?? "general") : "", title: "T", details: "D" });
     for (const meaning of Object.keys(meant)) assert.ok(action.candidates[meaning]?.length, `${action.id}: a name for ${meaning}`);
   }
   for (const bad of ["", "nope", "__proto__", "constructor", 5, null, undefined]) assert.equal(findAction(bad), null, String(bad));
   assert.deepEqual(actionsForApp("slack").map((action) => action.id), ["slack_message"]);
-  assert.deepEqual(actionsForApp("notion"), []);
+  assert.deepEqual(actionsForApp("notion").map((action) => action.id), ["notion_page"]);
+  assert.deepEqual(actionsForApp("airtable"), []);
 });
 
 test("the sign-in at Composio is limited to the app's lookup plus the tools of its actions, and nothing else", () => {
   assert.deepEqual(allowedTools(findComposioApp("slack")), ["SLACK_LIST_ALL_CHANNELS", "SLACK_SEND_MESSAGE"]);
-  assert.deepEqual(allowedTools(findComposioApp("notion")), ["NOTION_SEARCH_NOTION_PAGE"]);
+  assert.deepEqual(allowedTools(findComposioApp("airtable")), ["AIRTABLE_LIST_BASES"]);
   assert.deepEqual(allowedTools(findComposioApp("todoist")), ["TODOIST_GET_ALL_TASKS", "TODOIST_CREATE_TASK"]);
   for (const app of COMPOSIO_APPS) assert.ok(allowedTools(app).length >= 1);
 });
@@ -122,3 +123,23 @@ test("nothing is sent when the tool does not match what we know, and every probl
   assert.deepEqual(failed, { ok: false, error: COMPOSIO_FAILED.failed });
   assert.ok(!JSON.stringify(failed).includes("SECRET"));
 });
+
+test("a calendar event and a Notion page: the start time and the page id are checked, the words go to the tool's own boxes, and Notion never sends the details box", () => {
+  const event = findAction("calendar_event");
+  for (const good of ["2026-11-05 15:00", "2027-01-31 00:00", "2026-12-31 23:59"]) assert.deepEqual(checkTarget(event, good), { value: good }, good);
+  for (const bad of ["", "2026-13-05 15:00", "2026-11-32 15:00", "2026-11-05 24:00", "2026-11-05 15:60", "2026-11-05T15:00", "tomorrow 3pm", "2026-11-05", "2026-11-05 15:00\nbcc"]) assert.ok(checkTarget(event, bad).error, bad);
+  const inputs = readToolInputs({ input_parameters: { start_datetime: { required: true }, summary: {}, description: {}, event_duration_minutes: {} } });
+  assert.deepEqual(buildArguments(event, { target: "2026-11-05 15:00", title: "Dentist", details: "Bring the card" }, inputs).arguments, { start_datetime: "2026-11-05T15:00:00", summary: "Dentist", description: "Bring the card" });
+  assert.deepEqual(buildArguments(event, { target: "2026-11-05 15:00", title: "Dentist", details: "" }, inputs).arguments, { start_datetime: "2026-11-05T15:00:00", summary: "Dentist" });
+  assert.ok(buildArguments(event, { target: "2026-11-05 15:00", title: "x", details: "" }, readToolInputs({ input_parameters: { start_datetime: { required: true }, summary: {}, timezone: { required: true } } })).error, "an input we do not fill in is required: nothing is sent");
+
+  const page = findAction("notion_page");
+  for (const good of ["0123456789abcdef0123456789abcdef", "01234567-89ab-cdef-0123-456789abcdef"]) assert.deepEqual(checkTarget(page, good), { value: good }, good);
+  for (const bad of ["", "abc", "0123456789abcdef0123456789abcdeg", "https://notion.so/x-0123456789abcdef0123456789abcdef"]) assert.ok(checkTarget(page, bad).error, bad);
+  assert.equal(page.noDetails, true);
+  const pageInputs = readToolInputs({ input_parameters: { parent_id: { required: true }, title: { required: true }, icon: {} } });
+  assert.deepEqual(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "ignored words" }, pageInputs).arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Notes" });
+  assert.deepEqual(allowedTools(findComposioApp("gcalwrite")), ["GOOGLECALENDAR_LIST_CALENDARS", "GOOGLECALENDAR_CREATE_EVENT"]);
+  assert.deepEqual(allowedTools(findComposioApp("notion")), ["NOTION_SEARCH_NOTION_PAGE", "NOTION_CREATE_NOTION_PAGE"]);
+});
+

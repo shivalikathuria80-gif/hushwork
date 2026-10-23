@@ -5,7 +5,7 @@
 import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
 import { findComposioApp } from "./connectors/composio-apps.js";
-import { checkTarget, findAction } from "./connectors/composio-actions.js";
+import { checkTarget, findAction, labelFor } from "./connectors/composio-actions.js";
 import { fillActionDetails, fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
@@ -94,7 +94,14 @@ export const actionSummary = (step, answer = "", answers = []) => {
   const f = step?.fields ?? {};
   const title = fillAnswerText(String(f.title ?? ""), answer, 150);
   const details = fillActionDetails(action?.id, String(f.details ?? ""), answer, answers);
-  return [`Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`, action?.needsTarget ? `Where: ${f.target}` : "", `${action?.id === "slack_message" ? "Message" : action?.id === "gmail_send" ? "Subject" : "Title"}: ${title.text ?? f.title}`, f.details ? `${action?.id === "gmail_send" ? "Email text" : "Details"}: ${details.text ?? f.details}` : "", "It is sent through Composio, the company that keeps the connection to the app.", title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
+  return [
+    `Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`,
+    action?.needsTarget ? `${labelFor(action, "target")}: ${f.target}` : "",
+    `${labelFor(action, "title")}: ${title.text ?? f.title}`,
+    f.details && !action?.noDetails ? `${labelFor(action, "details")}: ${details.text ?? f.details}` : "",
+    "It is sent through Composio, the company that keeps the connection to the app.",
+    title.error ?? (action?.noDetails ? "" : details.error) ?? "",
+  ].filter(Boolean).join(String.fromCharCode(10));
 };
 
 // Steps that WRITE somewhere (add a row, create a task). Auto mode runs them too, so the screens that offer Auto say so in plain words.

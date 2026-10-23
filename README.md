@@ -9,7 +9,7 @@ Hushwork is a small workspace where you describe a job in plain words ("every Fr
 
 - **Build workflows** from blocks (start, look something up, ask the AI, call a web address, add a spreadsheet row, create a Linear task, send an email, and more), with drag and drop, templates, or an AI that writes the plan.
 - **Look things up** in Google (Calendar, Gmail sender and subject lines, Drive file names), Linear, and 14 more apps through [Composio](https://composio.dev) (Vercel, Xero and Cloudflare are listed but cannot be connected yet, because Composio has no ready-made sign-in for them).
-- **Do things** only after you press Approve (or switch Auto mode on on purpose): send an email through Gmail, send a Slack message, create a GitHub issue, add a Todoist task or a Linear task, add a row to a Google Sheet.
+- **Do things** only after you press Approve (or switch Auto mode on on purpose): send an email through Gmail, send a Slack message, create a GitHub issue, add a Todoist task, add a Google Calendar event, create a Notion page or a Linear task, add a row to a Google Sheet.
 - **Run on a schedule**, with writing allowed only if you tick the box for that schedule.
 - **Explain results** with an AI summary (Groq), always followed by the app's own list exactly as it answered.
 

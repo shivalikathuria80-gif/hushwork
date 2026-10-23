@@ -73,6 +73,7 @@ export const ARTWORK = {
   },
 };
 
+ARTWORK.gcalwrite = ARTWORK.calendar; // the Calendar picture, for the event-adding connection through Composio
 ARTWORK.gmailsend = ARTWORK.gmail; // the same picture, for the send-only Gmail connection through Composio
 
 export const LOGOS = {
