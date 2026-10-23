@@ -42,12 +42,14 @@ test("templateById: a known id gives checked steps; anything else gives null", (
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["invoices"], { id: "invoices" }]) assert.equal(templateById(bad), null, String(bad));
 });
 
+const MULTI = ["testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask"];
+
 test("templates: the three that work for real say what they need, and their steps can really be approved on the Runs page", async () => {
   const { isAiStep } = await import("./run-engine.js");
   const { checkRequestUrl } = await import("./connectors/http.js");
   const real = TEMPLATES.filter((t) => t.needs);
-  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail"]);
-  for (const t of real.filter((x) => !["testall", "hellomail"].includes(x.id))) {
+  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask"]);
+  for (const t of real.filter((x) => !MULTI.includes(x.id))) {
     assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
     const checked = checkSteps(t.steps).value;
     const ai = checked.find((s) => s.kind === "ai");
@@ -61,6 +63,13 @@ test("templates: the three that work for real say what they need, and their step
   for (const s of all.filter((x) => x.kind !== "trigger")) assert.ok(isAiStep(s) || isAppLookup(s) || isActionStep(s) || isLinearCreate(s) || isRequestStep(s), `testall: ${s.kind} can be approved`);
   assert.equal(all.filter(isActionStep).length + all.filter(isLinearCreate).length, 1, "exactly one test task is written");
   assert.ok(all.findLast(isAiStep) === all[6] && all[7].fields.title === "{answer}", "the write uses the last AI line");
+  // each one-way chain (look, then write) must be approvable, and its write must use the AI's line
+  for (const id of ["emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask"]) {
+    const chain = checkSteps(real.find((x) => x.id === id).steps).value;
+    assert.ok(isAiStep(chain[1]) && (isActionStep(chain[2]) || isLinearCreate(chain[2])), `${id}: look with the AI, then write`);
+    assert.ok(chain[2].fields.title === "{answer}" || chain[2].fields.details === "{answer}", `${id}: the write uses the AI's line`);
+    if (isActionStep(chain[2])) assert.equal(chain[2].fields.action, "gmail_send", id);
+  }
   const hello = checkSteps(real.find((x) => x.id === "hellomail").steps).value;
   assert.ok(isActionStep(hello[1]) && hello[1].fields.action === "gmail_send", "the hello email is a real send step, approved on the Runs page");
   for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);

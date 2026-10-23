@@ -79,6 +79,56 @@ export const TEMPLATES = [
       step("action", { action: "gmail_send", target: "arjun.arora30th@gmail.com", title: "Warm greetings", details: "Dear Arjun, I hope this message finds you well. I am writing to send my warmest greetings. Kind regards, Shivalika" }),
     ],
   },
+  {
+    id: "emailweek", icon: "Calendar", title: "Email me my week ahead", needs: "Google, Gmail (send)",
+    body: "The AI reads your Google Calendar for the next 7 days and emails you a short summary. You read the email and press Approve before it is sent. Change the address to send it to someone else.",
+    request: "When I ask, read my Google Calendar for the next 7 days and email me a short summary. Ask me before it is sent.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Sum up my next 7 days in 5 short lines. Point out the busiest day.", uses: "calendar", address: "" }),
+      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "My week ahead", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "emailinbox", icon: "Inbox", title: "Email me what to answer first", needs: "Google, Gmail (send)",
+    body: "The AI looks at who wrote to you and the subjects of your latest 10 emails, then emails you which three to answer first. It never reads the text inside an email.",
+    request: "When I ask, look at my latest emails and email me which ones need an answer first. Ask me before it is sent.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Which 3 of my latest emails need an answer first? Use sender and subject. Say why, in 3 short lines.", uses: "gmail", address: "" }),
+      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "Emails to answer first", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "emailfiles", icon: "FolderOpen", title: "Email me what I worked on", needs: "Google, Gmail (send)",
+    body: "The AI reads the names of your 10 most recently changed Google Drive files and emails you a short recap. It never opens a file.",
+    request: "When I ask, look at the files I changed most recently in Google Drive and email me a short recap. Ask me before it is sent.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "From my 10 latest files (names and times only), sum up what I worked on lately in 3 short lines.", uses: "drive", address: "" }),
+      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "What I worked on", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "emailtask", icon: "ListTodo", title: "Email me my top task", needs: "Google, Gmail (send)",
+    body: "The AI looks at your open Linear tasks and emails you which one to start with. You press Approve before it is sent.",
+    request: "When I ask, look at my open Linear tasks and email me which one to do first. Ask me before it is sent.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Tell me which of my open tasks to do first and why, in 3 short lines.", uses: "linear", address: "" }),
+      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "My top task", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "mailtask", icon: "ListTodo", title: "Turn my latest email into a task", needs: "Google, Linear",
+    body: "The AI looks at the senders and subjects of your latest 10 emails, picks the one that needs action, and you approve a new Linear task for it. It never reads the text inside an email.",
+    request: "When I ask, look at my latest emails, pick the one that needs action, and add a task for it in Linear. Ask me before it is added.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Write ONE short line: the action I should take for the email that needs an answer most. Start with a verb.", uses: "gmail", address: "" }),
+      step("issue", { title: "{answer}", details: "Made from my latest emails by Hushwork.", team: "" }),
+    ],
+  },
   // ---- these describe a plan only ----
   {
     id: "invoices", icon: "Receipt", title: "Chase unpaid invoices",
