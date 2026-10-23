@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "node --test \"lib/**/*.test.js\"",
     "secret": "node scripts/make-secret.mjs",
+    "clock": "node --env-file=.env.local scripts/clock.mjs",
     "make:sculpture": "node scripts/make-sculpture.mjs"
   },
   "dependencies": {

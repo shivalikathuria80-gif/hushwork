@@ -77,3 +77,14 @@ Nobody has done these yet. Steps 1 to 4 need your own accounts, so they can only
 3. **Add the settings from section 2** under Settings, Environment Variables, before the first deploy. At least `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL`, `GROQ_API_KEY` and `CONNECTIONS_KEY`. Without the Supabase ones nobody can sign in.
 4. **Deploy**, copy the address Vercel gives you, put it in `NEXT_PUBLIC_SITE_URL`, then do section 3 (tell Linear, Google and Supabase the new address) and redeploy.
 5. **Sections 6 and 7** (test it, set up the clock).
+
+## 9. Try scheduling on your own computer (no hosting)
+
+1. Paste `supabase/schedules.sql` into Supabase (SQL Editor, New query, paste, Run).
+2. In a terminal run `npm run secret cron`, copy the line it prints into `hushwork-app/.env.local`.
+3. Add `SUPABASE_SERVICE_ROLE_KEY=...` to the same file (Supabase, Project Settings, API Keys, the secret key). It is the all-access key: never share it.
+4. Restart the app (`npm run dev`).
+5. Open a **second** terminal in `hushwork-app` and run `npm run clock`. It asks the app "is anything due?" once a minute and prints one line each time. Leave it open. `npm run clock -- --once` asks one time and stops.
+6. On the Workflows page save a schedule a few minutes ahead (tick "Allow writing" only for a workflow you trust), and watch the Runs page.
+
+The clock only works while the app and the clock terminal are both running. For a clock that runs by itself you need hosting (section 8) and section 7.
