@@ -6,7 +6,7 @@ import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
 import { findComposioApp } from "./connectors/composio-apps.js";
 import { checkTarget, findAction } from "./connectors/composio-actions.js";
-import { fillAnswerText } from "./run-answer.js";
+import { fillActionDetails, fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
@@ -93,7 +93,7 @@ export const actionSummary = (step, answer = "") => {
   const action = findAction(step?.fields?.action);
   const f = step?.fields ?? {};
   const title = fillAnswerText(String(f.title ?? ""), answer, 150);
-  const details = fillAnswerText(String(f.details ?? ""), answer, 300);
+  const details = fillActionDetails(action?.id, String(f.details ?? ""), answer);
   return [`Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`, action?.needsTarget ? `Where: ${f.target}` : "", `${action?.id === "slack_message" ? "Message" : action?.id === "gmail_send" ? "Subject" : "Title"}: ${title.text ?? f.title}`, f.details ? `${action?.id === "gmail_send" ? "Email text" : "Details"}: ${details.text ?? f.details}` : "", "It is sent through Composio, the company that keeps the connection to the app.", title.error ?? details.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
 };
 

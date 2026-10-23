@@ -30,6 +30,19 @@ export function fillAnswerText(text, answer, max) {
   return { text: text.split(ANSWER_TAG).join(words).slice(0, max) };
 }
 
+// The "more details" of a Do something in another app step. For an email the text is a letter, so line breaks are kept (at most one blank
+// line in a row) and it may be up to 3000 characters; for everything else it is the one-line version above, up to 300. The Runs page and
+// the Approve action both call this, so the email you read before pressing Approve is the email that is sent.
+export function fillActionDetails(actionId, text, answer) {
+  if (actionId !== "gmail_send") return fillAnswerText(text, answer, 300);
+  if (!text.includes(ANSWER_TAG)) return { text };
+  const words = typeof answer === "string"
+    ? answer.replace(/\r/g, "").replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]+/g, " ").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 2800)
+    : "";
+  if (!words) return { error: NO_ANSWER };
+  return { text: text.split(ANSWER_TAG).join(words).slice(0, 3000) };
+}
+
 // Steps that WRITE somewhere (add a row, create a task) are approved once per step of a practice run, so going back and pressing
 // Approve again cannot add a second copy. True when a real run of this kind from this practice run and step already exists.
 export async function wasApproved(supabase, userId, run, kind) {

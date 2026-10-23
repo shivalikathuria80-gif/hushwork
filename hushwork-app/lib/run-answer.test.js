@@ -49,3 +49,17 @@ test("a step that writes is approved once per practice run and step: the check l
   assert.equal(await wasApproved(make([]), "u1", run, "row"), false);
   assert.equal(await wasApproved(make(null, { code: "x" }), "u1", run, "row"), false);
 });
+
+test("an email's text keeps its line breaks (never more than one blank line), is cut at 3000, and a missing answer is a clear message; other actions stay one short line", async () => {
+  const { fillActionDetails } = await import("./run-answer.js");
+  const answer = "Monday:\r\n- Standup\n\n\n\n- Dentist\t at 5\u0007pm\n";
+  assert.deepEqual(fillActionDetails("gmail_send", "Hi,\n{answer}\nBye", answer), { text: "Hi,\nMonday:\n- Standup\n\n- Dentist at 5 pm\nBye" });
+  assert.equal(fillActionDetails("gmail_send", "{answer}", "x".repeat(5000)).text.length, 2800);
+  assert.equal(fillActionDetails("gmail_send", "a ".repeat(2000) + "{answer}", "tail").text.length, 3000);
+  assert.deepEqual(fillActionDetails("gmail_send", "No tag here", ""), { text: "No tag here" });
+  assert.ok(fillActionDetails("gmail_send", "{answer}", "  \n ").error);
+  assert.ok(fillActionDetails("gmail_send", "{answer}", undefined).error);
+  assert.deepEqual(fillActionDetails("slack_message", "{answer}", "line one\nline two"), { text: "line one line two" });
+  assert.equal(fillActionDetails("github_issue", "{answer}", "y".repeat(900)).text.length, 300);
+});
+
