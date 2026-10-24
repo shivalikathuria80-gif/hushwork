@@ -75,5 +75,8 @@ create policy "owner can delete own schedules"
   to authenticated
   using ((select auth.uid()) = user_id);
 
+-- A run that is deleted must clear last_run_id here; this index keeps that quick. (Also in schedules-index.sql for databases made before it was added.)
+create index if not exists schedules_last_run_id_idx on public.schedules (last_run_id);
+
 -- ROLLBACK (removes every schedule; only run it on purpose):
 --   drop table public.schedules;

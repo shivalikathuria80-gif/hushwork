@@ -13,6 +13,11 @@ const SAFETY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  // Always use https (browsers ignore this on http://localhost). No includeSubDomains or preload: those cannot be taken back easily.
+  { key: "Strict-Transport-Security", value: "max-age=31536000" },
+  // A safe slice of a content policy: no framing by other sites, no plugins, no changing the page's base address. A full script policy is not
+  // set because Next.js needs inline scripts; adding one safely needs per-request nonces (see docs/deploy.md).
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
 ];
 
 const nextConfig = {

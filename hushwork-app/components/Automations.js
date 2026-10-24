@@ -7,7 +7,7 @@ import { EASE } from "./ui";
 
 const FOLDERS = [
   ["Sales", [["Score new leads", "Hourly"], ["Top-5 digest", "Mondays"], ["Follow-up nudges", "Daily"]]],
-  ["Support", [["Triage inbox", "Live"], ["Draft replies", "On email"], ["Weekly themes", "Fridays"]]],
+  ["Support", [["Triage inbox", "All day"], ["Draft replies", "On email"], ["Weekly themes", "Fridays"]]],
   ["Finance", [["Chase invoices", "Weekly"], ["File receipts", "On email"], ["Monthly summary", "1st"]]],
 ];
 
@@ -36,8 +36,8 @@ export default function Automations() {
 
   return (
     <section id="auto" className="mx-auto max-w-6xl px-5 pb-24 pt-8">
-      <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">What it automates</h2>
-      <p className="mt-3 max-w-xl text-[17px] text-mute">Pick a folder to see the workflows inside.</p>
+      <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Example workflows</h2>
+      <p className="mt-3 max-w-xl text-[17px] text-mute">Pick a folder to see a few things you could build. These are examples, not running jobs.</p>
       <div className="mt-10">
         {/* On phones the three tabs share the row evenly (icons hidden) so they never run off the screen. */}
         <div role="tablist" aria-label="Workflow folders" onKeyDown={onKeyDown} className="flex gap-1">
@@ -57,7 +57,7 @@ export default function Automations() {
             <motion.ul key={selected} className="space-y-2" variants={listVariants} initial="hidden" animate="show" exit="exit">
               {files.map(([name, when]) => (
                 <motion.li key={name} variants={rowVariants} className="flex items-center gap-3 rounded-xl border border-line bg-bg px-4 py-3">
-                  <Icon name="FileText" className="shrink-0 text-mute" /><span className="font-medium">{name}</span><span className="ml-auto text-sm text-mute">{when}</span>
+                  <Icon name="FileText" className="shrink-0 text-mute" /><span className="font-medium">{name}</span><span className="ml-auto flex items-center gap-2 text-sm text-mute">{when}<span className="rounded-md border border-line bg-raised px-1.5 text-xs font-medium">Sample</span></span>
                 </motion.li>
               ))}
             </motion.ul>

@@ -20,7 +20,7 @@ Hushwork lets a person describe a recurring task in plain English. It turns that
 
 A plain-English builder with no nodes to wire up and no code. The workflow is shown as readable steps before anything runs. The page promises approval before anything is sent, a step-by-step log for every run, and a one-click pause.
 
-These are promises the page makes. None of them is built yet.
+These promises are built in the app: each step that does something waits for an Approve click (or Auto mode, which the person switches on, or a schedule with writing ticked), every run keeps a step-by-step record on the Runs page, and a schedule can be paused. The example workflows on the landing page are samples and are labelled as such.
 
 ## Operating Context
 
@@ -30,12 +30,12 @@ Jobs the page leads with: invoice chasing, weekly client report, inbox triage, l
 
 ## Capabilities and Constraints
 
-- **Status: pre-launch, waitlist only.** Nobody is using the product. No workflow runs for anyone. This is confirmed, so the page must not claim a private beta or active users.
-- The agent box on the page is a simulation (keyword matching in `hushwork/AgentBox.jsx`), clearly labelled as a preview. The landing box uses no AI model. The app's Preview plan uses an AI model (run by Groq) only when a key is set and the person leaves "Write with AI" on; otherwise it is keyword matching too. Nothing it writes ever runs.
+- **Status: live in early access and open source** (https://hushwork-six.vercel.app, MIT license). There are no customers, testimonials or usage numbers, so the page must not claim any, or a private beta with active users. Workflows really run, but only after Approve, Auto mode, or a schedule with writing switched on.
+- The agent box on the page is a simulation (keyword matching in `hushwork/AgentBox.jsx`), clearly labelled as a preview. The landing box uses no AI model. The app's Preview plan uses an AI model (run by Groq) only when a key is set and the person leaves "Write with AI" on; otherwise it is keyword matching too. A plan it writes only runs after the person approves each step that does something.
 - Login, "Continue with Google" and "Save workflow" were simulated. The public site no longer shows them (`Login.jsx` is kept, not loaded, for the real product).
 - **Waitlist storage: Supabase** (confirmed and live, 2026-10-14). Project `hushwork`, region ap-south-1, table `waitlist`. The public can add an email and cannot read, change or delete rows. Setup is recorded in `supabase/waitlist.sql`. Supabase is also intended as the base for login and data when the product is built.
-- Current stack (confirmed, 2026-10-15): Next.js 16 (App Router), React 19, Tailwind 4, `motion`, Phosphor icons, in `hushwork-app/`. The earlier no-build prototype is kept in `hushwork/` for reference. Hosting: none. The owner decided on 2026-10-15 to keep the site running locally and not deploy it. It runs on http://localhost:3100; port 3000 is kept free for the owner's other app.
-- Undecided: the first product slice to build (the Invoice Chaser is proposed, not confirmed); the framework for Phase 2; whether Gmail access is feasible, because Google's app-review requirements have not been checked.
+- Current stack (confirmed, 2026-10-15): Next.js 16 (App Router), React 19, Tailwind 4, `motion`, Phosphor icons, in `hushwork-app/`. The earlier no-build prototype is kept in `hushwork/` for reference. Hosting (decided 2026-10-23): Vercel at https://hushwork-six.vercel.app, deployed from the public GitHub repository on every push to `main`. Local development runs on http://localhost:3100; port 3000 is kept free for the owner's other app.
+- Undecided: whether to go through Google's app review so anyone, not only listed test users, can connect Gmail and Drive; which write actions to add next (Stripe is held back on purpose because of real money).
 
 ## Brand Commitments
 
