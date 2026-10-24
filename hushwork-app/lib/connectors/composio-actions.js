@@ -19,6 +19,8 @@
 //   done         how a finished action is described in the result ("Sent a Slack message")
 //   labels       (optional) the words the approval card uses for the three boxes: { target, title, details }; the default is Where / Title / Details
 //   selfAllowed  (optional) true when the "where" may be {myEmail}: the signed-in person's own address, filled in when the step is shown and run
+//   example      (optional) the made-up value a TEMPLATE puts in the "where" box (a page id of zeros, your-name/your-repo). It is refused with a plain
+//                sentence until the person changes it, instead of being sent to the app.
 //   noDetails    (optional) true when the tool has no place for the "details" box: it is then never shown or sent
 export const COMPOSIO_ACTIONS = [
   {
@@ -30,7 +32,7 @@ export const COMPOSIO_ACTIONS = [
     labels: { title: "Message" },
   },
   {
-    id: "github_issue", app: "github", name: "Create a GitHub issue", tool: "GITHUB_CREATE_AN_ISSUE", needsTarget: true,
+    id: "github_issue", app: "github", name: "Create a GitHub issue", tool: "GITHUB_CREATE_AN_ISSUE", needsTarget: true, example: "your-name/your-repo",
     target: { pattern: /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/, hint: "Write the repository as owner/name, for example acme/website." },
     candidates: { owner: ["owner"], repo: ["repo", "repo_name"], title: ["title"], body: ["body"] },
     meaning: (v) => { const [owner, repo] = v.target.split("/"); return { owner, repo, title: v.title, body: v.details }; },
@@ -53,7 +55,7 @@ export const COMPOSIO_ACTIONS = [
     labels: { target: "Starts", title: "Event", details: "Notes" },
   },
   {
-    id: "notion_page", app: "notion", name: "Create a Notion page", tool: "NOTION_CREATE_NOTION_PAGE", needsTarget: true, noDetails: true,
+    id: "notion_page", app: "notion", name: "Create a Notion page", tool: "NOTION_CREATE_NOTION_PAGE", needsTarget: true, noDetails: true, example: "00000000000000000000000000000000",
     target: { pattern: /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/, hint: "Write the id of the Notion page it goes under: the long code (32 letters and numbers) at the end of that page's address." },
     candidates: { parent_id: ["parent_id"], title: ["title"] },
     meaning: (v) => ({ parent_id: v.target, title: v.title }),
@@ -124,4 +126,10 @@ export function resolveTarget(action, value, myEmail) {
   const own = checkTarget({ ...action, selfAllowed: false }, typeof myEmail === "string" ? myEmail : "");
   return own.error ? { error: "Your account has no email address to send to. Write an address in the step instead of {myEmail}." } : own;
 }
+
+// Is this "where" still the made-up value a template starts with? (A Notion page id of all zeros has no dashes or capitals to worry about.)
+const plain = (text) => String(text ?? "").trim().toLowerCase().replaceAll("-", "");
+export const isExampleTarget = (action, target) => Boolean(action?.example) && plain(target) === plain(action.example);
+
+export const EXAMPLE_NOTICE = "This is still the example value from the template. In the Builder, change it to your own: for Notion the id of your page (the long code at the end of its address), for GitHub your repository as owner/name.";
 

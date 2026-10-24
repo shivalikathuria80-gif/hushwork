@@ -156,3 +156,32 @@ test("{myEmail}: allowed only for an email, becomes the signed-in person's own a
   for (const missing of ["", undefined, null, 5, "not an address", "{myEmail}", "a@b.co\nbcc:x@y.co"]) assert.match(resolveTarget(email, MY_EMAIL, missing).error, /no email address/, String(missing));
 });
 
+test("a template's made-up value is recognised, and only that: zeros for Notion, your-name/your-repo for GitHub", async () => {
+  const { isExampleTarget, EXAMPLE_NOTICE } = await import("./composio-actions.js");
+  const page = findAction("notion_page");
+  const repo = findAction("github_issue");
+  for (const same of ["00000000000000000000000000000000", "00000000-0000-0000-0000-000000000000", " 00000000000000000000000000000000 "]) assert.equal(isExampleTarget(page, same), true, same);
+  for (const real of ["0123456789abcdef0123456789abcdef", "00000000000000000000000000000001", "", undefined]) assert.equal(isExampleTarget(page, real), false, String(real));
+  assert.equal(isExampleTarget(repo, "your-name/your-repo"), true);
+  assert.equal(isExampleTarget(repo, "Your-Name/Your-Repo"), true);
+  assert.equal(isExampleTarget(repo, "acme/website"), false);
+  for (const other of ["slack_message", "gmail_send", "calendar_event", "todoist_task"]) assert.equal(isExampleTarget(findAction(other), "00000000000000000000000000000000"), false, `${other} has no example value`);
+  assert.match(EXAMPLE_NOTICE, /change it to your own/);
+});
+
+test("when an app refuses an action, the person gets one of our own sentences that says what to check, and the app's own words are never shown", async () => {
+  const { explainFailure } = await import("./composio.js");
+  const cases = [
+    ["No connected account found for user", "notConnected"], ["Could not find page with ID: 000", "notFound"], ["object_not_found", "notFound"], ["Not Found (404)", "notFound"],
+    ["Forbidden", "forbidden"], ["Insufficient permissions to create pages", "forbidden"], ["Access denied: page not shared with integration", "forbidden"],
+    ["body failed validation: parent_id is not a valid UUID", "invalid"], ["Bad request", "invalid"], ["Unauthorized", "notConnected"],
+    ["weird SECRET text", "failed"], ["", "failed"], [undefined, "failed"], [{ nested: "object" }, "failed"],
+  ];
+  for (const [said, key] of cases) {
+    const sentence = explainFailure(said);
+    assert.equal(sentence, COMPOSIO_FAILED[key], `${String(said)} -> ${key}`);
+    assert.ok(!sentence.includes("SECRET"), "the app's words are never echoed");
+  }
+  for (const key of ["notFound", "forbidden", "invalid"]) assert.ok(COMPOSIO_FAILED[key].length > 40, key);
+});
+

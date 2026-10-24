@@ -212,3 +212,11 @@ test("the approval card shows the signed-in person's own address for {myEmail}",
   assert.ok(actionSummary(step).includes("To: your own email address"), "with no known address it says so instead of printing the placeholder");
 });
 
+test("the approval card warns when an action still holds the template's example value", async () => {
+  const { actionSummary } = await import("./run-engine.js");
+  const example = actionSummary({ kind: "action", fields: { action: "notion_page", target: "00000000000000000000000000000000", title: "Design log: x", details: "" } });
+  assert.ok(example.includes("Warning: This is still the example value from the template."));
+  const real = actionSummary({ kind: "action", fields: { action: "notion_page", target: "0123456789abcdef0123456789abcdef", title: "Design log: x", details: "" } });
+  assert.ok(!real.includes("Warning"));
+});
+

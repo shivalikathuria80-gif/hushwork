@@ -23,11 +23,29 @@ export const COMPOSIO_FAILED = {
   noSignIn: "Composio could not make a sign-in for this app. It may not be offered without extra set-up at Composio.",
   failed: "The app did not answer. Try again in a minute.",
   cannotFill: "Composio asks for something Hushwork does not know how to fill in for this action, so nothing was sent.",
+  notFound: "The app could not find what the step points to. Check the page id, repository or channel in the step. For Notion, the page must also be shared with the connection (open the page, press the three dots, then Connections).",
+  forbidden: "The app says Hushwork is not allowed to do that. For Notion, share the page with the connection (three dots, then Connections); for GitHub, check that you can write to that repository. If it keeps happening, press Disconnect and then Connect for the app.",
+  invalid: "The app refused what was sent as not valid. Check the step's words and its place (page id, repository, channel or date).",
   busy: "Composio is busy right now. Try again in a minute.",
   network: "Could not reach Composio. Check your connection and try again.",
 };
 
 const flat = (value, max) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
+
+// Turns what an app said when it refused an action into ONE of our own sentences (never the app's own words: they could hold anything). The order
+// matters: "no connected account" must not be mistaken for "not found".
+const FAILURE_REASONS = [
+  [/connected.?account|not connected|no connection|connection.*(expired|revoked)/i, "notConnected"],
+  [/forbidden|permission|not allowed|insufficient|restricted|access denied|not shared|403/i, "forbidden"],
+  [/not.?found|could not find|does not exist|no such|404/i, "notFound"],
+  [/invalid|validation|malformed|bad request|400|required|must be/i, "invalid"],
+  [/unauthor|auth|connect|account/i, "notConnected"],
+];
+export const explainFailure = (said) => {
+  const text = String(said ?? "");
+  const found = FAILURE_REASONS.find(([pattern]) => pattern.test(text));
+  return COMPOSIO_FAILED[found ? found[1] : "failed"];
+};
 
 // One request. Returns { body } or { error } (a fixed sentence). `notFound` is the sentence used for a 404.
 async function call(key, method, path, { query, body, fetchImpl = fetch, notFound = COMPOSIO_FAILED.failed } = {}) {
@@ -132,7 +150,7 @@ export async function runActionTool({ key, userId, action, values, fetchImpl }) 
 
   const ran = await call(key, "POST", `/tools/execute/${action.tool}`, { body: { user_id: userId, arguments: built.arguments }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
   if (ran.error) return { ok: false, error: ran.error };
-  if (ran.body?.successful !== true) return { ok: false, error: /connect|account|auth/i.test(String(ran.body?.error ?? "")) ? COMPOSIO_FAILED.notConnected : COMPOSIO_FAILED.failed };
+  if (ran.body?.successful !== true) return { ok: false, error: explainFailure(ran.body?.error) };
   let text = "";
   try {
     text = flat(JSON.stringify(ran.body.data ?? null), 300);

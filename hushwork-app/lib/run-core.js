@@ -25,7 +25,7 @@ import { createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
 import { runActionTool, runReadTool } from "@/lib/connectors/composio";
-import { MY_EMAIL, checkTarget, findAction, resolveTarget } from "@/lib/connectors/composio-actions";
+import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 import { takeDbSlot } from "@/lib/db-limits";
@@ -551,6 +551,7 @@ export async function approveActionStep(input, who) {
   if (checked.error) return { error: checked.error };
   const target = resolveTarget(action, checked.value, checked.value === MY_EMAIL ? await accountEmail(who) : "");
   if (target.error) return { error: target.error };
+  if (isExampleTarget(action, target.value)) return { error: EXAMPLE_NOTICE };
   if (await wasApproved(supabase, user.id, run, "action")) return { error: ALREADY };
 
   const usesAnswer = `${step.fields.title}${step.fields.details}`.includes("{answer}");

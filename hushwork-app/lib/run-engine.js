@@ -5,7 +5,7 @@
 import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
 import { findComposioApp } from "./connectors/composio-apps.js";
-import { checkTarget, findAction, labelFor, resolveTarget } from "./connectors/composio-actions.js";
+import { EXAMPLE_NOTICE, checkTarget, findAction, isExampleTarget, labelFor, resolveTarget } from "./connectors/composio-actions.js";
 import { fillActionDetails, fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
@@ -99,6 +99,7 @@ export const actionSummary = (step, answer = "", answers = [], myEmail = "") => 
     action?.needsTarget ? `${labelFor(action, "target")}: ${resolveTarget(action, f.target, myEmail).value ?? "your own email address"}` : "",
     `${labelFor(action, "title")}: ${title.text ?? f.title}`,
     f.details && !action?.noDetails ? `${labelFor(action, "details")}: ${details.text ?? f.details}` : "",
+    isExampleTarget(action, f.target) ? `Warning: ${EXAMPLE_NOTICE}` : "",
     "It is sent through Composio, the company that keeps the connection to the app.",
     title.error ?? (action?.noDetails ? "" : details.error) ?? "",
   ].filter(Boolean).join(String.fromCharCode(10));

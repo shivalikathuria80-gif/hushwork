@@ -313,7 +313,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   const writing = action.slice(action.indexOf("export async function approveActionStep"));
-  const writeOrder = ["loadPracticeStep(", "checkTarget(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "getComposioKey(", "limitError(", "runActionTool("].map((call) => writing.indexOf(call));
+  const writeOrder = ["loadPracticeStep(", "checkTarget(", "isExampleTarget(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "getComposioKey(", "limitError(", "runActionTool("].map((call) => writing.indexOf(call));
   assert.ok(writeOrder.every((index) => index > 0));
   assert.deepEqual(writeOrder, [...writeOrder].sort((a, b) => a - b), "a Composio write checks the step, the place, the once-only rule, the words and the limits before anything is sent");
   const flow = files.find((file) => file.name === "lib/connections/composio-flow.js").text;
