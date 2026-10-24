@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { Btn, EASE, Reveal } from "./ui";
 import { Icon } from "./icons";
-import { joinWaitlist } from "@/lib/waitlist";
+import { joinWaitlist } from "@/lib/actions/waitlist";
 
 export default function Waitlist() {
   const [email, setEmail] = useState("");
@@ -18,15 +18,23 @@ export default function Waitlist() {
     e.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setInvalid(true); inputRef.current.focus(); return; }
     setInvalid(false);
-    if (trap.current && trap.current.value) { setStatus("ok"); return; } // a hidden field only bots fill in
     setStatus("sending");
-    setStatus(await joinWaitlist(email.trim()));
+    let result;
+    try {
+      result = await joinWaitlist({ email: email.trim(), trap: trap.current?.value ?? "" }); // runs on the server, which counts the tries
+    } catch {
+      result = "error";
+    }
+    if (result === "invalid") { setInvalid(true); setStatus("idle"); inputRef.current?.focus(); return; }
+    setStatus(result);
   };
 
   const finished = status === "ok" || status === "duplicate";
   const problem = invalid
     ? "Enter a valid email address, like you@company.com."
-    : status === "error"
+    : status === "slow"
+      ? "That is a lot of tries from here. Wait a few minutes and try again."
+      : status === "error"
       ? "That did not go through. Check your connection and try again."
       : status === "not-connected"
         ? "The waitlist is not connected yet, so your email was not saved. Please check back soon."
