@@ -181,3 +181,34 @@ test("when the AI says nothing usable, the email is NOT sent and the reason is s
   } finally { composio.restore(); }
 });
 
+test("a workflow SAVED EARLIER with the old 'Send a message' by email (the AI used to write these) now really sends, after Approve, to the address in the step", async () => {
+  // the exact shape that was saved: a Start, an approval note and a plan-only Send with a real address
+  const plan = finishSteps({ steps: [{ icon: "Zap", title: "When I ask", detail: "x", block: "trigger", choice: "manual", a: "", b: "" }, { icon: "Send", title: "Send a message", detail: "x", block: "send", choice: "email", a: "friend@example.com", b: "Hi, I made a new app. Come and see it." }] });
+  assert.ok(plan.some((step) => step.kind === "send"), "this plan holds the old plan-only step");
+  const { workflow, supabase, who } = setup({ plan });
+  const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
+  try {
+    const result = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.deepEqual(result.auto, { done: 1, stoppedAt: 0 });
+    const mail = livePosts(composio)[0].body.arguments;
+    assert.equal(mail.recipient_email, "friend@example.com");
+    assert.equal(mail.body, "Hi, I made a new app. Come and see it.");
+    assert.equal(mail.subject, "Hi, I made a new app");
+    const practice = supabase.tables.runs.find((run) => run.mode === "practice");
+    assert.ok(practice.results.some((step) => step.kind === "action"), "the run shows it as a real email step, so the approval card shows To, Subject and text");
+  } finally { composio.restore(); }
+});
+
+test("an old Send that cannot be a real email (Slack, 'other', no address, a bad address) stays a plan-only description and sends nothing", async () => {
+  for (const [how, to] of [["slack", "#general"], ["other", "my accountant"], ["email", ""], ["email", "not an address"], ["email", "two@example.com three@example.com"]]) {
+    const plan = finishSteps({ steps: [{ icon: "Zap", title: "When I ask", detail: "x", block: "trigger", choice: "manual", a: "", b: "" }, { icon: "Send", title: "Send a message", detail: "x", block: "send", choice: how, a: to, b: "hello" }] });
+    const { workflow, who } = setup({ plan });
+    const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
+    try {
+      const result = await startPracticeRun({ id: workflow, auto: true }, who);
+      assert.deepEqual(result.auto, { done: 0, stoppedAt: 0 }, `${how} to "${to}"`);
+      assert.equal(livePosts(composio).length, 0, `${how} to "${to}": nothing sent`);
+    } finally { composio.restore(); }
+  }
+});
+

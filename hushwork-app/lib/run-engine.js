@@ -2,7 +2,7 @@
 // It touches nothing outside Hushwork: no email, no Slack, no spreadsheet. (The one real action, a web call,
 // happens in lib/actions/runs.js after an Approve click, never in this walk.) Plain data in, plain data out, no imports from Next.js or Supabase,
 // so `node --test` and the server load the same code.
-import { STEP_KINDS, isTypedKind } from "./steps.js";
+import { STEP_KINDS, describeStep, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
 import { findComposioApp } from "./connectors/composio-apps.js";
 import { EXAMPLE_NOTICE, checkTarget, findAction, isExampleTarget, labelFor, resolveTarget } from "./connectors/composio-actions.js";
@@ -115,7 +115,10 @@ export const isApprovable = (step) =>
 // A step that can only DESCRIBE: it is part of the plan but nothing will happen when it runs (a note, a draft, an old-style Send, a Find that does not
 // look anywhere real). The Start step and an "ask you to approve" step are plan-only by nature, so they are not counted. Used to warn the person
 // instead of letting them run a plan whose "send" never sends. Returns [{ index, title }].
-export const isPlanOnly = (step) => step?.kind !== "trigger" && step?.kind !== "approve" && !(step?.icon === "ShieldCheck" && !step?.kind) && !isApprovable(step);
+export const isPlanOnly = (original) => {
+  const step = upgradeSend(original); // an old Send by email with a real address is really sent now, so it is not "plan only"
+  return step?.kind !== "trigger" && step?.kind !== "approve" && !(step?.icon === "ShieldCheck" && !step?.kind) && !isApprovable(step);
+};
 export const planOnlySteps = (steps) => (Array.isArray(steps) ? steps : []).map((step, index) => ({ index, title: String(step?.title ?? ""), plan: isPlanOnly(step) })).filter((one) => one.plan).map(({ index, title }) => ({ index, title }));
 
 // A sentence for the Builder to show after a save, or "" when every step really does something.
@@ -152,7 +155,25 @@ const WOULD = {
 };
 
 // One step of a saved plan -> one result. Never throws, whatever the step looks like.
-export function practiceStep(step) {
+// The old "Send a message" block only DESCRIBED sending, and plans saved with it (by hand or written by the AI) never sent anything. When such a
+// step is an email with a usable address ("me" and "my account" mean the signed-in person's own address), it is treated as the real thing: a
+// "Do something in another app" email. The person still sees the To, Subject and text on the approval card and presses Approve before it goes.
+// Anything else (a Slack or "other" Send, no address, an odd address) stays a plan-only description. Returns the step, or the real email step.
+const ME_WORDS = /^(me|myself|my\s+(own\s+)?(email|e-mail|account|inbox|address|gmail)|\{myemail\})$/i;
+export function upgradeSend(step) {
+  if (step?.kind !== "send" || step.fields?.how !== "email") return step;
+  const to = String(step.fields.to ?? "").trim();
+  const target = ME_WORDS.test(to) ? "{myEmail}" : to;
+  const email = findAction("gmail_send");
+  if (!target || checkTarget(email, target).error) return step;
+  const about = String(step.fields.about ?? "").replace(/\s+/g, " ").trim();
+  const fields = { action: "gmail_send", target, title: (about.split(/[.!?]/)[0] || "A message from Hushwork").trim().slice(0, 60) || "A message from Hushwork", details: about.slice(0, 120) };
+  const words = describeStep("action", fields);
+  return { ...step, icon: "Mail", title: words.title, detail: words.detail, kind: "action", fields };
+}
+
+export function practiceStep(original) {
+  const step = upgradeSend(original);
   const text = (value) => (typeof value === "string" ? value : "");
   const base = { icon: text(step?.icon), title: short(text(step?.title)), detail: short(text(step?.detail)) };
   if (isTypedKind(step?.kind) && step.fields && typeof step.fields === "object") {

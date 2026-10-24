@@ -324,3 +324,18 @@ test("the keyword preview's canned steps also get a real email when the words sa
   assert.equal(stepsToPlan(fixed).at(-1).length >= 3, true);
   assert.equal(ensureRealSend(typed, "Chase overdue invoices"), typed, "an unrelated task returns the very same steps");
 });
+
+test("an address written in the task counts too: 'email friend@example.com about my app' becomes a real email to that address", async () => {
+  const { isActionStep } = await import("../run-engine.js");
+  const notes = { steps: [{ icon: "Sparkles", title: "Do the task", detail: "x", block: "note", choice: "", a: "", b: "" }] };
+  const fixed = finishSteps(notes, undefined, "Email friend@example.com about my new app");
+  const email = fixed.find((step) => step.kind === "action");
+  assert.ok(email && isActionStep(email) && email.fields.target === "friend@example.com");
+  const withSend = finishSteps({ steps: [{ icon: "Send", title: "Send a message", detail: "x", block: "send", choice: "email", a: "friend@example.com", b: "my app" }] }, undefined, "Write to friend@example.com about my app");
+  assert.equal(withSend.some((step) => step.kind === "send"), false, "the plan-only send is replaced");
+  assert.equal(withSend.find((step) => step.kind === "action").fields.target, "friend@example.com");
+  // an address with no sending word, and a task about sending to someone else's role, are left alone
+  assert.equal(finishSteps(notes, undefined, "Keep a list of contacts like friend@example.com").some((step) => step.kind === "action"), false);
+  assert.equal(finishSteps(notes, undefined, "Chase overdue invoices").some((step) => step.kind === "action"), false);
+});
+

@@ -165,12 +165,17 @@ const SEND_TO_ME = /\b(?:send|email|e-mail|mail|message|notify|text|remind|ping|
 const REALLY_SENDS = (step) => step.kind === "action" && (step.fields?.action === "gmail_send" || step.fields?.action === "slack_message");
 const PLAN_ONLY_SEND = (step) => step.kind === "send" || (!step.kind && (step.icon === "Send" || step.icon === "Mail"));
 
+const ADDRESS = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}/;
+const SENDS_TO_ADDRESS = /\b(?:send|email|e-mail|mail|message|write to|notify|forward)\b/i;
+
 export function ensureRealSend(steps, task = "") {
-  if (!SEND_TO_ME.test(String(task)) || steps.some(REALLY_SENDS)) return steps;
+  const toMe = SEND_TO_ME.test(String(task));
+  const address = !toMe && SENDS_TO_ADDRESS.test(String(task)) ? String(task).match(ADDRESS)?.[0] : "";
+  if ((!toMe && !address) || steps.some(REALLY_SENDS)) return steps;
   const after = steps.findIndex(PLAN_ONLY_SEND);
   const hasAnswer = steps.slice(0, after === -1 ? steps.length : after).some((step) => step.kind === "ai");
   const words = tidy(String(task)).slice(0, 100);
-  const made = checkSteps([AI_BLOCKS.action("gmail_send", "{myEmail}", hasAnswer ? "From Hushwork" : "A message from Hushwork", hasAnswer ? "{answer}" : words)]).value?.[0];
+  const made = checkSteps([AI_BLOCKS.action("gmail_send", address || "{myEmail}", hasAnswer ? "From Hushwork" : "A message from Hushwork", hasAnswer ? "{answer}" : words)]).value?.[0];
   if (!made) return steps;
   if (after !== -1) return steps.map((step, index) => (index === after ? made : step));
   return steps.length >= LIMITS.planSteps ? [...steps.slice(0, -1), made] : [...steps, made];
