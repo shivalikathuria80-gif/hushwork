@@ -197,6 +197,41 @@ export function practiceRun(plan) {
   return { status: "done", results: plan.map(practiceStep) };
 }
 
+// WHAT HAPPENED to one step of a practice run, in one word, so the Runs page never says more than is true:
+//   "done"      a real result was saved for it (an Approve click or Auto mode)
+//   "unsure"    it was started but Hushwork never saw it finish (it may have happened)
+//   "stopped"   it was tried and failed (a stop note was saved)
+//   "waiting"   it can be done for real and has not been yet
+//   "plan-only" it only describes what would happen (see isPlanOnly), so it is never carried out
+//   "nothing"   there is nothing to carry out (the Start step, "ask you to approve")
+// `done`, `stopped` and `unsure` are Sets or Maps of step numbers, as the Runs page builds them. A success beats an older stop note (a retry worked).
+export function stepState(step, index, done, stopped, unsure) {
+  if (isApprovable(step)) return done?.has(index) ? "done" : unsure?.has(index) ? "unsure" : stopped?.has(index) ? "stopped" : "waiting";
+  return step && typeof step === "object" && isPlanOnly(step) ? "plan-only" : "nothing";
+}
+
+// The headline of a whole practice run, built from its steps. "Completed" is only said when every step that can be done for real WAS done
+// and no plan-only step is left over; otherwise the label and sentence say exactly what is missing.
+// Returns { key, label, notRun: [titles of the plan-only steps], text }.
+export function runOutcome(results, done, stopped, unsure) {
+  const steps = Array.isArray(results) ? results : [];
+  const states = steps.map((step, index) => stepState(step, index, done, stopped, unsure));
+  const count = (state) => states.filter((one) => one === state).length;
+  const notRun = steps.filter((step, index) => states[index] === "plan-only").map((step) => String(step?.title || "A step").slice(0, 60));
+  const [waiting, failed, finished, unclear] = [count("waiting"), count("stopped"), count("done"), count("unsure")];
+  const plural = (n, one, many) => (n === 1 ? one : many);
+  const left = notRun.length
+    ? ` Not carried out (plan only): ${notRun.slice(0, 4).join(", ")}${notRun.length > 4 ? ` and ${notRun.length - 4} more` : ""}. ${plural(notRun.length, "That step only describes", "Those steps only describe")} what would happen, so nothing was sent or changed by ${plural(notRun.length, "it", "them")}.`
+    : "";
+  const nothingChanged = "Nothing is sent, written or changed in your apps until you approve it.";
+  if (failed > 0) return { key: "stopped", label: "Stopped at a step", notRun, text: `${failed} ${plural(failed, "step", "steps")} stopped with an error. Read the reason under ${plural(failed, "it", "each one")}, fix it, then press Approve to try again.${left}` };
+  if (unclear > 0) return { key: "unsure", label: "Not sure it finished", notRun, text: `${unclear} ${plural(unclear, "step was", "steps were")} started, but Hushwork never saw ${plural(unclear, "it", "them")} finish. Look in the app first.${left}` };
+  if (waiting > 0) return { key: "waiting", label: "Needs approval", notRun, text: `${waiting} ${plural(waiting, "step is", "steps are")} waiting for your approval. ${nothingChanged}${left}` };
+  if (finished > 0 && notRun.length === 0) return { key: "completed", label: "Completed", notRun, text: `All ${finished} ${plural(finished, "step", "steps")} that Hushwork can do for real ${plural(finished, "was", "were")} done.` };
+  if (finished > 0) return { key: "partial", label: "Partly done", notRun, text: `${finished} ${plural(finished, "step was", "steps were")} done for real.${left}` };
+  return { key: "practice", label: "Practice only", notRun, text: `Nothing in this run was done for real, so nothing was sent, written or changed in your apps.${left}` };
+}
+
 // Reads saved results back from the database for the screen: strings only, known fields only.
 export function readSavedResults(value) {
   if (!Array.isArray(value)) return [];

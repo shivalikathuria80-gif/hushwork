@@ -241,3 +241,44 @@ test("plan-only steps: a Send, a Write, a Find that looks nowhere real and a pla
   assert.equal(planOnlyWarning([]), "");
   assert.equal(planOnlyWarning(undefined), "");
 });
+
+// ---- Honest run status: "Completed" must never hide a step that was not carried out ----
+const trigger = practiceStep({ icon: "Zap", title: "When I ask", detail: "", kind: "trigger", fields: { how: "manual", when: "" } });
+const send = practiceStep({ icon: "Send", title: "Send a message", detail: "By text", kind: "send", fields: { how: "other", to: "Ana", about: "" } });
+const think = practiceStep({ icon: "Sparkles", title: "Ask the AI", detail: "", kind: "ai", fields: { task: "Which first?", uses: "nothing", address: "" } });
+const approve = practiceStep({ icon: "ShieldCheck", title: "Ask you to approve", detail: "Nothing is sent until you say yes" });
+
+test("a run whose only real-looking step is 'Send a message' is NOT 'Completed': it says nothing was carried out", async () => {
+  const { runOutcome } = await import("./run-engine.js");
+  const outcome = runOutcome([trigger, send], new Set(), new Set());
+  assert.notEqual(outcome.label, "Completed");
+  assert.equal(outcome.key, "practice");
+  assert.equal(outcome.label, "Practice only");
+  assert.deepEqual(outcome.notRun, ["Send a message"]);
+  assert.match(outcome.text, /Not carried out \(plan only\): Send a message/);
+  assert.match(outcome.text, /nothing was sent/i);
+});
+
+test("run status: a stop beats everything, then a step never seen to finish, then waiting; 'Completed' needs every real step done", async () => {
+  const { runOutcome, stepState } = await import("./run-engine.js");
+  assert.equal(runOutcome([trigger, think, send], new Set(), new Set()).label, "Needs approval");
+  assert.equal(runOutcome([trigger, approve, think], new Set([2]), new Set()).label, "Completed");
+  assert.equal(runOutcome([trigger, think, send], new Set([1]), new Set()).label, "Partly done");
+  const stopped = runOutcome([trigger, think], new Set(), new Set([1]));
+  assert.equal(stopped.label, "Stopped at a step");
+  assert.match(stopped.text, /stopped/);
+  assert.equal(runOutcome([trigger, think], new Set(), new Set(), new Set([1])).label, "Not sure it finished");
+  // a retry that worked wins over the older stop note and over a step that was only started
+  assert.equal(runOutcome([trigger, think], new Set([1]), new Set([1]), new Set([1])).label, "Completed");
+  assert.deepEqual([trigger, approve, send, think].map((step, index) => stepState(step, index, new Set(), new Set())), ["nothing", "nothing", "plan-only", "waiting"]);
+  assert.equal(stepState(think, 3, new Set([3]), new Set()), "done");
+  assert.equal(stepState(think, 3, new Set(), new Set([3])), "stopped");
+  assert.equal(stepState(think, 3, new Map(), new Map(), new Map([[3, {}]])), "unsure");
+});
+
+test("run status never throws, whatever it is given", async () => {
+  const { runOutcome, stepState } = await import("./run-engine.js");
+  for (const bad of [null, undefined, "x", 5, [null, undefined, 5, "x", {}]]) assert.doesNotThrow(() => runOutcome(bad, undefined, null));
+  assert.equal(runOutcome([], new Set(), new Set()).key, "practice");
+  assert.doesNotThrow(() => stepState(null, 0));
+});
