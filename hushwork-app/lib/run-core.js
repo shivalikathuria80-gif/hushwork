@@ -136,6 +136,14 @@ async function loadPracticeStep(supabase, user, input, allowed) {
 // client), so it must say whose row it is.
 const ownerOf = (supabase, userId) => (supabase.__hushworkAdmin === true ? { user_id: userId } : {});
 
+// The same kind of check against the DATABASE count (supabase/usage.sql), which holds across servers. It USES a slot when there is room,
+// so call it after the in-memory check has passed. Returns a sentence, or "" when there is room (or the database count is not set up yet).
+async function dbLimitError(supabase, bucket, perMinute, perDay, what) {
+  const slot = await takeDbSlot(supabase, bucket, perMinute, perDay);
+  if (slot.ok) return "";
+  return slot.why === "limit_minute" ? "You did that a moment ago. Try again in a minute." : `You have reached today's limit for ${what}. It resets at midnight UTC.`;
+}
+
 // Checks the person's limits, without using a slot yet.
 function limitError(limits, userId, now, what) {
   if (limits.minute.left(userId, now) < 1) return `You did that a moment ago. Try again in a minute.`;
@@ -469,6 +477,8 @@ export async function approveLinearCreate(input, who) {
   const now = Date.now();
   const tooMany = limitError(linearCreateLimits(), user.id, now, "created tasks");
   if (tooMany) return { error: tooMany };
+  const dbFull = await dbLimitError(supabase, "linear_create", 3, 15, "created tasks");
+  if (dbFull) return { error: dbFull };
   linearCreateLimits().minute.take(user.id, now);
   linearCreateLimits().day.take(user.id, now);
 
@@ -542,6 +552,8 @@ export async function approveActionStep(input, who) {
   const now = Date.now();
   const tooMany = limitError(actionLimits(), user.id, now, "sent actions");
   if (tooMany) return { error: tooMany };
+  const dbFull = await dbLimitError(supabase, "action", 3, 15, "sent actions");
+  if (dbFull) return { error: dbFull };
   actionLimits().minute.take(user.id, now);
   actionLimits().day.take(user.id, now);
 
@@ -572,6 +584,8 @@ export async function approveSheetsRow(input, who) {
   const now = Date.now();
   const tooMany = limitError(sheetsLimits(), user.id, now, "added rows");
   if (tooMany) return { error: tooMany };
+  const dbFull = await dbLimitError(supabase, "sheets_row", 5, 30, "added rows");
+  if (dbFull) return { error: dbFull };
   sheetsLimits().minute.take(user.id, now);
   sheetsLimits().day.take(user.id, now);
 

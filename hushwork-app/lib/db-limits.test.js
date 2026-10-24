@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { takeDbSlot } from "./db-limits.js";
 
 const fake = (answer) => ({ rpc: async (name, args) => { fake.last = { name, args }; return answer; } });
@@ -28,3 +29,22 @@ test("db limits: the scheduled-run client has no signed-in person, so it skips t
   const admin = { __hushworkAdmin: true, rpc: async () => { throw new Error("must not be called"); } };
   assert.deepEqual(await takeDbSlot(admin, "ai_step", 3, 15), { ok: true });
 });
+
+test("db limits: every approval that writes or spends (AI step, email and other actions, Linear task, sheet row) checks the database count before it goes out", () => {
+  const core = fs.readFileSync(new URL("./run-core.js", import.meta.url), "utf8");
+  const checks = [
+    ["approveActionStep", 'dbLimitError(supabase, "action"', "runActionTool("],
+    ["approveLinearCreate", 'dbLimitError(supabase, "linear_create"', "fetchImpl"],
+    ["approveSheetsRow", 'dbLimitError(supabase, "sheets_row"', "appendRow("],
+    ["approveAiStep", 'takeDbSlot(supabase, "ai_step"', "runAgent("],
+  ];
+  for (const [fn, check, send] of checks) {
+    const body = core.slice(core.indexOf(`export async function ${fn}`));
+    const end = body.indexOf(String.fromCharCode(10) + "}" + String.fromCharCode(10));
+    const text = body.slice(0, end);
+    assert.ok(text.includes(check), `${fn} checks the database count`);
+    const sendAt = text.indexOf(send);
+    if (sendAt > 0) assert.ok(text.indexOf(check) < sendAt, `${fn} checks before it sends`);
+  }
+});
+

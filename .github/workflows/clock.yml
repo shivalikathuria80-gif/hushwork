@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 2
     env:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      # Change this one setting (Settings, Secrets and variables, Actions, Variables tab, name HUSHWORK_URL) when the site gets its own web address.
+      HUSHWORK_URL: ${{ vars.HUSHWORK_URL || 'https://hushwork-six.vercel.app' }}
     steps:
       - name: Secret missing on GitHub
         if: ${{ env.CRON_SECRET == '' }}
@@ -29,7 +31,7 @@ jobs:
         id: call
         if: ${{ env.CRON_SECRET != '' }}
         run: |
-          status=$(curl -s -o response.txt -w "%{http_code}" -X POST -H "Authorization: Bearer $CRON_SECRET" https://hushwork-six.vercel.app/api/cron/tick || true)
+          status=$(curl -s -o response.txt -w "%{http_code}" -X POST -H "Authorization: Bearer $CRON_SECRET" "$HUSHWORK_URL/api/cron/tick" || true)
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "Hushwork answered $status"
           head -c 300 response.txt || true

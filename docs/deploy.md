@@ -113,3 +113,28 @@ Until now every server counted AI use in its own memory, so on Vercel a person c
 
 1. Paste `supabase/usage.sql` into Supabase (SQL Editor, New query, paste, Run).
 2. Nothing else. Until it is pasted the app still works and falls back to the old in-memory count. The whole-site limit (60 AI plans a day for everybody) is still in memory only.
+
+## 13. Moving to your own web address (when you buy one)
+
+Nothing here can be done for you: buying the address is your job. The order matters.
+
+1. **Buy the address** from a registrar and add it in Vercel (project hushwork, Settings, Domains). Vercel shows the DNS records to add at the registrar.
+2. When Vercel says the address works, change `NEXT_PUBLIC_SITE_URL` on Vercel to it and redeploy.
+3. Tell the other sites the new address, exactly as in section 3: Supabase (Site URL and the redirect list), Google Cloud (redirect URI `https://<your address>/api/connect/google/callback`), Linear (callback `.../api/connect/linear/callback`).
+4. On GitHub add a repository **variable** (not a secret) named `HUSHWORK_URL` with the new address, so the clock keeps working (Settings, Secrets and variables, Actions, Variables tab).
+5. Change the address in `README.md`, `PROJECT.md` and the Terms and Privacy pages if they name the old one.
+
+Keep the old `hushwork-six.vercel.app` address in Google and Linear for a while: Vercel keeps answering on it.
+
+## 14. Limits, in one place
+
+| What | Where it is counted |
+| --- | --- |
+| AI plans, AI steps, AI summaries | the database (`supabase/usage.sql`) and memory |
+| Sent actions (emails, Slack, GitHub, Todoist, Calendar, Notion), Linear tasks, sheet rows | the database (same table) and memory |
+| Lookups (Linear, Calendar, Gmail, Drive, apps), web calls | memory only |
+| Waitlist, sign-in, sign-up | memory only (friction, not a wall) |
+| Everybody-together AI cap | memory only: set a **spending cap in your Groq account** instead |
+
+"Memory only" means each server counts alone and forgets on a restart.
+
