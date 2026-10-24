@@ -24,7 +24,7 @@ import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers
 import { createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
-import { runActionTool, runReadTool } from "@/lib/connectors/composio";
+import { checkComposioConnections, runActionTool, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
@@ -364,7 +364,7 @@ export async function approveAiStep(input, who) {
       description: `Reads ${app.what} from ${app.name} (read-only).`,
       run: async () => {
         const answer = await runReadTool({ key: composioKey, userId: user.id, app });
-        return answer.ok ? answer.text : failed(answer.error);
+        return answer.ok ? answer.text : failed(withSaid(answer));
       },
     };
   } else if (uses === "mcp") {
@@ -519,10 +519,14 @@ export async function approveAppLookup(input, who) {
   appLimits().day.take(user.id, now);
 
   const answer = await runReadTool({ key: composioKey, userId: user.id, app });
-  if (!answer.ok) return { error: answer.error };
+  if (!answer.ok) return { error: withSaid(answer) };
   const outcome = await withSummary({ supabase, userId: user.id, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
+
+// A Composio failure as one message: our own sentence, then (when the app said something we can show) what it actually said, so the real reason
+// is on screen instead of a guess. `said` was already cleaned and cut short by lib/connectors/composio.js.
+const withSaid = (result) => `${result.error}${result.said ? ` The app said: "${result.said}".` : ""}`;
 
 // The signed-in person's own email address, for a step that writes {myEmail}. A signed-in person's session has it; a scheduled run has only
 // the person's id, so the all-access client looks it up (for that one person). Returns "" when there is none.
@@ -574,7 +578,7 @@ export async function approveActionStep(input, who) {
 
   const values = { target: target.value, title: title.text, details: details.text };
   const done = await runActionTool({ key: composioKey, userId: user.id, action, values });
-  if (!done.ok) return { error: done.error };
+  if (!done.ok) return { error: withSaid(done) };
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${action.done(values)}: ${title.text}${details.text ? `\n${details.text}` : ""}`.slice(0, 700) });
 }
 
@@ -608,3 +612,60 @@ export async function approveSheetsRow(input, who) {
   if (!added.ok) return { error: added.error };
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Added one row to your Google Sheet (${row.cells.length} ${row.cells.length === 1 ? "box" : "boxes"}): ${row.cells.join(" | ")}`.slice(0, 700) });
 }
+
+// "Test all my connections": a REAL but harmless look at every connection this person has. Only reads (a few calendar events, a few email
+// headers, a few file names, a task list, each app's one lookup) and only a check that each action's inputs match: nothing is sent, written or
+// changed anywhere. Returns { groups: [{ title, rows: [{ name, state: "ok" | "problem" | "off", note, actions? }] }], off: [app names] } or { error }.
+const testLimits = () => (globalThis.__hushworkConnectionTestLimit ??= makeLimiter({ max: 4, windowMs: 5 * 60_000 }));
+
+export async function testAllConnections(who) {
+  const { user, supabase } = who;
+  const now = Date.now();
+  if (testLimits().left(user.id, now) < 1) return { error: "You just ran this. Wait a few minutes and try again." };
+  testLimits().take(user.id, now);
+
+  // One real look. A throw becomes a plain sentence, so one broken connection never hides the others.
+  const attempt = async (name, look) => {
+    try {
+      const answer = await look();
+      return answer.ok ? { name, state: "ok", note: "Works." } : { name, state: "problem", note: String(answer.error ?? "It did not work.").slice(0, 300) };
+    } catch {
+      return { name, state: "problem", note: "It did not answer. Try again in a minute." };
+    }
+  };
+
+  const groups = [];
+  const google = await googleAuthorization(supabase, user.id);
+  groups.push({
+    title: "Google",
+    rows: google
+      ? [
+        await attempt("Google Calendar", () => fetchUpcomingEvents({ authorization: google })),
+        await attempt("Gmail (reading)", () => fetchInbox({ authorization: google })),
+        await attempt("Google Drive", () => fetchRecentFiles({ authorization: google })),
+      ]
+      : [{ name: "Google (Calendar, Gmail, Drive, Sheets)", state: "off", note: "Not connected. Open Connections and press Connect Google." }],
+  });
+
+  const linear = await linearAuthorization(supabase, user.id);
+  groups.push({ title: "Linear", rows: [linear ? await attempt("Linear", () => fetchLinearIssues({ authorization: linear })) : { name: "Linear", state: "off", note: "Not connected. Open Connections and press Connect Linear." }] });
+
+  const composioKey = getComposioKey();
+  if (!composioKey) {
+    groups.push({ title: "More apps (through Composio)", rows: [{ name: "Composio", state: "problem", note: COMPOSIO_OFF }] });
+    return { groups, off: [] };
+  }
+  const composio = await checkComposioConnections({ key: composioKey, userId: user.id });
+  if (composio.error) {
+    groups.push({ title: "More apps (through Composio)", rows: [{ name: "Composio", state: "problem", note: composio.error }] });
+    return { groups, off: [] };
+  }
+  groups.push({
+    title: "More apps (through Composio)",
+    rows: composio.rows.length
+      ? composio.rows.map((row) => ({ name: row.name, state: row.ok ? "ok" : "problem", note: row.note, actions: row.actions.map((action) => ({ name: action.name, state: action.ok ? "ok" : "problem", note: action.note })) }))
+      : [{ name: "No apps connected yet", state: "off", note: "Open Connections and press Connect on an app, such as Gmail (send) or Slack." }],
+  });
+  return { groups, off: composio.off };
+}
+

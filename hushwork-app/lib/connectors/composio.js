@@ -1,7 +1,8 @@
 // Talks to Composio (https://backend.composio.dev, API version 3.1) so a person can connect an app from lib/connectors/composio-apps.js
 // with one click and Hushwork can READ one thing from it. Composio holds each person's sign-in for the app; Hushwork never sees
 // it. The API key is handed in from lib/connectors/composio-env.js (a header named x-api-key), `fetchImpl` can be replaced so tests
-// never call the real Composio, and failures come back as short fixed sentences, never Composio's own text, and never the key.
+// never call the real Composio, and failures come back as short fixed sentences of ours (and never the key). When an app REFUSES something, a
+// short cleaned-up excerpt of what it said comes back too, as `said`, so the person (and we) can see the real reason instead of guessing.
 //
 // What keeps this read-only:
 //   - the tool that runs is always the ONE tool written in the app's list entry (never text from a person or from the AI),
@@ -11,6 +12,8 @@
 //   - the person is identified to Composio by their Hushwork account id (a random id, never an email).
 
 import { actionsForApp, buildArguments, readToolInputs } from "./composio-actions.js";
+import { COMPOSIO_APPS } from "./composio-apps.js";
+import { looksSensitive } from "../ai/plan.js";
 
 const BASE = "https://backend.composio.dev/api/v3.1";
 const TIMEOUT_MS = 15_000;
@@ -30,15 +33,26 @@ export const COMPOSIO_FAILED = {
   network: "Could not reach Composio. Check your connection and try again.",
 };
 
+// What an app said when it refused, made safe to show: one plain line, at most 160 characters, and dropped completely if it looks like it holds a
+// key or card number. Always shown as plain text.
+export const cleanSaid = (value, secret = "") => {
+  let text = "";
+  if (typeof value === "string") text = value;
+  else if (value && typeof value === "object") text = String(value.message ?? value.error ?? value.detail ?? "");
+  const line = text.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  if (secret && text.includes(secret)) return ""; // an app that echoes our key back is never quoted
+  return line && !looksSensitive(line) ? line : "";
+};
+
 const flat = (value, max) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
 
 // Turns what an app said when it refused an action into ONE of our own sentences (never the app's own words: they could hold anything). The order
 // matters: "no connected account" must not be mistaken for "not found".
 const FAILURE_REASONS = [
   [/connected.?account|not connected|no connection|connection.*(expired|revoked)/i, "notConnected"],
-  [/forbidden|permission|not allowed|insufficient|restricted|access denied|not shared|403/i, "forbidden"],
-  [/not.?found|could not find|does not exist|no such|404/i, "notFound"],
-  [/invalid|validation|malformed|bad request|400|required|must be/i, "invalid"],
+  [/forbidden|permission|not allowed|insufficient|restricted|access denied|not shared|\b403\b/i, "forbidden"],
+  [/not.?found|could not find|does not exist|no such|\b404\b/i, "notFound"],
+  [/invalid|validation|malformed|bad request|\b400\b|required|must be/i, "invalid"],
   [/unauthor|auth|connect|account/i, "notConnected"],
 ];
 export const explainFailure = (said) => {
@@ -47,7 +61,22 @@ export const explainFailure = (said) => {
   return COMPOSIO_FAILED[found ? found[1] : "failed"];
 };
 
-// One request. Returns { body } or { error } (a fixed sentence). `notFound` is the sentence used for a 404.
+// What a refused request said, cleaned (see cleanSaid). Never throws.
+async function saidBy(response, secret) {
+  try {
+    const text = await response.text();
+    try {
+      const json = JSON.parse(text);
+      return cleanSaid(json?.error ?? json?.message ?? json, secret);
+    } catch {
+      return cleanSaid(text, secret);
+    }
+  } catch {
+    return "";
+  }
+}
+
+// One request. Returns { body } or { error, status, said } (a fixed sentence). `notFound` is the sentence used for a 404.
 async function call(key, method, path, { query, body, fetchImpl = fetch, notFound = COMPOSIO_FAILED.failed } = {}) {
   if (typeof key === "string" && (key.startsWith("uak_") || key.startsWith("ck_"))) return { error: COMPOSIO_FAILED.wrongKey }; // a consumer key (ck_) or user key (uak_) is a different kind of key with its own header: never sent as this one
   const url = new URL(`${BASE}${path}`);
@@ -59,11 +88,14 @@ async function call(key, method, path, { query, body, fetchImpl = fetch, notFoun
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (response.status === 401 || response.status === 403) return { error: COMPOSIO_FAILED.key };
-    if (response.status === 402) return { error: COMPOSIO_FAILED.allowance };
-    if (response.status === 404) return { error: notFound };
-    if (response.status === 429 || response.status >= 500) return { error: COMPOSIO_FAILED.busy };
-    if (!response.ok) return { error: COMPOSIO_FAILED.failed };
+    if (response.status === 401 || response.status === 403) return { error: COMPOSIO_FAILED.key, status: response.status };
+    if (response.status === 402) return { error: COMPOSIO_FAILED.allowance, status: response.status };
+    if (response.status === 404) return { error: notFound, status: response.status, said: await saidBy(response, key) };
+    if (response.status === 429 || response.status >= 500) return { error: COMPOSIO_FAILED.busy, status: response.status };
+    if (!response.ok) {
+      const said = await saidBy(response, key);
+      return { error: said ? explainFailure(said) : COMPOSIO_FAILED.failed, status: response.status, said };
+    }
     return { body: response.status === 204 ? {} : await response.json() };
   } catch {
     return { error: COMPOSIO_FAILED.network };
@@ -126,8 +158,11 @@ export async function disconnect({ key, userId, app, fetchImpl }) {
 // cut to 1500 characters) or { ok: false, error }.
 export async function runReadTool({ key, userId, app, fetchImpl }) {
   const ran = await call(key, "POST", `/tools/execute/${app.tool}`, { body: { user_id: userId, arguments: {} }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
-  if (ran.error) return { ok: false, error: ran.error };
-  if (ran.body?.successful !== true) return { ok: false, error: /connect|account|auth/i.test(String(ran.body?.error ?? "")) ? COMPOSIO_FAILED.notConnected : COMPOSIO_FAILED.failed };
+  if (ran.error) return { ok: false, error: ran.error, status: ran.status, said: ran.said };
+  if (ran.body?.successful !== true) {
+    const said = cleanSaid(ran.body?.error, key);
+    return { ok: false, error: explainFailure(said || ran.body?.error), said };
+  }
   let text;
   try {
     text = JSON.stringify(ran.body.data ?? null);
@@ -144,13 +179,16 @@ export async function runReadTool({ key, userId, app, fetchImpl }) {
 // for something we want to say, NOTHING is sent. Returns { ok: true, text } (what the app answered, as short plain text) or { ok: false, error }.
 export async function runActionTool({ key, userId, action, values, fetchImpl }) {
   const described = await call(key, "GET", `/tools/${action.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
-  if (described.error) return { ok: false, error: described.error };
+  if (described.error) return { ok: false, error: described.error, status: described.status, said: described.said };
   const built = buildArguments(action, values, readToolInputs(described.body));
   if (built.error) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
 
   const ran = await call(key, "POST", `/tools/execute/${action.tool}`, { body: { user_id: userId, arguments: built.arguments }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
-  if (ran.error) return { ok: false, error: ran.error };
-  if (ran.body?.successful !== true) return { ok: false, error: explainFailure(ran.body?.error) };
+  if (ran.error) return { ok: false, error: ran.error, status: ran.status, said: ran.said };
+  if (ran.body?.successful !== true) {
+    const said = cleanSaid(ran.body?.error, key);
+    return { ok: false, error: explainFailure(said || ran.body?.error), said };
+  }
   let text = "";
   try {
     text = flat(JSON.stringify(ran.body.data ?? null), 300);
@@ -171,3 +209,37 @@ export async function disconnectEverything({ key, userId, fetchImpl }) {
   }
   return { ok: true };
 }
+
+// Would this action's tool accept what Hushwork sends? Asks Composio for the tool's inputs and builds a request from a SAMPLE (nothing is sent).
+// Returns { ok: true } or { ok: false, error, said }.
+export async function checkActionFits({ key, action, sample, fetchImpl }) {
+  const described = await call(key, "GET", `/tools/${action.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
+  if (described.error) return { ok: false, error: described.error, said: described.said };
+  const built = buildArguments(action, sample, readToolInputs(described.body));
+  return built.error ? { ok: false, error: COMPOSIO_FAILED.cannotFill, said: built.error } : { ok: true };
+}
+
+// The made-up values used to check that an action's tool has the inputs Hushwork fills in (never sent anywhere).
+const SAMPLE_TARGETS = { slack_message: "general", github_issue: "acme/site", gmail_send: "a@b.co", calendar_event: "2026-11-05 15:00", notion_page: "0123456789abcdef0123456789abcdef", todoist_task: "" };
+
+// "Test all my connections", the Composio part. For every app this person connected: run its one read-only lookup for real, and check that each
+// action in it can be filled in. Apps that are not connected (or cannot be) are only listed by name. Returns { rows, off } or { error }.
+//   rows: [{ name, ok, note, actions: [{ name, ok, note }] }]     off: ["Slack", ...]
+export async function checkComposioConnections({ key, userId, fetchImpl }) {
+  const listed = await listConnected({ key, userId, fetchImpl });
+  if (listed.error) return { error: listed.error };
+  const connected = new Set(listed.accounts.map((account) => account.toolkit));
+  const usable = COMPOSIO_APPS.filter((app) => !app.unavailable && connected.has(app.toolkit));
+  const said = (result) => `${result.error}${result.said ? ` The app said: "${result.said}".` : ""}`;
+  const rows = await Promise.all(usable.map(async (app) => {
+    const read = await runReadTool({ key, userId, app, fetchImpl });
+    const actions = await Promise.all(actionsForApp(app.id).map(async (action) => {
+      const fit = await checkActionFits({ key, action, sample: { target: SAMPLE_TARGETS[action.id] ?? "", title: "Test", details: "Test" }, fetchImpl });
+      return { name: action.name, ok: fit.ok, note: fit.ok ? "Ready: its inputs match what Hushwork sends." : said(fit) };
+    }));
+    return { name: app.name, ok: read.ok, note: read.ok ? `Works. It answered with ${app.what}.` : said(read), actions };
+  }));
+  const off = COMPOSIO_APPS.filter((app) => app.unavailable || !connected.has(app.toolkit)).map((app) => app.name);
+  return { rows, off };
+}
+

@@ -279,7 +279,7 @@ test("the {answer} lookup only reads the signed-in person's own real runs of the
 test("Linear task creating: the only write is one fixed issueCreate request in its own file, the text travels as variables, and approving asks who is calling first and refuses a second copy", () => {
   const create = files.find((file) => file.name === "lib/connectors/linear-create.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(create.match(/mutation\s+\w+/g), ["mutation CreateTask"], "exactly one mutation");
-  assert.deepEqual([...new Set(create.match(/(?:issue|comment|project|team|user|label|cycle)\w*(?:Create|Update|Delete|Archive)\w*|\w+(?:Update|Delete|Archive)/g) ?? [])].filter((name) => name !== "issueCreate"), [], "no other kind of change");
+  assert.deepEqual([...new Set(create.match(/\b(?:issue|comment|project|team|user|label|cycle)\w*(?:Create|Update|Delete|Archive)\w*|\b\w+(?:Update|Delete|Archive)\b/g) ?? [])].filter((name) => name !== "issueCreate"), [], "no other kind of change");
   assert.ok(create.includes("variables: { input }") && !/\$\{[^}]*title|\+\s*title/.test(create), "what is written is sent as variables, never glued into the request text");
   const only = files.filter((file) => /mutation\s+\w+\s*\(/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js"));
   assert.deepEqual(only, ["lib/connectors/linear-create.js"], "no other file sends a change to Linear");
@@ -399,7 +399,7 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   assert.deepEqual(adminImporters, ["lib/actions/account.js", "lib/schedule-tick.js"], "the all-access client has exactly two users: the clock's handler and Delete my account");
   const account = files.find((file) => file.name === "lib/actions/account.js").text;
   assert.ok(/^"use server"/.test(account) && account.indexOf("requireUser()") > 0 && account.indexOf("userId: user.id") > account.indexOf("requireUser()"), "the account that is deleted is the signed-in person's, from the session");
-  assert.ok(!/input\??\.(userId|id)/.test(account), "the browser never says which account to delete");
+  assert.ok(!/input\??\.(userId|id)\b/.test(account), "the browser never says which account to delete");
   const accountCore = files.find((file) => file.name === "lib/account-core.js").text;
   assert.ok(accountCore.indexOf("CONFIRM_WORDS") < accountCore.indexOf("admin.auth.admin.deleteUser"), "the typed words are checked before anything is deleted");
   assert.match(files.find((file) => file.name === "lib/supabase/admin.js").text, /^import "server-only";/m);
@@ -433,3 +433,16 @@ test("a run that stops says WHY: the reason is saved as its own small record (ru
   assert.ok(viewer.includes("stoppedAt"), "the Runs page shows the stop reason");
 });
 
+
+test("Test all my connections only LOOKS: it never calls a write, is for the signed-in person, and is limited", () => {
+  const core = files.find((file) => file.name === "lib/run-core.js").text;
+  const body = core.slice(core.indexOf("export async function testAllConnections"));
+  for (const writer of ["runActionTool(", "appendRow(", "createIssue(", "saveLiveRun(", ".insert(", ".update(", ".delete("]) assert.ok(!body.includes(writer), `testing connections never uses ${writer}`);
+  assert.ok(body.includes("testLimits().left(user.id, now) < 1"), "it is limited per person");
+  const action = files.find((file) => file.name === "lib/actions/connections-check.js").text;
+  assert.ok(/^"use server"/.test(action) && action.indexOf("requireUser()") > 0 && action.indexOf("requireUser()") < action.indexOf("testAllConnections("), "only for a signed-in person, who is found from the session");
+  assert.ok(!/input|formData/.test(action.replace(/\/\/.*$/gm, "")), "nothing from the browser decides whose connections are tested");
+  const composio = files.find((file) => file.name === "lib/connectors/composio.js").text;
+  const check = composio.slice(composio.indexOf("export async function checkComposioConnections"));
+  assert.ok(!check.includes("runActionTool("), "an action is only checked for fit, never run");
+});

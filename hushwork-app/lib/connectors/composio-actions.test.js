@@ -4,7 +4,8 @@ import { COMPOSIO_ACTIONS, buildArguments, checkTarget, findAction, readToolInpu
 import { COMPOSIO_APPS, findComposioApp } from "./composio-apps.js";
 import { runActionTool, allowedTools, ensureAuthConfig, COMPOSIO_FAILED } from "./composio.js";
 
-const json = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+const sentence = (result) => ({ ok: result.ok, error: result.error });
+const json = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
 const slack = findAction("slack_message");
 const github = findAction("github_issue");
 const todoist = findAction("todoist_task");
@@ -115,13 +116,14 @@ test("nothing is sent when the tool does not match what we know, and every probl
   assert.deepEqual(await runActionTool({ key: "k", userId: "u", action: slack, values: { target: "general", title: "x", details: "" }, fetchImpl: mismatch.fetchImpl }), { ok: false, error: COMPOSIO_FAILED.cannotFill });
   assert.equal(mismatch.sent.filter((entry) => entry.method === "POST").length, 0, "no write request was sent");
   const refused = async () => json({}, 401);
-  assert.deepEqual(await runActionTool({ key: "ak_SECRET", userId: "u", action: slack, values: { target: "general", title: "x", details: "" }, fetchImpl: refused }), { ok: false, error: COMPOSIO_FAILED.key });
+  assert.deepEqual(sentence(await runActionTool({ key: "ak_SECRET", userId: "u", action: slack, values: { target: "general", title: "x", details: "" }, fetchImpl: refused })), { ok: false, error: COMPOSIO_FAILED.key });
   const notConnected = composio({ tool: { input_parameters: { channel: { required: true }, text: { required: true } } }, execute: { successful: false, error: "No connected account for user" } });
-  assert.deepEqual(await runActionTool({ key: "k", userId: "u", action: slack, values: { target: "general", title: "x", details: "" }, fetchImpl: notConnected.fetchImpl }), { ok: false, error: COMPOSIO_FAILED.notConnected });
+  assert.deepEqual(sentence(await runActionTool({ key: "k", userId: "u", action: slack, values: { target: "general", title: "x", details: "" }, fetchImpl: notConnected.fetchImpl })), { ok: false, error: COMPOSIO_FAILED.notConnected });
   const odd = composio({ tool: { input_parameters: { channel: { required: true }, text: { required: true } } }, execute: { successful: false, error: "weird SECRET text" } });
   const failed = await runActionTool({ key: "k", userId: "u", action: slack, values: { target: "general", title: "x", details: "" }, fetchImpl: odd.fetchImpl });
-  assert.deepEqual(failed, { ok: false, error: COMPOSIO_FAILED.failed });
-  assert.ok(!JSON.stringify(failed).includes("SECRET"));
+  assert.deepEqual(sentence(failed), { ok: false, error: COMPOSIO_FAILED.failed });
+  assert.equal(failed.said, "weird SECRET text", "what the app said is kept, cleaned, for the person to read");
+  assert.ok(!failed.error.includes("SECRET"), "but the sentence is always ours");
 });
 
 test("a calendar event and a Notion page: the start time and the page id are checked, the words go to the tool's own boxes, and Notion never sends the details box", () => {

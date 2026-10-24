@@ -8,6 +8,7 @@ import { COMPOSIO_APPS } from "@/lib/connectors/composio-apps";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { listConnected } from "@/lib/connectors/composio";
 import DisconnectApp from "@/components/app/DisconnectApp";
+import TestConnections from "@/components/app/TestConnections";
 import AppLogo, { AppLogos } from "@/components/AppLogo";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
@@ -34,6 +35,8 @@ export default function ConnectionsPage({ searchParams }) {
     <main id="main" className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
       <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Connections</h1>
       <p className="mt-3 max-w-[60ch] text-[15px] text-mute">Connections let a workflow act in your other apps. Web addresses, Linear (reading your tasks and adding a new one), Google Calendar, Google Sheets, reading your Gmail inbox, seeing your recent Drive files and more apps through Composio (including Slack and sending email through Gmail) work, and only after you approve them on the Runs page.</p>
+
+      <TestConnections />
 
       {APP_LIST.map((entry) => (
         <section key={entry.id} aria-labelledby={`${entry.id}-heading`} className="mt-8">
