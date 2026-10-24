@@ -138,3 +138,13 @@ Keep the old `hushwork-six.vercel.app` address in Google and Linear for a while:
 
 "Memory only" means each server counts alone and forgets on a restart.
 
+## 15. A reliable clock inside Supabase (use this one)
+
+GitHub's free timer (section 11) turned out to fire only about every 3 to 4 hours, so "every morning at 9" could run hours late. Supabase can call Hushwork itself every minute, for free, using `pg_cron` and `pg_net`:
+
+1. Open `supabase/clock.sql`. Replace `PASTE_YOUR_CRON_SECRET_HERE` with the same `CRON_SECRET` you set on Vercel (keep the quotes).
+2. Paste the whole file into Supabase (SQL Editor, New query, Run). It stores the password in Supabase's Vault and starts a job called `hushwork-clock`.
+3. After a couple of minutes check it: `select * from cron.job_run_details order by start_time desc limit 5;` should show `succeeded` rows. Then save a schedule a few minutes ahead and watch the Runs page.
+
+Leave the GitHub clock running as a backup: two clocks never run a schedule twice, because each due schedule is claimed first. To stop the Supabase clock: `select cron.unschedule('hushwork-clock');`.
+
