@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
-import { saveSchedule, deleteSchedule } from "@/lib/actions/schedules";
+import { saveSchedule, deleteSchedule, syncScheduleFromStart } from "@/lib/actions/schedules";
+import { parseWhen } from "@/lib/schedule-text";
 import { FREQUENCIES, WEEKDAYS, describeSchedule } from "@/lib/schedule";
 import { niceTime } from "@/lib/connectors/time-format";
 
@@ -24,7 +25,7 @@ async function call(action, input, fallback) {
   }
 }
 
-export default function ScheduleEditor({ workflowId, schedule, tableMissing, clockReady }) {
+export default function ScheduleEditor({ workflowId, schedule, tableMissing, clockReady, startWhen = "" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [frequency, setFrequency] = useState(schedule?.frequency ?? "weekdays");
@@ -51,6 +52,15 @@ export default function ScheduleEditor({ workflowId, schedule, tableMissing, clo
     });
   }
 
+  // The Start step in the Builder says WHEN in words. If those words and the schedule that really runs disagree, say so (the schedule here wins).
+  const asked = startWhen ? parseWhen(startWhen) : null;
+  const differs = asked && schedule && (asked.frequency !== schedule.frequency || asked.minute !== schedule.minute || (asked.frequency !== "hourly" && asked.hour !== schedule.hour) || (asked.frequency === "weekly" && asked.weekday !== schedule.weekday));
+  const mismatch = !startWhen ? ""
+    : !asked ? `The Start step says "${startWhen.slice(0, 40)}", but that time could not be read, so it is not used. In the Builder write it like "Every Monday at 9:00".`
+    : !schedule ? `The Start step says "${startWhen.slice(0, 40)}", but nothing is scheduled yet.`
+    : differs ? `The Start step says "${startWhen.slice(0, 40)}", but the schedule that really runs is "${describeSchedule(schedule)}". The schedule shown here is the one that runs.`
+    : "";
+
   const summary = schedule && (
     <p className="mt-1 text-sm text-mute">
       {describeSchedule(schedule)}{!schedule.enabled && " (paused)"}.
@@ -68,6 +78,12 @@ export default function ScheduleEditor({ workflowId, schedule, tableMissing, clo
         {schedule && <Btn size="sm" variant="ghost" loading={pending} onClick={() => run(saveSchedule, send({ enabled: !schedule.enabled }), "Could not change it. Try again.")}>{schedule.enabled ? "Pause" : "Resume"}</Btn>}
       </div>
       {summary}
+      {mismatch && (
+        <div className="mt-2 flex flex-wrap items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
+          <Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span className="min-w-0 flex-1">{mismatch}</span>
+          {asked && <Btn size="sm" variant="secondary" loading={pending} onClick={() => run(syncScheduleFromStart, { id: workflowId, tzOffset: -new Date().getTimezoneOffset() }, "Could not use the Start step's time. Try again.")}>Use the Start step{"’"}s time</Btn>}
+        </div>
+      )}
       {open && (
         <div className="mt-3 rounded-xl border border-line bg-raised p-3">
           {tableMissing ? (

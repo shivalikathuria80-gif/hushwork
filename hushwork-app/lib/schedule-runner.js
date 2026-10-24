@@ -1,4 +1,4 @@
-import { nextRun } from "./schedule.js";
+import { describeSchedule, nextRun } from "./schedule.js";
 
 // Runs every schedule that is due. `admin` is the all-access client (lib/supabase/admin.js); `run` is startPracticeRun from lib/run-core.js
 // (handed in by lib/schedule-tick.js, so this file has no imports of its own and tests never touch real services). For each due schedule:
@@ -37,7 +37,7 @@ export async function runDueSchedules({ admin, run, notify = async () => {}, now
     let status = "failed";
     let runId = null;
     try {
-      const result = await run({ id: row.workflow_id, auto: true, allowWrites: row.allow_writes === true }, { user: { id: row.user_id }, supabase: admin });
+      const result = await run({ id: row.workflow_id, auto: true, allowWrites: row.allow_writes === true, startedBy: `${describeSchedule(toSchedule(row))} (your time)` }, { user: { id: row.user_id }, supabase: admin });
       if (result?.ok) {
         runId = result.runId || null;
         status = result.auto?.stoppedAt ? "stopped" : "ok";

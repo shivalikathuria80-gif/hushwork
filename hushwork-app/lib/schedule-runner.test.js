@@ -47,7 +47,7 @@ test("a due schedule is claimed first (only if nobody moved it), then run as its
   assert.equal(claim.values.next_run_at, "2026-10-22T03:30:00.000Z", "the next run is the next 09:00 India time, after now");
   assert.equal(claim.values.last_run_at, "2026-10-21T04:00:00.000Z");
   assert.deepEqual(claim.filters, [["eq", "id", "s1"], ["eq", "next_run_at", "2026-10-21T03:30:00+00:00"]], "only if its due time is still the one we read");
-  assert.deepEqual(calls, [{ input: { id: "w1", auto: true, allowWrites: false }, who: { user: { id: "u1" }, supabase: admin } }]);
+  assert.deepEqual(calls, [{ input: { id: "w1", auto: true, allowWrites: false, startedBy: "Every day at 09:00 (your time)" }, who: { user: { id: "u1" }, supabase: admin } }]);
   assert.deepEqual(log.updates[1].values, { last_status: "ok", last_run_id: "r1" });
 });
 

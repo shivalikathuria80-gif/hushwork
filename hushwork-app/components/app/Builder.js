@@ -7,6 +7,7 @@ import { Icon } from "../icons";
 import useWarnBeforeLeaving from "../useWarnBeforeLeaving";
 import StepEditor, { ADD_ID, fieldId, firstPart, problemPart, toWorking } from "./StepEditor";
 import { saveDraft, updateDraft, renameDraft } from "@/lib/actions/drafts";
+import { syncScheduleFromStart } from "@/lib/actions/schedules";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
 import { BLOCKS, DRAG_KIND, newRowForBlock } from "@/lib/step-rows";
@@ -89,6 +90,20 @@ export default function Builder({ initial }) {
     return { name: checkedName.value, steps: checked.value };
   }
 
+  // When the Start step says "On a schedule", saving also makes that schedule real (lib/schedule-sync.js). Returns a sentence to add to the
+  // "Saved" message (empty when the Start step has nothing to do with a schedule).
+  async function scheduleSentence(id, steps) {
+    const start = steps[0];
+    if (!id || start?.kind !== "trigger" || start.fields?.how !== "schedule") return "";
+    try {
+      const result = await syncScheduleFromStart({ id, tzOffset: -new Date().getTimezoneOffset() });
+      return result?.text ? ` ${result.text}` : "";
+    } catch (problem) {
+      unstable_rethrow(problem);
+      return " The workflow was saved, but its schedule could not be checked. Set it on the Workflows page.";
+    }
+  }
+
   function afterSave(nextDraft, nextName, steps, words) {
     setDraft(nextDraft);
     setSaved({ name: nextName, steps });
@@ -108,7 +123,8 @@ export default function Builder({ initial }) {
         if (!draft) {
           const result = await saveDraft({ name: ready.name, prompt: about.trim() || ready.name, plan: JSON.stringify(ready.steps) });
           if (!result?.ok) { setMessage({ kind: "error", text: result?.error ?? FAILED }); return; }
-          afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, "Saved as a draft. Nothing will be sent.");
+          const extra = await scheduleSentence(result.id, ready.steps);
+          afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, extra ? `Saved.${extra}` : "Saved as a draft. Nothing will be sent.");
           // The address now names the draft, so a reload (or a shared link to yourself) opens it again.
           if (result.id) window.history.replaceState(null, "", `/app/builder?draft=${result.id}`);
           return;
@@ -130,7 +146,8 @@ export default function Builder({ initial }) {
           if (!renamed?.ok) { setMessage({ kind: renamed?.error === "That draft no longer exists." ? "gone" : "error", text: renamed?.error ?? FAILED }); return; }
           version = renamed.version ?? version;
         }
-        afterSave({ id: draft.id, version }, ready.name, ready.steps, "Saved. Nothing will be sent.");
+        const extra = await scheduleSentence(draft.id, ready.steps);
+        afterSave({ id: draft.id, version }, ready.name, ready.steps, extra ? `Saved.${extra}` : "Saved. Nothing will be sent.");
       } catch (problem) {
         unstable_rethrow(problem); // signed out: the server redirects to /login
         setMessage({ kind: "error", text: FAILED });
@@ -147,7 +164,8 @@ export default function Builder({ initial }) {
       try {
         const result = await saveDraft({ name: ready.name, prompt: about.trim() || ready.name, plan: JSON.stringify(ready.steps) });
         if (!result?.ok) { setMessage({ kind: "error", text: result?.error ?? FAILED }); return; }
-        afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, "Saved as a new draft. Nothing will be sent.");
+        const extra = await scheduleSentence(result.id, ready.steps);
+        afterSave(result.id ? { id: result.id, version: result.version } : null, ready.name, ready.steps, extra ? `Saved.${extra}` : "Saved as a new draft. Nothing will be sent.");
         if (result.id) window.history.replaceState(null, "", `/app/builder?draft=${result.id}`);
       } catch (problem) {
         unstable_rethrow(problem);

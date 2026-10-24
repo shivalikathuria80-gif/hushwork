@@ -350,9 +350,9 @@ export const TEMPLATES = [
   {
     id: "admin", icon: "FolderOpen", title: "Keep admin tidy",
     body: "Find receipts and contracts, then log the deadlines in one place.",
-    request: "Every month, gather my receipts and contracts into one folder and add upcoming deadlines to my calendar.",
+    request: "Every week, gather my receipts and contracts into one folder and add upcoming deadlines to my calendar.",
     steps: [
-      step("trigger", { how: "schedule", when: "On the 1st of each month" }),
+      step("trigger", { how: "schedule", when: "Every Monday at 9:00" }),
       step("find", { where: "inbox", what: "receipts and contracts" }),
       step("write", { what: "summary", about: "the deadlines found in contracts" }),
       step("row", { to: "Deadlines tracker", values: "document, deadline date" }),

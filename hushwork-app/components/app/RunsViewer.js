@@ -122,7 +122,7 @@ export default async function RunsViewer({ searchParams }) {
   const doneByRun = new Map();
   for (const run of runs) {
     const first = run.live ? run.results[0] : null;
-    if (first?.from && Number.isInteger(first.fromStep)) doneByRun.set(first.from, (doneByRun.get(first.from) ?? new Set()).add(first.fromStep));
+    if (first?.from && Number.isInteger(first.fromStep) && first.status !== "failed") doneByRun.set(first.from, (doneByRun.get(first.from) ?? new Set()).add(first.fromStep)); // a "stopped" note is not a finished step
   }
   const waitingIn = (run) => (run.live ? 0 : run.results.filter((step, index) => isApprovable(step) && !doneByRun.get(run.id)?.has(index)).length);
   const runIds = new Set(runs.filter((run) => !run.live).map((run) => run.id));
@@ -143,13 +143,17 @@ export default async function RunsViewer({ searchParams }) {
   // Real runs that came from this practice run (an Approve click, or Auto mode): each is shown right under the step it did, and that step
   // no longer offers Approve. (A step that failed saved nothing, so it still offers Approve and the person can try again.)
   const doneAt = new Map();
+  const stoppedAt = new Map(); // step number -> the saved note saying why it stopped (a later success wins)
   if (!selected.live) {
     try {
       const { data } = await (await createClient()).from("runs").select("results, created_at")
         .eq("user_id", user.id).eq("mode", "live").contains("results", JSON.stringify([{ from: selected.id }])) /* JSON text on purpose (see wasApproved in lib/run-answer.js) */.order("created_at", { ascending: true }).limit(60);
       for (const row of data ?? []) {
         const first = readSavedResults(row.results)[0];
-        if (first && first.from === selected.id && Number.isInteger(first.fromStep)) doneAt.set(first.fromStep, first);
+        if (first && first.from === selected.id && Number.isInteger(first.fromStep)) {
+          if (first.status === "failed") stoppedAt.set(first.fromStep, first);
+          else { doneAt.set(first.fromStep, first); stoppedAt.delete(first.fromStep); }
+        }
       }
     } catch {
       // the page still works without it: the steps just offer Approve
@@ -226,6 +230,11 @@ export default async function RunsViewer({ searchParams }) {
                   icon={step.icon} title={step.title} sub={step.detail}
                   right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : null}
                 />
+                {stoppedAt.has(index) && !doneAt.has(index) && (
+                  <li className="list-none pb-3 pt-1">
+                    <p role="alert" className="flex items-start gap-2 rounded-xl bg-raised px-3 py-2 pl-2.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">It stopped here.</b> {stoppedAt.get(index).outcome} You can fix that and press Approve on this step to try again.</span></p>
+                  </li>
+                )}
                 {doneAt.has(index) && (
                   <li className="list-none pb-3 pt-1">
                     <p className="flex items-center gap-2 pl-1 text-sm font-medium text-success"><Icon name="CircleCheck" size={16} />Done. Result:</p>

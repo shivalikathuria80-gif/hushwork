@@ -351,7 +351,7 @@ test("Auto mode: only an explicit true turns it on; it uses the very same Approv
   assert.ok(start.includes("input?.auto === true"), "only a real true");
   assert.ok(start.indexOf('from("runs")') < start.indexOf("runAutomatically("), "the practice run is saved before anything real happens");
   const loop = action.slice(action.indexOf("async function runAutomatically"), action.indexOf("export async function startPracticeRun"));
-  assert.ok(loop.includes("Math.min(results.length, 20)") && loop.includes("if (outcome?.error) return"), "capped, and stops at the first failure");
+  assert.ok(loop.includes("Math.min(results.length, 20)") && loop.includes("if (outcome?.error) {") && loop.includes("stoppedAt: index + 1"), "capped, and stops at the first failure");
   assert.ok(loop.includes("await action("), "one step at a time, in order");
   const table = action.slice(action.indexOf("const AUTO_ACTIONS"), action.indexOf("async function runAutomatically"));
   for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveActionStep", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input, who)`), `${name} is run through its normal Approve action`);
@@ -418,3 +418,18 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   const grants = sql.split("\n").filter((line) => /^grant /.test(line)).join("\n");
   assert.ok(!/last_run_at|last_status|last_run_id/.test(grants), "a person can never write the runner's bookkeeping columns");
 });
+
+test("a run that stops says WHY: the reason is saved as its own small record (runs are never edited), and a scheduled run says which schedule started it", () => {
+  const core = files.find((file) => file.name === "lib/run-core.js").text;
+  const loop = core.slice(core.indexOf("async function runAutomatically"), core.indexOf("export async function startPracticeRun"));
+  assert.ok(loop.indexOf("saveStopNote(") > 0 && loop.indexOf("saveStopNote(") < loop.indexOf("stoppedAt: index + 1"), "the reason is saved before the run reports that it stopped");
+  const note = core.slice(core.indexOf("async function saveStopNote"), core.indexOf("export async function runAutomatically"));
+  assert.ok(note.includes('status: "failed"') && note.includes("saveLiveRun(") && !/\.update\(/.test(note), "an added record, never an edit of the run");
+  const start = core.slice(core.indexOf("export async function startPracticeRun"), core.indexOf("// The \"Approve and call the address\""));
+  assert.ok(start.includes("Started by its schedule:") && start.includes("input.startedBy.slice(0, 120)"), "a scheduled run names its schedule, cut short");
+  const runner = files.find((file) => file.name === "lib/schedule-runner.js").text;
+  assert.ok(runner.includes("startedBy: `${describeSchedule(toSchedule(row))} (your time)`"), "the schedule runner says which schedule it is");
+  const viewer = files.find((file) => file.name === "components/app/RunsViewer.js").text;
+  assert.ok(viewer.includes("stoppedAt"), "the Runs page shows the stop reason");
+});
+

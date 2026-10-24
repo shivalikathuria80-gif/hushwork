@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
 import { checkSchedule, nextRun } from "@/lib/schedule";
+import { syncStartSchedule } from "@/lib/schedule-sync";
 
 // The Schedule panel on the Workflows page. A person chooses WHEN one of their own workflows runs by itself; the clock that actually runs
 // it is lib/schedule-tick.js. Same four habits as the other actions: requireUser first, validate, talk to the database (user_id is filled in
@@ -63,3 +64,19 @@ export async function deleteSchedule(input) {
   revalidatePath("/app/workflows");
   return { ok: true };
 }
+
+// Called by the Builder right after a workflow is saved. If its Start step says "On a schedule" with a time that can be read, the schedule is
+// made real (lib/schedule-sync.js). The workflow is read back from the database (the browser's copy of the plan is never trusted) and
+// `tzOffset` is the person's own time zone, in minutes east of UTC. Returns { text } for the Builder to show, or { error }.
+export async function syncScheduleFromStart(input) {
+  const user = await requireUser();
+  const id = checkId(input?.id);
+  if (id.error) return { error: "That workflow no longer exists." };
+  const supabase = await createClient();
+  const { data: rows, error } = await supabase.from("workflows").select("plan").eq("id", id.value).eq("user_id", user.id);
+  if (error || !rows?.[0]) return { error: "That workflow no longer exists." };
+  const result = await syncStartSchedule({ supabase, userId: user.id, workflowId: id.value, plan: rows[0].plan, tzOffset: input?.tzOffset });
+  if (result.text) revalidatePath("/app/workflows");
+  return result;
+}
+

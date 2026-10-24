@@ -92,7 +92,12 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
   // Auto: the same, and then every real step is done straight away, in order. The Runs page opens with the results under each step.
   const runMode = useRunMode();
   const auto = runMode === "auto";
-  const writes = draft.plan.filter((step) => (Array.isArray(step) ? step[3] : step?.kind) === "row" || (Array.isArray(step) ? step[3] : step?.kind) === "issue").length;
+  const kindOf = (step) => (Array.isArray(step) ? step[3] : step?.kind);
+  const writes = draft.plan.filter((step) => ["row", "issue", "action"].includes(kindOf(step))).length;
+  // What the Start step says about WHEN (empty unless it says "On a schedule"): the Schedule panel warns when it differs from the real schedule.
+  const startStep = draft.plan[0];
+  const startFields = Array.isArray(startStep) ? startStep[4] : startStep?.fields;
+  const startWhen = kindOf(startStep) === "trigger" && startFields?.how === "schedule" ? String(startFields.when ?? "") : "";
   function practice() {
     setError("");
     startTransition(async () => {
@@ -171,8 +176,8 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
           )}
         </div>
       )}
-      {mode === "view" && openBase && scheduling && <ScheduleEditor workflowId={draft.id} schedule={draft.schedule ?? null} tableMissing={scheduling.tableMissing} clockReady={scheduling.clockReady} />}
-      {mode === "view" && openBase && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step adds a row or creates a task" : "steps add rows or create tasks"}.</p>}
+      {mode === "view" && openBase && scheduling && <ScheduleEditor workflowId={draft.id} startWhen={startWhen} schedule={draft.schedule ?? null} tableMissing={scheduling.tableMissing} clockReady={scheduling.clockReady} />}
+      {mode === "view" && openBase && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step sends something, adds a row or creates a task" : "steps send things, add rows or create tasks"}.</p>}
       {mode === "view" && error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>
   );

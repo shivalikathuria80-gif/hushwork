@@ -47,7 +47,14 @@ const AUTO_ACTIONS = [
   [isGmailLookup, (input, who) => approveGmailLookup(input, who)], [isDriveLookup, (input, who) => approveDriveLookup(input, who)], [isLinearCreate, (input, who) => approveLinearCreate(input, who)],
   [isAppLookup, (input, who) => approveAppLookup(input, who)], [isActionStep, (input, who) => approveActionStep(input, who)], [isSheetsRow, (input, who) => approveSheetsRow(input, who)], [isRequestStep, (input, who) => approveWebCall(input, who)],
 ];
-export async function runAutomatically(runId, results, who, { allowWrites = true } = {}) {
+// When Auto mode (or a schedule) stops at a step, the REASON is saved as a small record under that step (never edited into the run itself: runs
+// are never changed once saved), so the Runs page can say why instead of leaving the person to guess. `run` = { id, user_id, workflow_id, workflow_name }.
+async function saveStopNote(supabase, run, index, step, reason) {
+  const title = `Stopped at step ${index + 1}${step?.title ? `: ${String(step.title).slice(0, 80)}` : ""}`;
+  return saveLiveRun(supabase, { ...run, stepIndex: index }, { icon: "CircleAlert", title, detail: "", status: "failed", outcome: String(reason).slice(0, 400) });
+}
+
+export async function runAutomatically(runId, results, who, { allowWrites = true, run = null } = {}) {
   let done = 0;
   for (let index = 0; index < Math.min(results.length, 20); index += 1) {
     const step = results[index];
@@ -56,7 +63,10 @@ export async function runAutomatically(runId, results, who, { allowWrites = true
     const action = AUTO_ACTIONS.find(([matches]) => matches(step))?.[1];
     if (!action) continue;
     const outcome = await action({ runId, index }, who);
-    if (outcome?.error) return { done, stoppedAt: index + 1 };
+    if (outcome?.error) {
+      if (run) await saveStopNote(who.supabase, run, index, step, outcome.error);
+      return { done, stoppedAt: index + 1, reason: String(outcome.error).slice(0, 400) };
+    }
     done += 1;
   }
   return { done, stoppedAt: 0 };
@@ -77,6 +87,10 @@ export async function startPracticeRun(input, who) {
 
   const run = practiceRun(workflow.plan);
   if (run.status === "failed") return { error: "This workflow has no steps to run. Add a step in the Builder first." };
+  // A run started by a schedule says WHICH schedule started it, instead of repeating the Start step's words (they can differ).
+  if (typeof input?.startedBy === "string" && input.startedBy && run.results[0]?.kind === "trigger") {
+    run.results[0] = { ...run.results[0], outcome: `Started by its schedule: ${input.startedBy.slice(0, 120)}.` };
+  }
 
   const { data, error } = await supabase
     .from("runs")
@@ -89,7 +103,7 @@ export async function startPracticeRun(input, who) {
   revalidatePath("/app", "layout");
   const runId = String(data?.[0]?.id ?? "");
   // Only an explicit true switches Auto on; anything else is the normal, ask-first Manual mode.
-  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results, who, { allowWrites: input?.allowWrites !== false }) };
+  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results, who, { allowWrites: input?.allowWrites !== false, run: { id: runId, user_id: user.id, workflow_id: workflow.id, workflow_name: workflow.name } }) };
   return { ok: true, runId };
 }
 
