@@ -205,3 +205,10 @@ test("the approval card uses each action's own words (an email says To, Subject 
   assert.ok(!page.includes("never sent"), "the details box is not shown for a tool that cannot take it");
 });
 
+test("the approval card shows the signed-in person's own address for {myEmail}", async () => {
+  const { actionSummary } = await import("./run-engine.js");
+  const step = { kind: "action", fields: { action: "gmail_send", target: "{myEmail}", title: "Hi", details: "x" } };
+  assert.ok(actionSummary(step, "", [], "me@example.com").includes("To: me@example.com"));
+  assert.ok(actionSummary(step).includes("To: your own email address"), "with no known address it says so instead of printing the placeholder");
+});
+

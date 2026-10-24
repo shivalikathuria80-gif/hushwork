@@ -72,21 +72,21 @@ export const TEMPLATES = [
   },
   {
     id: "hellomail", icon: "Mail", title: "Send a formal hello email", needs: "Gmail (send)",
-    body: "When you ask, it sends one short formal hello email to the address in the step. You read the email and press Approve before anything is sent. Change the address and words to your own.",
-    request: "When I ask, send a short formal hello email to arjun.arora30th@gmail.com. Ask me before it is sent.",
+    body: "When you ask, it sends one short formal hello email to your own address (the step says {myEmail}). Change that to someone else's address to greet them instead. You read the email and press Approve before anything is sent.",
+    request: "When I ask, send myself a short formal hello email. Ask me before it is sent.",
     steps: [
       step("trigger", { how: "manual", when: "" }),
-      step("action", { action: "gmail_send", target: "arjun.arora30th@gmail.com", title: "Warm greetings", details: "Dear Arjun, I hope this message finds you well. I am writing to send my warmest greetings. Kind regards, Shivalika" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Warm greetings", details: "Hello, I hope this message finds you well. I am writing to send my warmest greetings. Kind regards" }),
     ],
   },
   {
     id: "emailweek", icon: "Calendar", title: "Email me my week ahead", needs: "Google, Gmail (send)",
-    body: "The AI reads your Google Calendar for the next 7 days and emails you a short summary. You read the email and press Approve before it is sent. Change the address to send it to someone else.",
+    body: "The AI reads your Google Calendar for the next 7 days and emails you a short summary. You read the email and press Approve before it is sent. It goes to your own address ({myEmail}); change that in the step to send it to someone else.",
     request: "When I ask, read my Google Calendar for the next 7 days and email me a short summary. Ask me before it is sent.",
     steps: [
       step("trigger", { how: "manual", when: "" }),
       step("ai", { task: "Sum up my next 7 days in 5 short lines. Point out the busiest day.", uses: "calendar", address: "" }),
-      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "My week ahead", details: "{answer}" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "My week ahead", details: "{answer}" }),
     ],
   },
   {
@@ -96,7 +96,7 @@ export const TEMPLATES = [
     steps: [
       step("trigger", { how: "manual", when: "" }),
       step("ai", { task: "Which 3 of my latest emails need an answer first? Use sender and subject. Say why, in 3 short lines.", uses: "gmail", address: "" }),
-      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "Emails to answer first", details: "{answer}" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Emails to answer first", details: "{answer}" }),
     ],
   },
   {
@@ -106,7 +106,7 @@ export const TEMPLATES = [
     steps: [
       step("trigger", { how: "manual", when: "" }),
       step("ai", { task: "From my 10 latest files (names and times only), sum up what I worked on lately in 3 short lines.", uses: "drive", address: "" }),
-      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "What I worked on", details: "{answer}" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "What I worked on", details: "{answer}" }),
     ],
   },
   {
@@ -116,7 +116,7 @@ export const TEMPLATES = [
     steps: [
       step("trigger", { how: "manual", when: "" }),
       step("ai", { task: "Tell me which of my open tasks to do first and why, in 3 short lines.", uses: "linear", address: "" }),
-      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "My top task", details: "{answer}" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "My top task", details: "{answer}" }),
     ],
   },
   {
@@ -138,7 +138,7 @@ export const TEMPLATES = [
       step("ai", { task: "Sum up my next 7 days in 4 short lines. Start with the heading: This week.", uses: "calendar", address: "" }),
       step("ai", { task: "Which 3 of my latest emails need an answer first? 3 short lines. Start with the heading: Inbox.", uses: "gmail", address: "" }),
       step("ai", { task: "Which of my open tasks should I do first, and why? 2 short lines. Start with the heading: Tasks.", uses: "linear", address: "" }),
-      step("action", { action: "gmail_send", target: "shivalikathuria80@gmail.com", title: "Your morning briefing", details: "{answers}" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Your morning briefing", details: "{answers}" }),
     ],
   },
   // ---- these describe a plan only ----

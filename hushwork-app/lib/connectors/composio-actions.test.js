@@ -66,7 +66,7 @@ test("where a message or issue goes is checked before any request: a plain chann
   for (const good of ["acme/website", "my-org/repo.name", "a/b"]) assert.deepEqual(checkTarget(github, good), { value: good }, good);
   for (const bad of ["acme", "acme/", "/repo", "acme/re po", "acme/repo/extra", "-acme/repo", "ac me/repo", "../../etc/passwd", "acme/..%2f"]) assert.ok(checkTarget(github, bad).error, bad);
   const email = findAction("gmail_send");
-  for (const good of ["arjun.arora30th@gmail.com", "a+b@mail.example.co.uk"]) assert.deepEqual(checkTarget(email, good), { value: good }, good);
+  for (const good of ["alex.example@gmail.com", "a+b@mail.example.co.uk"]) assert.deepEqual(checkTarget(email, good), { value: good }, good);
   for (const bad of ["arjun", "a@b", "a b@c.com", "a@@c.com", "a@c.com"+String.fromCharCode(10)+"bcc:x@y.com", "<a@c.com>", "a@c..com", "@c.com"]) assert.ok(checkTarget(email, bad).error, bad);
   assert.deepEqual(checkTarget(todoist, ""), { value: "" });
   assert.ok(checkTarget(todoist, "inbox").error, "an action with no place refuses one");
@@ -141,5 +141,18 @@ test("a calendar event and a Notion page: the start time and the page id are che
   assert.deepEqual(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "ignored words" }, pageInputs).arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Notes" });
   assert.deepEqual(allowedTools(findComposioApp("gcalwrite")), ["GOOGLECALENDAR_LIST_CALENDARS", "GOOGLECALENDAR_CREATE_EVENT"]);
   assert.deepEqual(allowedTools(findComposioApp("notion")), ["NOTION_SEARCH_NOTION_PAGE", "NOTION_CREATE_NOTION_PAGE"]);
+});
+
+test("{myEmail}: allowed only for an email, becomes the signed-in person's own address (never one from the step), and a missing address is a clear message", async () => {
+  const { MY_EMAIL, resolveTarget } = await import("./composio-actions.js");
+  const email = findAction("gmail_send");
+  assert.deepEqual(checkTarget(email, MY_EMAIL), { value: MY_EMAIL });
+  assert.deepEqual(checkTarget(email, "  {myEmail} "), { value: MY_EMAIL });
+  for (const other of ["slack_message", "github_issue", "calendar_event", "notion_page", "todoist_task"]) assert.ok(checkTarget(findAction(other), MY_EMAIL).error, `${other} does not take {myEmail}`);
+  for (const bad of ["{myemail}", "{myEmail}x", "{{myEmail}}", "{ myEmail }"]) assert.ok(checkTarget(email, bad).error, bad);
+
+  assert.deepEqual(resolveTarget(email, MY_EMAIL, "me@example.com"), { value: "me@example.com" });
+  assert.deepEqual(resolveTarget(email, "friend@example.com", "me@example.com"), { value: "friend@example.com" }, "a written address is left alone");
+  for (const missing of ["", undefined, null, 5, "not an address", "{myEmail}", "a@b.co\nbcc:x@y.co"]) assert.match(resolveTarget(email, MY_EMAIL, missing).error, /no email address/, String(missing));
 });
 

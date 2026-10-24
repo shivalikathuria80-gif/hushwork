@@ -77,3 +77,12 @@ test("templates: the three that work for real say what they need, and their step
   assert.ok(isActionStep(hello[1]) && hello[1].fields.action === "gmail_send", "the hello email is a real send step, approved on the Runs page");
   for (const t of TEMPLATES.filter((x) => !x.needs)) assert.equal(t.needs, undefined);
 });
+
+test("templates: no real person's email address is written into any template, and every email template goes to {myEmail}", () => {
+  const text = JSON.stringify(TEMPLATES);
+  assert.equal(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/.test(text), false, "no address appears anywhere in the templates");
+  const emails = TEMPLATES.flatMap((t) => t.steps).filter((s) => s.kind === "action" && s.fields.action === "gmail_send");
+  assert.ok(emails.length >= 6);
+  for (const s of emails) assert.equal(s.fields.target, "{myEmail}");
+});
+

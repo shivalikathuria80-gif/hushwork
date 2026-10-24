@@ -25,7 +25,7 @@ import { createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
 import { runActionTool, runReadTool } from "@/lib/connectors/composio";
-import { checkTarget, findAction } from "@/lib/connectors/composio-actions";
+import { MY_EMAIL, checkTarget, findAction, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
 import { takeDbSlot } from "@/lib/db-limits";
@@ -500,6 +500,19 @@ export async function approveAppLookup(input, who) {
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
+// The signed-in person's own email address, for a step that writes {myEmail}. A signed-in person's session has it; a scheduled run has only
+// the person's id, so the all-access client looks it up (for that one person). Returns "" when there is none.
+async function accountEmail({ user, supabase }) {
+  if (typeof user.email === "string" && user.email) return user.email;
+  if (supabase.__hushworkAdmin !== true) return "";
+  try {
+    const { data } = await supabase.auth.admin.getUserById(user.id);
+    return data?.user?.email ?? "";
+  } catch {
+    return "";
+  }
+}
+
 // The "Approve and send it" button for a Do something in another app step. This WRITES one thing in an app (a Slack message, a GitHub
 // issue, a Todoist task) through Composio. Only a step naming an action from lib/connectors/composio-actions.js qualifies; its words are
 // built again here from the saved run (never from the browser), checked, and shown in full on the approval card first; it can be approved
@@ -510,7 +523,9 @@ export async function approveActionStep(input, who) {
   if (loaded.error) return loaded;
   const { run, step } = loaded;
   const action = findAction(step.fields.action);
-  const target = checkTarget(action, step.fields.target);
+  const checked = checkTarget(action, step.fields.target);
+  if (checked.error) return { error: checked.error };
+  const target = resolveTarget(action, checked.value, checked.value === MY_EMAIL ? await accountEmail(who) : "");
   if (target.error) return { error: target.error };
   if (await wasApproved(supabase, user.id, run, "action")) return { error: ALREADY };
 

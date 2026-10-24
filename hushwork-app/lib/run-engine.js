@@ -5,7 +5,7 @@
 import { STEP_KINDS, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
 import { findComposioApp } from "./connectors/composio-apps.js";
-import { checkTarget, findAction, labelFor } from "./connectors/composio-actions.js";
+import { checkTarget, findAction, labelFor, resolveTarget } from "./connectors/composio-actions.js";
 import { fillActionDetails, fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
 
@@ -89,14 +89,14 @@ export const isActionStep = (step) => {
 };
 
 // What you read before approving: exactly what will be sent. `answer` fills in {answer} (see lib/run-answer.js).
-export const actionSummary = (step, answer = "", answers = []) => {
+export const actionSummary = (step, answer = "", answers = [], myEmail = "") => {
   const action = findAction(step?.fields?.action);
   const f = step?.fields ?? {};
   const title = fillAnswerText(String(f.title ?? ""), answer, 150);
   const details = fillActionDetails(action?.id, String(f.details ?? ""), answer, answers);
   return [
     `Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`,
-    action?.needsTarget ? `${labelFor(action, "target")}: ${f.target}` : "",
+    action?.needsTarget ? `${labelFor(action, "target")}: ${resolveTarget(action, f.target, myEmail).value ?? "your own email address"}` : "",
     `${labelFor(action, "title")}: ${title.text ?? f.title}`,
     f.details && !action?.noDetails ? `${labelFor(action, "details")}: ${details.text ?? f.details}` : "",
     "It is sent through Composio, the company that keeps the connection to the app.",

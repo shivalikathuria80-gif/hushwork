@@ -18,6 +18,7 @@
 //   meaning      turns the step's words into the things we send
 //   done         how a finished action is described in the result ("Sent a Slack message")
 //   labels       (optional) the words the approval card uses for the three boxes: { target, title, details }; the default is Where / Title / Details
+//   selfAllowed  (optional) true when the "where" may be {myEmail}: the signed-in person's own address, filled in when the step is shown and run
 //   noDetails    (optional) true when the tool has no place for the "details" box: it is then never shown or sent
 export const COMPOSIO_ACTIONS = [
   {
@@ -36,8 +37,8 @@ export const COMPOSIO_ACTIONS = [
     done: (v) => `Created a GitHub issue in ${v.target}`,
   },
   {
-    id: "gmail_send", app: "gmailsend", name: "Send an email (Gmail)", tool: "GMAIL_SEND_EMAIL", needsTarget: true,
-    target: { pattern: /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}$/, hint: "Write the email address it goes to, for example name@example.com." },
+    id: "gmail_send", app: "gmailsend", name: "Send an email (Gmail)", tool: "GMAIL_SEND_EMAIL", needsTarget: true, selfAllowed: true,
+    target: { pattern: /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}$/, hint: "Write the email address it goes to, for example name@example.com, or {myEmail} for your own address." },
     candidates: { recipient_email: ["recipient_email", "to"], subject: ["subject"], body: ["body"] },
     meaning: (v) => ({ recipient_email: v.target, subject: v.title, body: v.details || v.title }),
     done: (v) => `Sent an email to ${v.target}`,
@@ -74,9 +75,12 @@ export const COMPOSIO_ACTION_IDS = COMPOSIO_ACTIONS.map((action) => action.id);
 export const actionsForApp = (appId) => COMPOSIO_ACTIONS.filter((action) => action.app === appId);
 
 // Is this "where" acceptable for this action? Returns { value } or { error }. An action with no "where" accepts only an empty one.
+export const MY_EMAIL = "{myEmail}";
+
 export function checkTarget(action, raw) {
   const text = typeof raw === "string" ? raw.trim() : "";
   if (!action.needsTarget) return text ? { error: "This action does not use a place. Leave that box empty." } : { value: "" };
+  if (action.selfAllowed && text === MY_EMAIL) return { value: MY_EMAIL }; // filled in later by resolveTarget, from the signed-in person
   if (!action.target.pattern.test(text)) return { error: action.target.hint };
   return { value: text };
 }
@@ -112,3 +116,12 @@ export function buildArguments(action, values, { names, required }) {
   for (const name of required) if (!(name in args)) return { error: "the tool needs " + name };
   return { arguments: args };
 }
+
+// The real "where": {myEmail} becomes the signed-in person's own address (checked like any other address); anything else is already real.
+// `myEmail` comes from the session or the database, never from the step. Returns { value } or { error }.
+export function resolveTarget(action, value, myEmail) {
+  if (value !== MY_EMAIL) return { value };
+  const own = checkTarget({ ...action, selfAllowed: false }, typeof myEmail === "string" ? myEmail : "");
+  return own.error ? { error: "Your account has no email address to send to. Write an address in the step instead of {myEmail}." } : own;
+}
+
