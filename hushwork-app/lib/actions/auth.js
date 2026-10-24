@@ -1,8 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { checkEmail, checkPassword, EMAIL_RULE, PASSWORD_RULE } from "@/lib/validate";
+import { allowAuthTry } from "@/lib/auth-limits";
+import { visitorAddress } from "@/lib/visitor";
 
 // A Server Action is a function that runs only on the server but can be called straight from a <form>.
 // Treat each one as a public door: anyone can send it anything, so it checks its input every time.
@@ -48,6 +51,7 @@ export async function signIn(formData) {
   const password = checkPassword(formData.get("password"), false);
   if (email.error) return { kind: "field", field: "email", error: email.error };
   if (password.error) return { kind: "field", field: "password", error: password.error };
+  if (!allowAuthTry("signIn", { email: email.value, visitor: visitorAddress(await headers()) })) return { kind: "other", error: MESSAGE.rate }; // the app's own brake, before the password is checked
 
   const supabase = await openSupabase();
   if (!supabase) return { kind: "other", error: MESSAGE.setup };
@@ -70,6 +74,7 @@ export async function signUp(formData) {
   const password = checkPassword(formData.get("password"), true);
   if (email.error) return { kind: "field", field: "email", error: email.error };
   if (password.error) return { kind: "field", field: "password", error: password.error };
+  if (!allowAuthTry("signUp", { email: email.value, visitor: visitorAddress(await headers()) })) return { kind: "other", error: MESSAGE.rate };
 
   const supabase = await openSupabase();
   if (!supabase) return { kind: "other", error: MESSAGE.setup };
