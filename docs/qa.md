@@ -1,5 +1,7 @@
 # QA report: sign-in, drafts and sculpture login (first app slice)
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Stage 5, 2026-10-15. Local only, http://localhost:3100. Reviewer changed no app file, made no commit, installed nothing, ran no DDL, did not touch the dev server, port 3000 or `.env.local`, and did not sign up, sign in or submit the waitlist. Real sign-in is NOT TESTABLE for the reviewer, so everything behind it is judged by reading code (marked "code").
 
 **Verdict: FIX FIRST (small).** 0 BLOCKER, 1 MAJOR (auth cookie flags, safe locally, must be fixed before any deployment), 10 MINOR, 15 NIT. The fix batch is about 40 lines. No security problem was found in the request path: every draft action checks the user first, input is validated on the server, the database rules match the plan exactly, and no secret is in the code.
@@ -114,3 +116,5 @@ Write these down as you go. Use only `http://localhost:3100` (not `127.0.0.1`: t
 11. **Cleanup.** Delete your test users in Authentication > Users (their drafts go with them), clear `localhost:3100` cookies.
 12. Re-run Supabase's security and performance advisors once an account and a draft exist (the `unused_index` INFO should disappear).
 13. **Build.** Stop `npm run dev` (Ctrl+C), run `npm run build` (makes the optimized version; it fails loudly on mistakes), then `npm run dev` again. I did not run it.
+
+Related: [Plan: first app slice](plan.md), [Design: first slice](design.md)

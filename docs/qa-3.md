@@ -1,5 +1,7 @@
 # QA report round 3: manual step editor (workflow-builder phase A)
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Stage 5, 2026-10-18. Reviewer changed no app file, made no commit, installed nothing, ran no DDL, did not start/stop a server, never used port 3000, never signed in, never opened `.env.local`, never called an AI API. Scratch: `...\scratchpad\qa5\` (hostile.mjs, fuzz.mjs, mutate.py, scan.mjs, `harness\`). **NOT RUN or NOT TESTABLE:** `next build` (not allowed in the project folder), anything behind a real sign-in (live `updated_at` text equality, two accounts, two tabs, a screen reader), the production client bundle. Everything else below was run.
 
 **Verdict: FIX FIRST (small).** 0 BLOCKER, 1 MAJOR, 4 MINOR, 9 NIT. No security check failed (nothing may ship with a security fail; there is none). The MAJOR is a UI race (a late save result lands on the wrong draft); the fix is about 6 lines. m2 should be fixed with it.
@@ -68,3 +70,5 @@ Use only `http://localhost:3100` (never 3000). You need to sign in yourself; I n
 8. **Unload prompt:** type in the editor and reload or close the tab: the browser asks "Leave site?". Click "Runs" in the sidebar with unsaved steps: nothing asks (m3).
 9. **Screen reader pass** (NVDA or VoiceOver): Move a step, Delete and Undo, Done, Save changes; listen for double announcements (n8).
 10. Delete the test drafts and accounts when you are done.
+
+Related: [Plan: step editor](plan-editor.md), [Design: step editor](design-editor.md)

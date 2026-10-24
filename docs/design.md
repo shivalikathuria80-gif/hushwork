@@ -1,5 +1,7 @@
 # Design: sign-in, workspace and runs (first slice)
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Written 2026-10-15 for `docs/spec.md` (owner-approved answers 1 to 4). Local only, http://localhost:3100. Figma not used (not authorised). Inputs: the repo, the five reference screenshots (layouts only, no copy taken) and the four sculpture images.
 
 **How it was checked.** Contrast ratios are computed from the tokens in `app/globals.css` (WCAG formula, script). The sculpture blend was simulated in Python by copying the component's own shader maths (key out the flat background, multiply by panel colour / image colour) and the CSS `hue-rotate` matrix. It was not run in a browser, so the builder must look at both themes once (section 2.2). Component behaviour was read from its source.
@@ -509,3 +511,5 @@ Decisions made where the spec was silent (cheap to change):
 5. **Panel colours:** dark uses `--bg`, light uses `--raised`, chosen from the simulation above.
 6. **Privacy page** (`app/privacy/page.js`) is written for waitlist emails only. Before real accounts are used it needs a sentence on sign-in emails and saved drafts. The link in the create-account note points there.
 7. **Confirm-email setting** in Supabase is the owner's switch. The design covers both (redirect when off, "Check your email" screen when on).
+
+Related: [Spec](spec.md), [Plan: first app slice](plan.md), [QA round 1](qa.md)

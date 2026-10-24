@@ -1,5 +1,7 @@
 # Spec: the real Hushwork app, first slice
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Draft for the owner's checkpoint, 2026-10-15. Local only (http://localhost:3100), not deployed, port 3000 never used. Saved here, not in Notion.
 
 **Goal:** bring the five screenshot patterns into the signed-in app (not the landing page `/`, which stays as it is), with the liquid sculpture on the sign-in page, and keep every label true to what really works.
@@ -81,3 +83,5 @@ Start the site with `npm run dev` inside `hushwork-app` (it serves the app on po
 - **Quiet brand.** A spectacle on a "quiet by design" product. Contain it to one page, keep Pause and the still-image paths, replace the component's default headline, CTAs and nav, and test headline contrast against the lightest and darkest parts of the image.
 - **Scope creep.** The five screenshots come from five different products. Stop at three pages; any control that does not work is cut, and sample data is labelled. The PLAN gate (prove demand first) is skipped by owner choice, so keep the slice small and Invoice-Chaser-shaped.
 - **Small technical snags.** The component is `.tsx` but the app is JavaScript. TypeScript packages already show as uncommitted edits in `hushwork-app/package.json` (not made by this spec), but there is no `tsconfig.json` yet, so Next will create one (accept for this one file). If the component imports something like `three`, that is a new package to approve. Supabase's built-in email limit can block testing sign-up.
+
+Related: [Plan: first app slice](plan.md), [Design: first slice](design.md), [QA round 1](qa.md)

@@ -78,3 +78,5 @@ Hushwork's `PRODUCT.md` requires WCAG AA (text 4.5:1, large text and UI parts 3:
 | dark error `#f87171` on surface | 6.24 | pass |
 
 **Adaptations that keep the Arjun look and pass AA** (the designer confirms exact values by computing): secondary and placeholder text use gray-600 (light) and gray-400 (dark); tertiary is used only for text that is purely decorative or paired with a stronger label; in dark mode, filled buttons use purple-600 `#7c3aed` (white on it 5.70) and accent text/links use purple-400; input and control borders use gray-500 (light) and a stronger translucent white (dark) to reach 3:1; status colours as text use the 600 values (light) and the listed dark values.
+
+Related: [Design: Arjun AI restyle](design-next.md), [Product](../PRODUCT.md)

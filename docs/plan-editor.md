@@ -1,5 +1,7 @@
 # Plan: manual step editor (workflow-builder phase A). It still runs NOTHING.
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 ## What shipped (differs from the plan below)
 The plan below is the architect's first design. The build follows the owner's decisions and QA round 3 (`docs/qa-3.md`), so these things differ:
 - **Where the editor lives:** one `StepEditor`, inside the Composer's plan card only, for a fresh preview and an opened draft. `DraftCard` has no editor: Open sends the draft (id, name, version) to the composer, and the card only says "Updated <time>".
@@ -175,3 +177,5 @@ The assistant must not sign in, create an account, write any row, open `.env.loc
 | R8. Legacy draft with an empty title or unknown icon | The editor flags the title on open; an unknown icon becomes Sparkles on save. |
 
 **Open questions: none blocking.** Defaults chosen (cheap to change): no "save anyway" on conflict; no editing inside the Composer's opened saved view (edit on the card); `window.confirm` for discard questions; native `<select>` for icons; edits apply on Done/Save steps, not per keystroke.
+
+Related: [Design: step editor](design-editor.md), [QA round 3](qa-3.md)

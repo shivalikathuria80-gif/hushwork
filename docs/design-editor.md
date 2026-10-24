@@ -1,4 +1,6 @@
 # Design: manual step editor (workflow-builder phase A)
+
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
 Stage 2 of the ship-it pipeline, 2026-10-17. Local only (http://localhost:3100). Figma not used. Owner decision: build phase A, a manual step editor that **still runs nothing**. Phases B and later are out of scope.
 **Read:** `arjun-ai-design-system.md`, `design-next.md` (0 to 3, 5 to 7), `design.md` 3.7, `plan-groq.md` 6, `PRODUCT.md`, `globals.css`, and the real `Composer.js`, `Workspace.js`, `DraftCard.js`, `DraftList.js`, `Drafts.js`, `ui.js`, `icons.js`, `lib/ai/icon-names.js`, `lib/validate.js`, `lib/actions/drafts.js`, `supabase/workflows.sql`. The code is newer than `design-next.md` (it says "Write with AI" and Groq, not Claude and Anthropic): **this file follows the code.**
 **Checked:** every ratio comes from `contrast.py` (WCAG formula) in the scratchpad `...\scratchpad\design-editor\`. Not run in a browser: the builder looks at both themes and at 320px once (section 5). Tokens only: no new colour, radius or shadow.
@@ -190,3 +192,5 @@ Decisions where the brief was silent (each cheap to change):
 - **D6** No `maxLength` on step fields, so a paste is never cut silently (the composer box still uses it).
 - **D7** Add step appends at the end; Move up and Move down place it. **D8** No "restore original plan" button: Cancel restores what was there when the editor opened.
 - **D9** The request box is read-only while step edits are unsaved. **D10** Edge Move buttons use `aria-disabled`, not `disabled`. **D11** Last save wins, no two-tab warning. **D12** Escape never discards.
+
+Related: [Plan: step editor](plan-editor.md), [QA round 3](qa-3.md), [Design: Arjun AI restyle](design-next.md)

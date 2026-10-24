@@ -1,5 +1,7 @@
 # Hushwork: Build Plan and UI/UX Direction
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](PROJECT.md) and [`DECISIONS.md`](DECISIONS.md).
+
 Written 2026-10-14. Based on reading every file in `hushwork/`, running the UI/UX Pro Max, Taste and Impeccable skills against it, and browsing 21st.dev.
 
 ---
@@ -461,3 +463,5 @@ Every table gets RLS so a user can only see their own rows.
 - 21st.dev was **sampled, not exhausted**, and licences are confirmed for four components only.
 - The Impeccable detector catches style tells, not layout or information-architecture problems; the structural findings (C1, C3, C4) come from reading the code.
 - Estimates of effort are deliberately omitted. Sizes depend on how much you want to hand-build versus have me implement.
+
+Related: [Product](PRODUCT.md), [Prototype README](hushwork/README.md), [Docs index](docs/INDEX.md)

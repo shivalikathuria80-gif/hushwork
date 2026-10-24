@@ -1,5 +1,7 @@
 # Plan: Arjun AI restyle, a real "Preview plan" with Claude, and our own sculpture images
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Written 2026-10-16 (stage 3). Local only (http://localhost:3100), never deployed, port 3000 never touched. Owner decisions are fixed: (1) Arjun AI design system everywhere, Geist kept; (2) AI plan only when `ANTHROPIC_API_KEY` exists, keyword preview as the fallback, key added LATER; (3) the four placeholder sculpture images replaced by images from our own script.
 Inputs read: `docs/arjun-ai-design-system.md`, `spec.md`, `plan.md`, `design.md`, `qa.md`, `sculpture-assets.md`, `PRODUCT.md`, the code, the Next.js 16 guides in `node_modules/next/dist/docs/` (environment variables, data security, `use server`, `connection`), and Anthropic's own current pages (listed in section 3). `docs/design-next.md` (the designer) did not exist when this was written: **where the two documents differ about looks, `design-next.md` wins; about files, behaviour and safety, this plan wins.**
 
@@ -293,3 +295,5 @@ Follow `CLAUDE.md`: explain each concept in one plain line, smallest change, che
 | Anthropic pages change | Dated statements; re-read before publishing the privacy page. |
 
 **Defaults chosen (change by saying so):** model `claude-haiku-5-5`; limits 5 per minute, 30 per day per person, 200 per day overall; lossless WebP; no SDK; in-memory limiter now. **Blocking open questions: none.**
+
+Related: [Design: Arjun AI restyle](design-next.md), [Groq amendment (wins on the AI provider)](plan-groq.md), [QA round 2](qa-2.md)

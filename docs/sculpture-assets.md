@@ -65,3 +65,5 @@ Rules the script checks (numbers live in `scripts/sculpture-config.json`):
 - every colour in the form sits on the palette; the form covers about 10 to 45 percent of the picture; the form keeps empty margins; the particle count the component will make stays in a sensible range
 
 The old placeholder pictures (beige and brass, from 21st.dev, licence unknown) are no longer used. They remain in git history (commit `f72a1e3`), and that only matters if the repository is ever made public.
+
+Related: [Design: Arjun AI restyle](design-next.md), [Plan: restyle and Preview plan](plan-next.md)

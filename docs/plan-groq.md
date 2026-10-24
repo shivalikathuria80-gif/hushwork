@@ -1,5 +1,7 @@
 # Plan amendment: Groq instead of Anthropic for "Preview plan"
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Written 2026-10-17 (architect). Local only (http://localhost:3100), port 3000 never touched. No key exists and **no AI API was called**: every Groq fact was read from Groq's own pages on **2026-10-17** (curl, text only, nothing saved in the repo). UNVERIFIED marks what cannot be confirmed without a key or a sign-in. **Where this file and `docs/plan-next.md` (sections 1 to 4, 6, 8 T7 to T10, 9, 10) or `docs/design-next.md` section 3 disagree about the AI provider, this file wins. Everything else in them stands** (safety layers, validation chain, UI states, fallback to the keyword preview, no SDK, no tools, no SQL now).
 
 **Words (one plain line each)**
@@ -199,3 +201,5 @@ Constraints to know before starting:
 ## 7. Open questions and defaults
 **Blocking questions: none.** Decisions to confirm when convenient (cheap to change): (1) turn on Zero Data Retention in Groq's Data Controls or not (the privacy page has both variants, section 4); (2) default model `openai/gpt-oss-20b` versus the 120b, decided after reading real plans.
 **Defaults chosen:** Groq via plain `fetch`; `openai/gpt-oss-20b`; strict JSON schema; `max_completion_tokens` 1200; `reasoning_effort` low; 15 s timeout; no retries; limits 2 a minute and 20 a day per person, 3 a minute and 60 a day overall; in-memory limiter and cool-off now (database limiter before any deployment, as in plan-next); no SQL; Gemini and a Python model not built.
+
+Related: [Plan: restyle and Preview plan (partly superseded by this file)](plan-next.md), [Design: Arjun AI restyle](design-next.md), [QA round 2](qa-2.md)

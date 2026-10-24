@@ -1,5 +1,7 @@
 # Plan: sign-in, saved drafts and the sculpture login (first app slice)
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Written 2026-10-15 from the approved `docs/spec.md`. Local only (http://localhost:3100), never deployed. Port 3000 is never touched.
 Visual details (spacing, colours, copy tone) live in `docs/design.md`. This plan covers structure, behaviour, safety and order. If the two disagree about file names, this plan wins; about looks, `design.md` wins.
 
@@ -418,3 +420,5 @@ Do B after T5 and again at T12. Between those, watch the dev server terminal and
 | Scope creep | Five screenshots, five products | Three pages; no dead controls; Preview plan is labelled; no AI, no runner |
 
 **Not verified in this plan (the builder must confirm):** the current dashboard labels (they move); that `min-release-age` is accepted by npm 11.19; the exact wording for Supabase's own sign-in records on the privacy page; the actual hourly email limit (read it on the Rate Limits page); whether the project uses asymmetric JWT signing keys (if not, `getClaims()` calls the Auth server on each check, which is slower but still correct).
+
+Related: [Spec](spec.md), [Design: first slice](design.md), [QA round 1](qa.md)

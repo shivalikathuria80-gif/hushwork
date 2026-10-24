@@ -1,6 +1,6 @@
 # Putting Hushwork online (checklist)
 
-Hushwork is online at https://hushwork-six.vercel.app (see section 10 for what is live) and the free clock for scheduled runs works (section 11). This file is the checklist it was put online with; use it again for your own copy.
+Hushwork is online at https://hushwork-six.vercel.app (see section 10 for what is live) and scheduled runs work through a clock inside Supabase (section 15). This file is the checklist it was put online with; use it again for your own copy. The overall picture is in `../PROJECT.md`.
 
 ## 1. Before you start
 
@@ -23,7 +23,7 @@ Type them in the host's "Environment variables" page. Never put them in the code
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | secret is **yes** | Hushwork's own app in Google Cloud |
 | `COMPOSIO_API_KEY` | **yes** | the Project API key (starts with `ak_`) from Composio's PLATFORM view; switches on the "More apps" connections |
 | `CRON_SECRET` | **yes** | the clock's password for scheduled runs (make one with `npm run secret cron`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **yes, the most powerful one** | Supabase's all-access SECRET key. Used only for scheduled runs. Never share it, never put `NEXT_PUBLIC_` in front of it |
+| `SUPABASE_SERVICE_ROLE_KEY` | **yes, the most powerful one** | Supabase's all-access SECRET key. Used only for scheduled runs and Delete my account. Never share it, never put `NEXT_PUBLIC_` in front of it |
 
 Do **not** add `LINEAR_API_KEY` online. It is your personal key for your own computer, and Hushwork ignores it on a real server on purpose.
 
@@ -39,20 +39,22 @@ While the Google app is in **Testing**, only the test users you listed can conne
 
 ## 5. Known limits to fix before many people use it
 
-- **Usage limits live in the server's memory.** Online, each server copy counts on its own and a restart forgets everything, so a person could get more than the limit. Move the counters into the database first (`lib/ai/limits.js` and `limiters` in `lib/run-core.js`).
-- **Scheduled runs need the clock in section 7.** Without it, a saved schedule is only a note. Scheduled runs act as the person, with the permissions they already gave, and writing steps only run if that person ticked the box for that schedule.
+- **Some usage limits still live in the server's memory.** AI use, sent actions, Linear tasks and sheet rows are counted in the database (`supabase/usage.sql`, section 12), so they hold across servers. Lookups, web calls, sign-in, sign-up, the waitlist and the whole-site AI cap are counted in memory (each server counts alone and forgets on a restart; section 14 has the table). Set a monthly spending cap in your Groq account: it is the only whole-site protection.
+- **Scheduled runs need a clock** (section 15 is the one to use). Without it, a saved schedule is only a note. Scheduled runs act as the person, with the permissions they already gave, and writing steps only run if that person ticked the box for that schedule.
 - **Backups and email.** Check Supabase backups and the email provider limits (Supabase's own mail sender is very limited).
 
 ## 6. After it is online, test these
 
 1. Sign up and sign in with a fresh email.
 2. Connections: Connect Linear, Connect Google, and Disconnect each.
-3. A practice run, then one Approve of each kind you use.
-4. The `/privacy` page still matches what the app really does.
+3. On Connections press **Test all my connections**: every line should be green for the apps you connected.
+4. A practice run, then one Approve of each kind you use (an email to yourself is the safest first one).
+5. Make a schedule a few minutes ahead (from the Builder's Start step, for example `Every day at 14:05`), leave "Let it write by itself" off, and watch the Runs page.
+6. The `/privacy` and `/terms` pages still match what the app really does.
 
 ## 7. The clock for scheduled runs (how a workflow runs by itself)
 
-A schedule saved on the Workflows page is only a note until something **calls Hushwork every minute** and asks "is anything due?". That something is a "clock". Hushwork has a safe address for it: `https://<your address>/api/cron/tick`. It does nothing unless the call carries the password in the header `Authorization: Bearer <CRON_SECRET>`.
+A schedule is only a note until something **calls Hushwork every minute** and asks "is anything due?". That something is a "clock". Hushwork has a safe address for it: `https://<your address>/api/cron/tick`. It does nothing unless the call carries the password in the header `Authorization: Bearer <CRON_SECRET>`: 503 means scheduled runs are not switched on, 401 means a wrong or missing password, 200 means it worked. **Use the Supabase clock in section 15**; the options below are alternatives.
 
 **Before it can work:**
 1. Paste `supabase/schedules.sql` into Supabase (SQL Editor, New query, paste, Run).
@@ -61,7 +63,7 @@ A schedule saved on the Workflows page is only a note until something **calls Hu
 
 **Pick one clock:**
 - **Vercel Cron** (easiest if you host on Vercel). Add a file `hushwork-app/vercel.json` with `{ "crons": [{ "path": "/api/cron/tick", "schedule": "* * * * *" }] }`. Vercel sends the password for you when `CRON_SECRET` is set. A free (Hobby) Vercel plan allows a cron only once a day, so every-minute needs a paid plan; with once a day, only "daily" schedules work.
-- **GitHub Actions** (free, about every 5 minutes at best). A workflow file in your repository runs `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://<your address>/api/cron/tick` on a schedule; store the password in the repository's Secrets.
+- **GitHub Actions** (free, but in practice it fires only every 3 to 4 hours; keep it as a backup only). `.github/workflows/clock.yml` is in the repository; store `CRON_SECRET` in the repository's Actions secrets, and the site address in an Actions *variable* named `HUSHWORK_URL` if it is not the default.
 - **cron-job.org** (free pinger). Make a job that calls the address every minute with the header above.
 - **On your own computer** (to try it): while the app runs, in PowerShell: `Invoke-RestMethod -Method Post -Uri http://localhost:3100/api/cron/tick -Headers @{ Authorization = "Bearer <CRON_SECRET>" }`. A reply like `ok: True, due: 1, ran: 1` means it worked. Windows Task Scheduler can repeat that every minute.
 
@@ -89,15 +91,17 @@ Done for the live copy (see section 10). Steps 1 to 4 need your own accounts, so
 
 The clock only works while the app and the clock terminal are both running. For a clock that runs by itself you need hosting (section 8) and section 7.
 
-## 10. What is live right now (2026-10-23)
+## 10. What is live right now (2026-10-24)
 
-- Code: https://github.com/shivalikathuria80-gif/hushwork (public, MIT license). Vercel project `hushwork`, root folder `hushwork-app`, production branch `main`: every push to `main` deploys by itself.
+- Code: https://github.com/shivalikathuria80-gif/hushwork (public, MIT license). Vercel project `hushwork`, root folder `hushwork-app`, production branch `main`: every push to `main` deploys by itself, and GitHub Actions runs the tests and lint on every push.
 - Address: https://hushwork-six.vercel.app
-- Settings already added on Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (both public values) and `NEXT_PUBLIC_SITE_URL`.
-- **Still to add by hand** (Vercel project, Settings, Environment Variables; mark secrets "Sensitive"): `GROQ_API_KEY`, `CONNECTIONS_KEY`, `COMPOSIO_API_KEY`, `LINEAR_CLIENT_ID`/`LINEAR_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, and for scheduling `CRON_SECRET` + `SUPABASE_SERVICE_ROLE_KEY`. Redeploy after adding them.
-- **Still to do by hand:** section 3 (tell Supabase, Linear and Google the new address) and section 6 (test it).
+- Settings on Vercel: the public Supabase values and `NEXT_PUBLIC_SITE_URL`, and the secrets (`GROQ_API_KEY`, `CONNECTIONS_KEY`, `COMPOSIO_API_KEY`, the Linear and Google client ids and secrets, `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`). Vercel never shows a secret again after it is saved, so keep your own copy; to change one, edit it on Vercel and press **Redeploy**.
+- Supabase: the SQL files for waitlist, workflows, runs, connections, schedules, usage and the clock have been run. The Site URL and redirect list include the live address.
+- Google and Linear callbacks: `https://hushwork-six.vercel.app/api/connect/google/callback` and `.../linear/callback` are registered with each service.
+- Proven live: sign-in, the AI, Connect Google and Linear, apps through Composio, real emails, calendar events and Notion pages, scheduled runs by the Supabase clock.
+- Not yet tried for real: Slack and GitHub actions, Linear task creation, the failure email.
 
-## 11. The free clock on GitHub (already in the repository)
+## 11. The backup clock on GitHub (already in the repository)
 
 `.github/workflows/clock.yml` asks `https://hushwork-six.vercel.app/api/cron/tick` about every 5 minutes (GitHub can be a few minutes late; Vercel's own free timer can only run once a day). To switch it on:
 
@@ -105,7 +109,7 @@ The clock only works while the app and the clock terminal are both running. For 
 2. On GitHub open the repository, Settings, Secrets and variables, Actions, New repository secret. Name `CRON_SECRET`, value the same as on Vercel.
 3. Actions tab, **clock**, Run workflow, to try it once. It should say `Hushwork answered 200`.
 
-Because of the 5-minute rhythm, a schedule set to "every minute" will run at most every 5 minutes online.
+**In practice GitHub's free timer fires only every 3 to 4 hours**, so a schedule could run hours late. Use the Supabase clock in section 15 as the real clock. If you keep this workflow, a red run means one of: the `CRON_SECRET` Actions secret is missing (the step is named "Secret missing on GitHub"), its value differs from Vercel's ("Password refused (401)"), or Vercel has no password ("503").
 
 ## 12. AI limits in the database (do this once the site is public)
 
@@ -122,7 +126,8 @@ Nothing here can be done for you: buying the address is your job. The order matt
 2. When Vercel says the address works, change `NEXT_PUBLIC_SITE_URL` on Vercel to it and redeploy.
 3. Tell the other sites the new address, exactly as in section 3: Supabase (Site URL and the redirect list), Google Cloud (redirect URI `https://<your address>/api/connect/google/callback`), Linear (callback `.../api/connect/linear/callback`).
 4. On GitHub add a repository **variable** (not a secret) named `HUSHWORK_URL` with the new address, so the clock keeps working (Settings, Secrets and variables, Actions, Variables tab).
-5. Change the address in `README.md`, `PROJECT.md` and the Terms and Privacy pages if they name the old one.
+5. In `supabase/clock.sql` the job's address is written in the SQL. Re-run the `select cron.schedule(...)` command from that file with the new address (it replaces the job with the same name), or the clock keeps calling the old address.
+6. Change the address in `README.md`, `PROJECT.md` and the Terms and Privacy pages if they name the old one.
 
 Keep the old `hushwork-six.vercel.app` address in Google and Linear for a while: Vercel keeps answering on it.
 
@@ -147,4 +152,14 @@ GitHub's free timer (section 11) turned out to fire only about every 3 to 4 hour
 3. After a couple of minutes check it: `select * from cron.job_run_details order by start_time desc limit 5;` should show `succeeded` rows. Then save a schedule a few minutes ahead and watch the Runs page.
 
 Leave the GitHub clock running as a backup: two clocks never run a schedule twice, because each due schedule is claimed first. To stop the Supabase clock: `select cron.unschedule('hushwork-clock');`.
+
+Related: [Try it](try-it.md), [Hushwork site README](../hushwork-app/README.md)
+
+## 16. If something does not work, start here
+
+1. **Connections, Test all my connections.** It really checks Google, Linear and every Composio app and says what each one answered.
+2. **The Runs page.** A step that stopped shows "It stopped here." and the reason, including what the app said. A step marked "Plan only" never does anything; use "Do something in another app" to really send or create.
+3. **Notion pages** need two things: the right page id (the long code at the end of the page's address) and the page shared with the connection (three dots on the page, then Connections).
+4. **The clock:** in Supabase run `select * from cron.job_run_details order by start_time desc limit 5;` (rows should say `succeeded`) and `select status_code, content from net._http_response order by created desc limit 3;` (200 means the app answered; 401 means the password differs from Vercel's).
+5. **Logs:** Vercel keeps runtime logs for one hour on the free plan, so look soon after a problem.
 

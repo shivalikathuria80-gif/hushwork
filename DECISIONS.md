@@ -60,14 +60,26 @@ Last updated: 2026-10-24
 | D-016 | Security review fixes + accepted risks | ✅ | 2026-10-19 |
 | D-017 | Deploy on Vercel, open source (MIT) | ✅ | 2026-10-23 |
 | D-018 | Schedules write only if ticked | ✅ | 2026-10-20 |
-| D-019 | Service-role key only for the scheduler | ✅ | 2026-10-20 |
-| D-020 | GitHub Actions as the free scheduler clock | ✅ | 2026-10-23 |
-| D-021 | Move AI usage limits into the database | 🟡 | 2026-10-23 |
+| D-019 | Service-role key only for the scheduler and Delete my account | ✅ | 2026-10-20 |
+| D-020 | GitHub Actions as the free scheduler clock | 🔁 by D-031 | 2026-10-23 |
+| D-021 | Move AI usage limits into the database | ✅ | 2026-10-23 |
 | D-022 | First product slice = Invoice Chaser | 🟡 | 2026-10-14 |
 | D-023 | Domain `hushwork.in`: which registrar? | ❓ | 2026-10-19 |
 | D-024 | Google verification for Gmail/Drive: when? | ❓ | 2026-10-23 |
 | D-025 | Brand violet: loud or quieter ink-violet? | ❓ | 2026-10-14 |
 | D-026 | Shared PROJECT.md + DECISIONS.md for all AI tools | ✅ | 2026-10-24 |
+| D-027 | Real actions through Composio, each approved | ✅ | 2026-10-24 |
+| D-028 | Placeholders, not real addresses, in templates | ✅ | 2026-10-24 |
+| D-029 | Never let a plan pretend: label plan-only steps, teach the AI real blocks | ✅ | 2026-10-24 |
+| D-030 | The Start step makes the schedule real | ✅ | 2026-10-24 |
+| D-031 | Supabase pg_cron is the scheduler clock | ✅ | 2026-10-24 |
+| D-032 | Delete my account, Download my data, Terms page | ✅ | 2026-10-24 |
+| D-033 | Free leaked-password check at sign-up | ✅ | 2026-10-24 |
+| D-034 | Say why something failed (and test every connection) | ✅ | 2026-10-24 |
+| D-035 | Template packs with suggested schedules | ✅ | 2026-10-24 |
+| D-036 | Tests that run the real server code | ✅ | 2026-10-24 |
+| D-037 | No whole-site AI limit in the database | ✅ | 2026-10-24 |
+| D-038 | Vercel, Xero and Cloudflare cannot be connected through Composio | ✅ | 2026-10-24 |
 
 ---
 
@@ -193,9 +205,9 @@ Last updated: 2026-10-24
 ### D-019: Service-role key only for the scheduler
 - **Date:** 2026-10-20
 - **Status:** ✅ Approved
-- **Decision:** `SUPABASE_SERVICE_ROLE_KEY` (ignores privacy rules) is used only by `/api/cron/tick`, protected by `CRON_SECRET`. Every query names the person's `user_id`. The real actions live in `lib/run-core.js`, which a browser can never call directly.
-- **Reason:** It's the most powerful secret in the project. Keeping it in one place limits the damage if something goes wrong.
-- **Where:** `lib/supabase/admin.js`, `lib/schedule-tick.js`
+- **Decision:** `SUPABASE_SERVICE_ROLE_KEY` (ignores privacy rules) is used only by `/api/cron/tick`, protected by `CRON_SECRET`, **and by Delete my account** (D-032), which deletes only the signed-in person's own account (the id comes from the session, never from the browser). Every query names the person's `user_id`. The real actions live in `lib/run-core.js`, which a browser can never call directly.
+- **Reason:** It's the most powerful secret in the project. Keeping it in two small, tested places limits the damage if something goes wrong. A test lists exactly which files may import `lib/supabase/admin.js`.
+- **Where:** `lib/supabase/admin.js`, `lib/schedule-tick.js`, `lib/actions/account.js`
 
 ---
 
@@ -203,11 +215,10 @@ Last updated: 2026-10-24
 
 ### D-013: Composio for "more apps"
 - **Date:** 2026-10-19
-- **Status:** ✅ Approved (not tested against the real Composio yet)
-- **Decision:** Reach 16 extra apps (Todoist, Notion, Slack, GitHub, HubSpot ...) through Composio instead of building a sign-in for each one. Each app gets ONE read-only lookup plus a short list of allowed actions.
+- **Status:** ✅ Approved (works: real emails were sent and apps were connected through it)
+- **Decision:** Reach 17 extra apps (Todoist, Notion, Slack, GitHub, HubSpot ...) through Composio instead of building a sign-in for each one; 14 can be connected today (see D-038). Each app gets ONE read-only lookup plus a short list of allowed actions (D-027).
 - **Reason:** Building an OAuth app per website is slow. Composio's free plan covers 100,000 tool calls a month.
 - **Options considered:** Pipedream Connect (free only while building), Nango (free for 10 connections).
-- **Next action:** Test with a real Composio key and fix any tool that needs inputs.
 - **Where:** `lib/connectors/composio-apps.js`, `lib/connectors/composio-actions.js`
 
 ### D-015: Results = AI summary + the app's exact answer
@@ -219,18 +230,106 @@ Last updated: 2026-10-24
 
 ### D-020: GitHub Actions as the free scheduler clock
 - **Date:** 2026-10-23
-- **Status:** ✅ Approved (needs secrets before it runs)
+- **Status:** 🔁 Replaced by D-031 (in practice GitHub's free timer fired only every 3 to 4 hours)
 - **Decision:** `.github/workflows/clock.yml` calls `/api/cron/tick` about every 5 minutes.
 - **Reason:** Vercel's free cron only runs once a day. Every-minute cron needs a paid plan.
 - **Options considered:** Vercel Cron (paid), cron-job.org, a scheduled task on the laptop.
-- **Next action:** Add `CRON_SECRET` on Vercel and as a GitHub secret, then Run workflow once.
+- **What happened:** The workflow works (it reached the app with a 200), but the history showed runs hours apart. It stays in the repo as an optional backup; set a `CRON_SECRET` Actions secret to keep it green.
 
 ### D-021: Move AI usage limits into the database
 - **Date:** 2026-10-23
-- **Status:** 🟡 Proposed (built, SQL not pasted yet)
-- **Decision:** Count per-person AI use in Supabase (`take_usage` function) instead of server memory.
+- **Status:** ✅ Approved (live: `supabase/usage.sql` is pasted)
+- **Decision:** Count per-person use in Supabase (`take_usage` function) instead of server memory: AI plans, AI steps, AI summaries, and also sent actions (email, Slack, GitHub...), Linear tasks and sheet rows. If the table is missing or the database does not answer, the request is allowed and the in-memory limit still applies.
 - **Reason:** On Vercel each server copy counts on its own, so people could get past the limit.
-- **Next action:** Paste `supabase/usage.sql`. Then also move the whole-site limit (60 plans a day) into the database.
+- **Not moved:** the whole-site limit, see D-037. Lookups, web calls, sign-in and the waitlist are still counted in memory only.
+- **Where:** `supabase/usage.sql`, `lib/db-limits.js`
+
+---
+
+## Actions, schedules and safety (added 2026-10-24)
+
+### D-027: Real actions through Composio, each approved
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** Besides reading, a step called "Do something in another app" can send an email (through Gmail), send a Slack message, create a GitHub issue, add a Todoist task, add a Google Calendar event or create a Notion page. Each action is one entry in `lib/connectors/composio-actions.js`. The approval card shows exactly what will be sent, a writing step can be approved once per run, and Hushwork first asks Composio for the tool's real inputs and sends nothing if they do not match. Stripe writes are deliberately not offered (real money).
+- **Reason:** Reading is not enough for a workflow to be useful. Listing each action keeps a step from ever naming an arbitrary tool.
+- **Options considered:** An own sign-in per app (slow); a "run any tool" step (unsafe).
+- **Where:** `lib/connectors/composio-actions.js`, `lib/connectors/composio.js`, `lib/run-core.js` (`approveActionStep`)
+
+### D-028: Placeholders, not real addresses, in templates
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** Templates and AI plans use `{myEmail}` (the signed-in person's own address, filled in when the step is shown and when it runs, also for scheduled runs), `{answer}` (what the last Ask the AI step said) and `{answers}` (every AI answer of the run, in order, for a morning briefing). A template never holds a real person's address, and its made-up values (a Notion page id of zeros, `your-name/your-repo`) are refused with a plain sentence until changed.
+- **Reason:** A weekly scan found the owner's address written into five templates. Public templates must not email someone else.
+- **Where:** `lib/connectors/composio-actions.js`, `lib/run-answer.js`, `lib/templates.js`
+
+### D-029: Never let a plan pretend
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** (1) The AI plan writer and the keyword preview write the real blocks; when the task says "send to me / my account / an address" and no step really sends, code adds a real email step. (2) The old plan-only "Send a message" by email with a usable address is upgraded to a real email on the approval card. (3) Steps that only describe are named after saving in the Builder, marked "Plan only" on the Runs page, and labelled in the palette. (4) No template is plan-only; a test enforces it.
+- **Reason:** A plan the AI wrote said "Send a message" and a run answered "Nothing was sent". The person lost an hour. Silent no-ops destroy trust.
+- **Where:** `lib/ai/plan.js` (`ensureRealSend`), `lib/run-engine.js` (`upgradeSend`, `planOnlyWarning`), `lib/step-rows.js`
+
+### D-030: The Start step makes the schedule real
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** Saving a workflow whose Start step says "On a schedule" with a time that can be read ("Every weekday at 17:30") creates the real schedule (writing OFF until ticked; an existing schedule keeps its writing and paused choices). A scheduled run names which schedule started it. The Schedule panel warns when it disagrees with the Start step. Monthly schedules are not supported.
+- **Reason:** The Start step used to be a note nobody read, so two places could disagree and "it doesn't run on a schedule".
+- **Where:** `lib/schedule-text.js`, `lib/schedule-sync.js`, `lib/actions/schedules.js`
+
+### D-031: Supabase pg_cron is the scheduler clock
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved (replaces D-020)
+- **Decision:** `supabase/clock.sql` makes the database call `/api/cron/tick` every minute with `pg_cron` and `pg_net`; the password is stored in Supabase Vault. Verified live: every run succeeded and the app answered 200.
+- **Reason:** It is free, runs every minute and needs no outside account.
+- **Where:** `supabase/clock.sql`, `docs/deploy.md` section 15
+
+### D-032: Delete my account, Download my data, Terms page
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** Settings has a Download my data button (workflows, newest runs and schedules as one JSON file; saved connections are never included) and a Delete my account button (the person types the words; Composio apps are disconnected first; everything else is removed by the database's "on delete cascade"). `/terms` is a plain-words page. There is no public contact address, so people use the GitHub issues page.
+- **Reason:** A public app needs a way to leave and to keep a copy. The privacy page promised it.
+- **Where:** `lib/account-core.js`, `lib/actions/account.js`, `lib/export-data.js`, `app/terms/page.js`
+
+### D-033: Free leaked-password check at sign-up
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** New passwords are checked against the free Pwned Passwords service in its privacy-keeping way (only the first 5 characters of the SHA-1 fingerprint leave the server). If the service is down, sign-up still works.
+- **Reason:** Supabase's own leaked-password protection needs a paid plan.
+- **Where:** `lib/leaked-password.js`, `lib/actions/auth.js`
+
+### D-034: Say why something failed, and test every connection
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** When an app refuses, Hushwork's own sentence is followed by what the app said (cleaned, cut to 160 characters, dropped if it looks secret or contains the API key). A run that stops saves the reason as a small record under the step (runs are never edited). A scheduled workflow that starts failing sends one email (not repeated while it stays broken). The Connections page has a "Test all my connections" button that really reads from Google, Linear and each Composio app and only checks that each action fits.
+- **Reason:** "The app did not answer" hid the real reason for an hour.
+- **Where:** `lib/connectors/composio.js` (`cleanSaid`, `explainFailure`), `lib/run-core.js` (`saveStopNote`, `testAllConnections`), `lib/schedule-notify.js`
+
+### D-035: Template packs with suggested schedules
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** The template library is split into Everyday, Finance, Marketing, Coding and Design (33 templates). The chosen pack is remembered in the browser. A template can suggest a schedule, set later on the Workflows page.
+- **Where:** `lib/template-packs.js`, `components/app/TemplateLibrary.js`
+
+### D-036: Tests that run the real server code
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** `npm test` loads the real server code through `scripts/test-hooks.mjs` (a loader that understands `@/` and stubs the Next.js-only modules), with an in-memory pretend database and a pretend Composio (`lib/test-server-support.js`). `lib/run-core.integration.test.js` runs flows from "press Run" to "the email left".
+- **Reason:** Most tests only read the code's text, so a real bug (a plan that sent nothing, a regex written with the wrong character) passed them all.
+- **Where:** `scripts/test-hooks.mjs`, `scripts/test-resolve.mjs`, `lib/run-core.integration.test.js`
+
+### D-037: No whole-site AI limit in the database
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** The "60 AI plans a day for everyone" cap stays in memory. Set a monthly spending cap in the Groq account instead.
+- **Reason:** A database counter for everybody could be used up by one signed-in person calling the database function directly, which would lock everyone out.
+
+### D-038: Vercel, Xero and Cloudflare cannot be connected through Composio
+- **Date:** 2026-10-24
+- **Status:** ✅ Approved
+- **Decision:** These three stay in the list but show "Not available yet" with a reason instead of a Connect button. Composio has no ready-made sign-in for Vercel and Xero, and Cloudflare only works with an API key, which Hushwork never collects.
+- **Next action:** Revisit with an own OAuth integration or hosted key collection if they matter.
+- **Where:** `lib/connectors/composio-apps.js` (`unavailable`)
 
 ---
 

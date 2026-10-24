@@ -1,4 +1,6 @@
 # Design: Arjun AI restyle, AI plan preview, owned sculpture
+
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
 Stage 2 of the ship-it pipeline, 2026-10-16. Local only (http://localhost:3100). Figma and Notion not used. Owner decisions (do not reopen): Arjun AI Design System everywhere with Geist kept; AI plan with a keyword fallback; four sculpture images made by code in Arjun purple.
 **How it was checked.** Every ratio below comes from `contrast.py` (WCAG formula, glass uses the CSS `saturate(160%)` matrix); sculpture colour, keying, particle counts and WebP size from `mock.py` (rough Pillow mock-up). Both live in the scratchpad `...\scratchpad\design-next\`, not in the repo. Not run in a browser: the builder looks at both themes once (section 7).
 **Overrides.** This file beats `PRODUCT.md`, `PLAN.md` s3, `docs/design.md` and skill defaults on: glass (now allowed, 3 places), radius (6/10/16/22/pill), shadows (sm/md/lg), "no error colour" (status colours now allowed, always with icon and text), uppercase chips (sentence case). Still binding: Geist, WCAG AA both themes, reduced motion plus Pause, honest copy, no em dashes, 44px phone targets, local only.
@@ -339,3 +341,5 @@ Decisions where the brief was silent (cheap to change):
 5. **No red delete button;** `dark` ink button stays. **Landing agent box** never calls AI (cost and abuse on a public page).
 6. **Sculpture exception.** Arjun says no illustration; the login sculpture is the owner's approved exception and is abstract and generated. Type scale not applied to `/` (would rewrap the hero).
 7. **Limit number and window** ({limit}, "tomorrow") are the architect's; copy only needs the number.
+
+Related: [Plan: restyle and Preview plan](plan-next.md), [Arjun AI Design System](arjun-ai-design-system.md), [Sculpture assets](sculpture-assets.md), [Groq amendment](plan-groq.md)

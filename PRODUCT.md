@@ -65,3 +65,5 @@ Future work must not invent counts, testimonials, customer names or scarcity, an
 ## Accessibility & Inclusion
 
 No product-specific requirement has been stated. Working target for the redesign, set in `PLAN.md`: WCAG 2.2 AA, both themes, full keyboard operation, and reduced-motion honoured for CSS, JavaScript and SVG motion.
+
+Related: [Build plan and UI/UX direction](PLAN.md), [Project brief](PROJECT.md), [Arjun AI Design System](docs/arjun-ai-design-system.md)

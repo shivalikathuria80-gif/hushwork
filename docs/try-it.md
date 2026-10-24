@@ -1,38 +1,55 @@
 # Try everything Hushwork can do (in plain words)
 
-Hushwork runs on your computer at `http://localhost:3100`. Nothing real happens until **you press an Approve button**.
+Hushwork is online at https://hushwork-six.vercel.app (and runs on your computer at `http://localhost:3100` with `npm run dev` inside `hushwork-app`). **Nothing real happens until you press an Approve button**, or you switch Auto mode on, or you tick "Let it write by itself" on a schedule.
 
-## 0. Make it start
+## 1. Connect your apps (once)
 
-Open the terminal in the `hushwork-app` folder and run `npm run dev`. This starts the app. Then open `http://localhost:3100` in Chrome and sign in.
+Open **Connections**.
 
-## 1. One-time setup for Google (Gmail and Drive are new)
+1. **Google:** press **Connect Google** and press **Allow** on every permission (Calendar, Sheets, Gmail, Drive). Google must have the Calendar, Sheets, Gmail and Drive APIs enabled in your Google Cloud project, and the live address registered as a redirect address (`docs/deploy.md` section 3).
+2. **Linear:** press **Connect Linear** (it now also asks to add a task).
+3. **More apps (through Composio):** press **Connect** on each app you use. For sending email use **Gmail (send)**; for calendar events **Google Calendar (events)**. Vercel, Xero and Cloudflare say "Not available yet" on purpose.
+4. Press **Test all my connections** at the top. Every line should be green. A red line says what the app answered; fix that first.
 
-1. Go to `console.cloud.google.com` and open your Hushwork project.
-2. Open **APIs & Services**, then **Library**. Make sure these four are **Enabled**: Google Calendar API, Google Sheets API, Gmail API, Google Drive API.
-3. In Hushwork open **Connections**. Under Google press **Disconnect**, then **Connect Google**, and press **Allow** on every permission. Do the same for **Linear** (it now has a new permission: adding a task).
+## 2. Easy things to try (they only read, or only email you)
 
-## 2. Easy things to try (they only read)
-
-Open **Templates** and press **Open in the Builder** on one. Then in the Builder press **Save**, then go to **Workflows** and press **Practice run**. A practice run only writes down what each step would do. Then open **Runs**, find your practice run and press the **Approve** button.
+Open **Templates**, pick a pack (Everyday, Finance, Marketing, Coding, Design), press **Open in the Builder** on a template, then **Save**. Go to **Workflows** and press **Run**. Open **Runs** and press **Approve** on each step. Start with an email to yourself:
 
 | Template | What it does |
 | --- | --- |
+| Send a formal hello email | emails you a short hello (change `{myEmail}` in the step to greet someone else) |
+| Email me my week ahead | the AI reads your calendar, then emails you a summary |
+| Morning briefing by email | three AI summaries (calendar, inbox, top task) in one email |
 | Which task should I do first? | the AI reads your Linear tasks |
 | What is in my inbox? | the AI reads who wrote to you and the subjects (never the text) |
-| What did I work on lately? | the AI reads the names of your latest Drive files |
-| My week ahead | the AI reads your Google Calendar |
-| Is my website up? | the AI looks at one web page |
+| Test all my connections | reads Calendar, Gmail, Drive and Linear, calls one web address, then creates ONE Linear task (delete it after) |
 
-## 3. Things that write (they need extra care)
+Every template says what it needs ("Works with Google, Gmail (send)").
 
-- **Add a row** puts one line into a Google Sheet you name. Paste the sheet's web address in the step.
-- **Create Linear task** adds one new task in Linear.
-- Both can use **`{answer}`** to use what an **Ask the AI** step said. The order is: Practice run, approve the Ask the AI step, press **Back to the practice run**, then approve the row or task. You see the exact words before you approve.
-- A writing step can be approved only **once** per practice run, so you cannot add it twice by mistake.
+## 3. Things that write (read the card before you approve)
 
-## 4. If something goes wrong
+- **Do something in another app** really sends an email, sends a Slack message, creates a GitHub issue, adds a Todoist task, adds a Calendar event or creates a Notion page. The approval card shows the exact words and where they go. It can be approved **once** per run.
+- **Add a row** puts one line into a Google Sheet you name. **Create Linear task** adds one task.
+- `{myEmail}` means your own address. `{answer}` is what the last **Ask the AI** step said. `{answers}` (emails only) is every AI step's answer, in order.
+- **Notion:** put the id of the page it should go under (the long code at the end of the page's address) in the step, and share that page with the connection (three dots on the page, then Connections). A template's example id (all zeros) is refused until you change it. The same goes for `your-name/your-repo` in the GitHub template and the example dates in the calendar templates.
 
-- A red message under an Approve button says what happened. "Google refused" or "Linear refused" almost always means: press Disconnect, then Connect again.
-- "The Gmail API is switched off" means step 1.2 above is not finished.
-- Delete any run you do not want with **Delete this run** (it only removes the record, nothing else).
+## 4. Make something run by itself
+
+1. In the Builder set the **Start** step to "On a schedule" and write the time the way you would say it: `Every weekday at 17:30`, `Every Monday at 9`, `Daily at 5pm`. Press **Save**: the message tells you the schedule was made.
+2. On **Workflows**, the Schedule panel shows it. A new schedule only reads. Tick **Let it write by itself** only if it should send or create things while you are away.
+3. If a schedule starts failing you get one email (needs Gmail (send) connected). The Runs page shows where it stopped and why.
+4. On your own computer, `npm run clock` in a second terminal makes a clock for testing. Online, the clock is inside Supabase (`docs/deploy.md` section 15).
+
+## 5. Ask the AI to build it
+
+On the home screen of the app describe a job ("send a message to my account every morning"). The plan uses real steps: an email like that really goes to your own address after Approve. A step marked **Plan only** never does anything; swap it for **Do something in another app**.
+
+## 6. If something goes wrong
+
+- A red message under an Approve button says what happened and, when an app refused, what the app said. "Not allowed" for Notion almost always means the page is not shared with the connection.
+- "Google refused" or "Linear refused": press Disconnect, then Connect again.
+- Delete any run you do not want with **Delete this run** (it only removes the record).
+- **Settings** has **Download my data** (a copy of your workflows, runs and schedules) and **Delete my account**.
+- More: `docs/deploy.md` section 16.
+
+Related: [Deploy checklist](deploy.md), [Hushwork app README](../hushwork-app/README.md), [Project brief](../PROJECT.md)

@@ -1,5 +1,7 @@
 # QA report round 2: restyle checkpoint, stage-A fixes and the AI "Preview plan" (Groq)
 
+> **Historical document.** Written for an earlier slice of the project and not kept up to date. For how Hushwork works today read [`PROJECT.md`](../PROJECT.md) and [`DECISIONS.md`](../DECISIONS.md).
+
 Stage 5, 2026-10-17. Local only, http://localhost:3100. Reviewer changed no app file, made no commit, installed nothing, ran no DDL, did not start, stop or restart a server, never used port 3000, never signed in or up, never called Groq, never opened `.env.local` (only checked it is ignored and was never committed). Scratch files: `...\scratchpad\qa4\` (hostile.mjs, limits-model.mjs, mutate.mjs, scan.mjs, login.mjs, hero.mjs, tabs.mjs).
 
 **Verdict: SHIP-READY** for today's state (no key, AI off, nothing ever sent to Groq). **0 BLOCKER, 0 MAJOR, 7 MINOR, 11 NIT.** No security check failed: key handling, order of checks, validation, limits, cool-off, logging and treatment of the model's reply all held under 76 hostile inputs, 65 parallel calls, 19 hostile `retry-after` headers, 20 hostile model replies and 29 mutations. The 7 MINOR items are small; fix m1 to m4 (about 25 lines) **before the owner adds a Groq key**, because they only matter once text can actually leave the machine.
@@ -82,3 +84,5 @@ Use only `http://localhost:3100` (never 3000, that is your other app). Do not pa
 10. **Production check.** Stop the dev server, run `npm run build` in `hushwork-app` (it makes the optimised version and fails loudly), then in PowerShell: `Get-ChildItem .next\static -Recurse -Filter *.js | Select-String -Pattern "GROQ|gsk_|sb_secret"` must print nothing. Then `npm run dev` again.
 11. **Slow state (m5).** If an answer ever takes more than 6 s, click "Show keyword preview instead" and then Save: it may wait a few seconds for the abandoned AI call. That is expected.
 12. **Take the key away.** Delete the `GROQ_API_KEY=` line, restart; the page says AI planning is off. Revoke the key on the Groq keys page.
+
+Related: [Plan: restyle and Preview plan](plan-next.md), [Groq amendment](plan-groq.md), [Design: Arjun AI restyle](design-next.md)
