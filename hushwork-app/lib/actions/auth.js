@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { checkEmail, checkPassword, EMAIL_RULE, PASSWORD_RULE } from "@/lib/validate";
 import { allowAuthTry } from "@/lib/auth-limits";
 import { visitorAddress } from "@/lib/visitor";
+import { isLeakedPassword } from "@/lib/leaked-password";
 
 // A Server Action is a function that runs only on the server but can be called straight from a <form>.
 // Treat each one as a public door: anyone can send it anything, so it checks its input every time.
@@ -16,6 +17,7 @@ const MESSAGE = {
   credentials: "That email and password do not match. Check both and try again.",
   exists: "We could not create that account. If you already have one, sign in instead.",
   rate: "Too many attempts. Wait a few minutes and try again.",
+  leaked: "That password has appeared in known data leaks, so anyone could try it. Choose a different one.",
   unconfirmed: "Confirm your email first.",
   signupOff: "New accounts are switched off right now.",
   setup: "Sign-in is not set up on this computer yet. Add the two Supabase settings to .env.local, then restart npm run dev.",
@@ -75,6 +77,8 @@ export async function signUp(formData) {
   if (email.error) return { kind: "field", field: "email", error: email.error };
   if (password.error) return { kind: "field", field: "password", error: password.error };
   if (!allowAuthTry("signUp", { email: email.value, visitor: visitorAddress(await headers()) })) return { kind: "other", error: MESSAGE.rate };
+  // A free stand-in for Supabase's paid "leaked password protection": only the first 5 characters of the password's fingerprint are sent.
+  if (await isLeakedPassword(password.value)) return { kind: "field", field: "password", error: MESSAGE.leaked };
 
   const supabase = await openSupabase();
   if (!supabase) return { kind: "other", error: MESSAGE.setup };
