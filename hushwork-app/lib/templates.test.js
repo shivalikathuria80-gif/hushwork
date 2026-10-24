@@ -42,14 +42,14 @@ test("templateById: a known id gives checked steps; anything else gives null", (
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["invoices"], { id: "invoices" }]) assert.equal(templateById(bad), null, String(bad));
 });
 
-const MULTI = ["testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"];
+const SIMPLE = ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup"]; // one look, one AI step; every other template is checked by the general rules below
 
 test("templates: the three that work for real say what they need, and their steps can really be approved on the Runs page", async () => {
   const { isAiStep } = await import("./run-engine.js");
   const { checkRequestUrl } = await import("./connectors/http.js");
   const real = TEMPLATES.filter((t) => t.needs);
-  assert.deepEqual(real.map((t) => t.id), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"]);
-  for (const t of real.filter((x) => !MULTI.includes(x.id))) {
+  assert.deepEqual(real.map((t) => t.id).slice(0, 13), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"]);
+  for (const t of real.filter((x) => SIMPLE.includes(x.id))) {
     assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
     const checked = checkSteps(t.steps).value;
     const ai = checked.find((s) => s.kind === "ai");

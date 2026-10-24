@@ -141,6 +141,164 @@ export const TEMPLATES = [
       step("action", { action: "gmail_send", target: "{myEmail}", title: "Your morning briefing", details: "{answers}" }),
     ],
   },
+  // ---- the packs: Finance, Marketing, Coding and Design. Each is a few ready-made workflows with a suggested schedule (lib/template-packs.js) ----
+  {
+    id: "stripeweek", pack: "finance", icon: "CreditCard", title: "Weekly Stripe summary by email", needs: "Stripe, Gmail (send)",
+    body: "The AI reads your latest Stripe payments and emails you a short summary: how many, how much, anything odd. It cannot charge or refund anything. You press Approve before the email is sent.",
+    request: "Every Monday morning, look at my latest Stripe payments and email me a short summary. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 1, hour: 9, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Monday at 9:00" }),
+      step("ai", { task: "Sum up my latest payments in 4 short lines: how many, the total, the biggest, and anything that looks odd.", uses: "app", address: "stripe" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Your weekly Stripe summary", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "invoicemail", pack: "finance", icon: "Receipt", title: "Turn an invoice email into a to-do", needs: "Google, Linear",
+    body: "The AI looks at the senders and subjects of your latest 10 emails, picks the one that looks like a bill or invoice, and you approve a Linear task to pay it. It never reads the text inside an email.",
+    request: "Every Monday, look at my latest emails, find a bill or invoice, and add a task in Linear to pay it. Ask me before it is added.",
+    schedule: { frequency: "weekly", weekday: 1, hour: 9, minute: 30 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Monday at 9:30" }),
+      step("ai", { task: "One line starting with Pay: the email that looks most like a bill (sender, subject). If none: Pay: nothing.", uses: "gmail", address: "" }),
+      step("issue", { title: "{answer}", details: "Made from my latest emails by Hushwork.", team: "" }),
+    ],
+  },
+  {
+    id: "receiptsmail", pack: "finance", icon: "FolderOpen", title: "Receipts and invoices I saved, by email", needs: "Google, Gmail (send)",
+    body: "The AI reads the names of your 10 most recently changed Drive files and emails you which ones look like receipts, invoices or contracts. It never opens a file.",
+    request: "Every Friday, look at the files I changed lately in Google Drive and email me which ones look like receipts or invoices. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 5, hour: 16, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Friday at 16:00" }),
+      step("ai", { task: "From my 10 latest file names, which look like receipts, invoices or contracts? List them in 3 short lines.", uses: "drive", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Receipts and invoices this week", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "postideas", pack: "marketing", icon: "PenLine", title: "Five post ideas by email", needs: "Gmail (send)",
+    body: "The AI writes five short post ideas and emails them to you. Change the task in the AI step to describe your own product and readers. You press Approve before the email is sent.",
+    request: "Every Monday morning, email me five short social post ideas for my product. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 1, hour: 8, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Monday at 8:00" }),
+      step("ai", { task: "Give me 5 short social post ideas for a small software product that automates weekly admin. One line each.", uses: "nothing", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Five post ideas for this week", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "pagecheck", pack: "marketing", icon: "Plug", title: "Check my landing page and email me", needs: "Gmail (send)",
+    body: "The AI reads one web page and emails you three clear things to improve. Change the address in the AI step to your own page. You press Approve before the email is sent.",
+    request: "Every Friday, read my landing page and email me three things to improve. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 5, hour: 9, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Friday at 9:00" }),
+      step("ai", { task: "Read this page like a new visitor. Give 3 short, specific things that would make it clearer.", uses: "web", address: "https://example.com/" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Three ways to improve the page", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "writingblock", pack: "marketing", icon: "Calendar", title: "Block writing time on my calendar", needs: "Google Calendar (events)",
+    body: "Adds one event to your Google Calendar for writing. Change the start time in the step first: a template cannot know your date. You see the event and press Approve before it is added.",
+    request: "Put a writing block on my calendar. Ask me before it is added.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("action", { action: "calendar_event", target: "2026-11-02 09:00", title: "Writing time: this week's posts", details: "Draft and schedule the week's posts." }),
+    ],
+  },
+  {
+    id: "launchnotes", pack: "marketing", icon: "FileText", title: "Launch notes page in Notion", needs: "Google, Notion",
+    body: "The AI looks at your latest Drive files and creates a Notion page called Launch notes with a one-line summary of what you worked on. First change the page id in the step to the Notion page it should go under. You press Approve before it is created.",
+    request: "When I ask, create a Launch notes page in Notion with a summary of what I worked on. Ask me before it is created.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Say in 8 words or fewer what I worked on most lately, from my latest file names.", uses: "drive", address: "" }),
+      step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Launch notes: {answer}", details: "" }),
+    ],
+  },
+  {
+    id: "githubdigest", pack: "coding", icon: "Inbox", title: "GitHub digest by email", needs: "GitHub, Gmail (send)",
+    body: "The AI reads your latest GitHub notifications (review requests, mentions, issues) and emails you a short digest. You press Approve before the email is sent.",
+    request: "Every weekday morning, read my GitHub notifications and email me a short digest. Ask me before it is sent.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 30 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every weekday at 8:30" }),
+      step("ai", { task: "Sum up my GitHub notifications in 4 short lines. Put review requests first.", uses: "app", address: "github" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Your GitHub digest", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "notifytask", pack: "coding", icon: "ListTodo", title: "Turn a GitHub notification into a Linear task", needs: "GitHub, Linear",
+    body: "The AI reads your latest GitHub notifications, picks the one most worth doing, and you approve a Linear task for it.",
+    request: "Every weekday, look at my GitHub notifications and add the most important one as a task in Linear. Ask me before it is added.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 9, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every weekday at 9:00" }),
+      step("ai", { task: "Write ONE short line starting with a verb: the most important thing to do from my GitHub notifications.", uses: "app", address: "github" }),
+      step("issue", { title: "{answer}", details: "Made from my GitHub notifications by Hushwork.", team: "" }),
+    ],
+  },
+  {
+    id: "weeklydeps", pack: "coding", icon: "ShieldCheck", title: "Weekly dependency check issue", needs: "GitHub",
+    body: "Creates one GitHub issue each week as a reminder to check dependency updates and security alerts. First change owner/name in the step to your own repository. You press Approve before it is created.",
+    request: "Every Monday, create an issue in my repository to check dependency updates and security alerts. Ask me before it is created.",
+    schedule: { frequency: "weekly", weekday: 1, hour: 9, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Monday at 9:00" }),
+      step("action", { action: "github_issue", target: "your-name/your-repo", title: "Weekly: check dependency updates and security alerts", details: "Made by Hushwork. Close it when done." }),
+    ],
+  },
+  {
+    id: "incidentmail", pack: "coding", icon: "Clock", title: "Incident digest by email", needs: "PagerDuty, Gmail (send)",
+    body: "The AI reads your latest PagerDuty incidents and emails you a short digest. It cannot acknowledge or resolve anything. You press Approve before the email is sent.",
+    request: "Every weekday evening, read my PagerDuty incidents and email me a short digest. Ask me before it is sent.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 17, minute: 30 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every weekday at 17:30" }),
+      step("ai", { task: "Sum up my latest incidents in 4 short lines: how many, how serious, and which are still open.", uses: "app", address: "pagerduty" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Incident digest", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "designreview", pack: "design", icon: "ListChecks", title: "Weekly design review task", needs: "Linear",
+    body: "Creates one Linear task every week to review your screens for spacing, contrast and wording. You press Approve before it is created.",
+    request: "Every Friday afternoon, add a design review task in Linear. Ask me before it is added.",
+    schedule: { frequency: "weekly", weekday: 5, hour: 15, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Friday at 15:00" }),
+      step("issue", { title: "Design review: check this week's screens for spacing, contrast and wording", details: "Made by Hushwork. Note what to fix, then close it.", team: "" }),
+    ],
+  },
+  {
+    id: "feedbackmail", pack: "design", icon: "MessageSquare", title: "Feedback roundup by email", needs: "Google, Gmail (send)",
+    body: "The AI looks at who wrote to you and the subjects of your latest 10 emails, and emails you which ones look like feedback or complaints. It never reads the text inside an email.",
+    request: "Every Friday, look at my latest emails and email me the ones that look like feedback. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 5, hour: 16, minute: 30 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Friday at 16:30" }),
+      step("ai", { task: "Which emails look like feedback or complaints? Use sender and subject. Up to 3 short lines.", uses: "gmail", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Feedback this week", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "designlog", pack: "design", icon: "FileText", title: "Design log page in Notion", needs: "Google, Notion",
+    body: "The AI looks at the names of your latest Drive files and creates a Notion page called Design log with a one-line summary. First change the page id in the step to the Notion page it should go under. You press Approve before it is created.",
+    request: "When I ask, create a Design log page in Notion that sums up my latest design files. Ask me before it is created.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("ai", { task: "Say in 8 words or fewer which design work I changed most lately, from my latest file names.", uses: "drive", address: "" }),
+      step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Design log: {answer}", details: "" }),
+    ],
+  },
+  {
+    id: "focusblock", pack: "design", icon: "Calendar", title: "Block design focus time on my calendar", needs: "Google Calendar (events)",
+    body: "Adds one focus block to your Google Calendar. Change the start time in the step first: a template cannot know your date. You see the event and press Approve before it is added.",
+    request: "Put a design focus block on my calendar. Ask me before it is added.",
+    steps: [
+      step("trigger", { how: "manual", when: "" }),
+      step("action", { action: "calendar_event", target: "2026-11-03 14:00", title: "Design focus: no meetings", details: "Deep work on the current design." }),
+    ],
+  },
   // ---- these describe a plan only ----
   {
     id: "invoices", icon: "Receipt", title: "Chase unpaid invoices",
