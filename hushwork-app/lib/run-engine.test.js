@@ -220,3 +220,24 @@ test("the approval card warns when an action still holds the template's example 
   assert.ok(!real.includes("Warning"));
 });
 
+
+test("plan-only steps: a Send, a Write, a Find that looks nowhere real and a plain note are named as steps that do nothing; real steps, the Start and the approval step are not", async () => {
+  const { planOnlySteps, planOnlyWarning, isPlanOnly } = await import("./run-engine.js");
+  const steps = [
+    { icon: "Clock", title: "Every morning", detail: "8:00", kind: "trigger", fields: { how: "schedule", when: "Every day at 8:00" } },
+    { icon: "Sparkles", title: "Ask the AI", detail: "x", kind: "ai", fields: { task: "Sum up", uses: "nothing", address: "" } },
+    { icon: "ShieldCheck", title: "Ask you to approve", detail: "Nothing is sent until you say yes" },
+    { icon: "Send", title: "Send a message", detail: "To my account", kind: "send", fields: { how: "other", to: "my account", about: "hi" } },
+    { icon: "Mail", title: "Send an email (Gmail)", detail: "Hi", kind: "action", fields: { action: "gmail_send", target: "{myEmail}", title: "Hi", details: "Hi" } },
+    { icon: "Sparkles", title: "Do the task", detail: "x" },
+  ];
+  assert.deepEqual(planOnlySteps(steps), [{ index: 3, title: "Send a message" }, { index: 5, title: "Do the task" }]);
+  assert.equal(isPlanOnly(steps[4]), false, "the real email is not plan-only");
+  const warning = planOnlyWarning(steps);
+  assert.match(warning, /^Heads up: 2 steps only describe/);
+  assert.ok(warning.includes('"Send a message" (step 4)') && warning.includes("Do something in another app"));
+  assert.match(planOnlyWarning([steps[3]]), /^Heads up: this step only describes/);
+  assert.equal(planOnlyWarning([steps[0], steps[1], steps[4]]), "", "nothing to warn about when every step really does something");
+  assert.equal(planOnlyWarning([]), "");
+  assert.equal(planOnlyWarning(undefined), "");
+});

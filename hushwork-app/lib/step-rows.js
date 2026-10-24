@@ -62,13 +62,13 @@ export const BLOCKS = [
   { id: "ai", label: "Ask the AI", help: "Let the AI think or look", icon: "Sparkles" },
   { id: "mcp", label: "MCP server", help: "Let the AI use a tool server", icon: "Plug" },
   { id: "find", label: "Find something", help: "Search for information", icon: "Search" },
-  { id: "write", label: "Write something", help: "Draft a text", icon: "PenLine" },
+  { id: "write", label: "Write something", help: "Plan only: describes a draft", icon: "PenLine" },
   { id: "approve", label: "Ask me first", help: "Wait for your yes", icon: "ShieldCheck" },
-  { id: "send", label: "Send a message", help: "Say who gets it", icon: "Send" },
+  { id: "send", label: "Send a message (plan only)", help: "Describes it. Does NOT send", icon: "Send" },
   { id: "row", label: "Add a row", help: "Put a line in a sheet", icon: "Table" },
   { id: "issue", label: "Create Linear task", help: "Add a task in Linear", icon: "ListTodo" },
   { id: "app", label: "Another app", help: "Look in Todoist, Notion...", icon: "Plug" },
-  { id: "action", label: "Do in another app", help: "Slack message, GitHub issue...", icon: "Send" },
+  { id: "action", label: "Do in another app", help: "REALLY sends: email, Slack, GitHub...", icon: "Send" },
   { id: NOTE, label: "Note", help: "Your own words", icon: "FileText" },
 ];
 export const PRESET_BLOCKS = {

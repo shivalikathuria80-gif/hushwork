@@ -70,3 +70,12 @@ test("packs: a template with a placeholder the person must change says so in pla
     }
   }
 });
+
+test("no template is plan-only: every step of every template either really runs or is the Start or an approval note", async () => {
+  const { planOnlySteps } = await import("./run-engine.js");
+  for (const t of TEMPLATES) {
+    const only = planOnlySteps(checkSteps(t.steps).value);
+    assert.deepEqual(only, [], `${t.id} has steps that only describe: ${only.map((o) => o.title).join(", ")}`);
+    assert.ok(t.needs, `${t.id} says what it needs`);
+  }
+});

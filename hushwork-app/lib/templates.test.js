@@ -38,7 +38,8 @@ test("templateById: a known id gives checked steps; anything else gives null", (
   const invoices = templateById("invoices");
   assert.equal(invoices.title, "Chase unpaid invoices");
   assert.equal(invoices.steps[0].title, "On a schedule");
-  assert.equal(invoices.steps.at(-1).detail, "By email, to each overdue client: payment reminder");
+  assert.equal(invoices.steps.at(-1).kind, "action", "the last step really sends an email (to the person themself)");
+  assert.equal(invoices.steps.at(-1).fields.target, "{myEmail}");
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["invoices"], { id: "invoices" }]) assert.equal(templateById(bad), null, String(bad));
 });
 

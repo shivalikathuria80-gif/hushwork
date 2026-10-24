@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Btn, EASE, StepRow } from "./ui";
 import { Icon } from "./icons";
+import { ensureRealSend } from "@/lib/ai/plan";
+import { planToSteps, stepsToPlan } from "@/lib/steps";
 
 const MODES = [["Search", "Search", "Look up details in your connected apps"], ["DeepResearch", "Telescope", "Research sources before drafting"], ["Reason", "Brain", "Check edge cases before running"]];
 const SUGGEST = [
@@ -29,7 +31,11 @@ export function planFor(task, modes) {
   if (modes.includes("Search")) s.splice(1, 0, ["Search", "Look up details", "In your connected apps"]);
   if (modes.includes("DeepResearch")) s.splice(1, 0, ["Telescope", "Research sources", "Cross-check before drafting"]);
   if (modes.includes("Reason")) s.splice(s.length - 1, 0, ["Brain", "Check edge cases", "Skip anything that looks off"]);
-  return s;
+  // "Send a message to my account" must really send: when the words say send-to-me, the made-up steps above only DESCRIBE sending, so a real
+  // email to the person's own address replaces the first of them (or is added). Anything else is returned exactly as it was.
+  const typed = planToSteps(s);
+  const real = ensureRealSend(typed, task);
+  return real === typed ? s : stepsToPlan(real);
 }
 
 export default function AgentBox() {

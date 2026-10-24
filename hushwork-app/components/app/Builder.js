@@ -10,6 +10,7 @@ import { saveDraft, updateDraft, renameDraft } from "@/lib/actions/drafts";
 import { syncScheduleFromStart } from "@/lib/actions/schedules";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
+import { planOnlyWarning } from "@/lib/run-engine";
 import { BLOCKS, DRAG_KIND, newRowForBlock } from "@/lib/step-rows";
 
 // The Builder: build a workflow by hand from a short list of blocks (lib/step-rows.js). It reuses the step editor (the same rows, the same
@@ -108,8 +109,10 @@ export default function Builder({ initial }) {
     setDraft(nextDraft);
     setSaved({ name: nextName, steps });
     setName(nextName);
-    setMessage({ kind: "ok", text: words });
-    announce(words);
+    const warning = planOnlyWarning(steps); // steps that would run but do nothing: say so now, not after a run where "nothing came up"
+    const text = warning ? `${words} ${warning}` : words;
+    setMessage({ kind: "ok", text });
+    announce(text);
     setShowErrors(false);
   }
 

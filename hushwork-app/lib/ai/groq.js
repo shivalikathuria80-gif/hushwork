@@ -109,7 +109,7 @@ async function attempt(text, { groqKey, fetchImpl, now = Date.now }, rich) {
   } catch {
     return fail("unusable");
   }
-  const steps = finishSteps(parsed);
+  const steps = finishSteps(parsed, undefined, text);
   if (!steps) return fail("unusable");
   const usage = data?.usage;
   return {

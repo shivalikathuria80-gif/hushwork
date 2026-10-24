@@ -33,8 +33,8 @@ test("template: a known id starts from its checked steps and request", async () 
   const result = await builderStart(client, ME, { template: "invoices" });
   assert.equal(result.start, "template");
   assert.equal(result.name, "Chase unpaid invoices");
-  assert.match(result.prompt, /^Every weekday at 9am/);
-  assert.equal(result.steps.length, 5);
+  assert.match(result.prompt, /^Every weekday morning/);
+  assert.equal(result.steps.length, 3);
   assert.equal(result.steps[0].kind, "trigger");
   assert.equal(calls.length, 0, "templates need no database");
 });

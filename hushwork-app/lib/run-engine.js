@@ -112,6 +112,20 @@ export const isWriteStep = (step) => isSheetsRow(step) || isLinearCreate(step) |
 export const isApprovable = (step) =>
   isRequestStep(step) || isLinearLookup(step) || isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isLinearCreate(step) || isAppLookup(step) || isActionStep(step) || isSheetsRow(step) || isAiStep(step);
 
+// A step that can only DESCRIBE: it is part of the plan but nothing will happen when it runs (a note, a draft, an old-style Send, a Find that does not
+// look anywhere real). The Start step and an "ask you to approve" step are plan-only by nature, so they are not counted. Used to warn the person
+// instead of letting them run a plan whose "send" never sends. Returns [{ index, title }].
+export const isPlanOnly = (step) => step?.kind !== "trigger" && step?.kind !== "approve" && !(step?.icon === "ShieldCheck" && !step?.kind) && !isApprovable(step);
+export const planOnlySteps = (steps) => (Array.isArray(steps) ? steps : []).map((step, index) => ({ index, title: String(step?.title ?? ""), plan: isPlanOnly(step) })).filter((one) => one.plan).map(({ index, title }) => ({ index, title }));
+
+// A sentence for the Builder to show after a save, or "" when every step really does something.
+export function planOnlyWarning(steps) {
+  const only = planOnlySteps(steps);
+  if (only.length === 0) return "";
+  const named = only.slice(0, 3).map((one) => `"${one.title.slice(0, 40)}" (step ${one.index + 1})`).join(", ");
+  return `Heads up: ${only.length === 1 ? "this step only describes" : `${only.length} steps only describe`} what would happen and will not really do anything: ${named}${only.length > 3 ? ", and more" : ""}. To really send, create or add something, use "Do something in another app".`;
+}
+
 // What you read before approving a web call. The server reads the address from the saved run again when you approve.
 export const requestSummary = (step) =>
   ["Hushwork will ask this web address (a read-only GET, nothing is posted):", step?.fields?.url ?? "", step?.fields?.why ? `What it is for: ${step.fields.why}` : ""].filter(Boolean).join(String.fromCharCode(10));

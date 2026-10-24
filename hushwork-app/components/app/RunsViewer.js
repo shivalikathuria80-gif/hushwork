@@ -7,7 +7,7 @@ import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isPlanOnly, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 import { ANSWERS_TAG, findAnswer, findAnswers } from "@/lib/run-answer";
@@ -228,7 +228,7 @@ export default async function RunsViewer({ searchParams }) {
               <Fragment key={index}>
                 <StepRow
                   icon={step.icon} title={step.title} sub={step.detail}
-                  right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : null}
+                  right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : isPlanOnly(step) ? <span className="text-xs text-mute" title="This step only describes what would happen. It does nothing when run.">Plan only</span> : null}
                 />
                 {stoppedAt.has(index) && !doneAt.has(index) && (
                   <li className="list-none pb-3 pt-1">

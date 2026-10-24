@@ -1,7 +1,7 @@
 // Starter workflows for the Builder, written as TYPED steps (see lib/steps.js). A template is only a starting point: it
 // opens in the Builder, where every step can be changed. Nothing runs by itself: a template with `needs` set is one whose
-// steps can really do something after you connect that app and press Approve on the Runs page (needs: "Linear", "Google" or
-// "Nothing", meaning it works straight away). The others only describe what would happen.
+// steps can really do something after you connect that app and press Approve on the Runs page. Every template says what it needs; none of them
+// is plan-only any more (a test keeps it that way).
 // `request` is the sentence the template stands for; it is saved with the draft, like the text typed in the workspace box.
 // Pure data and one small function, no imports from React or Next.js, so tests and both sides of the app can load it.
 import { checkSteps } from "./validate.js";
@@ -299,63 +299,60 @@ export const TEMPLATES = [
       step("action", { action: "calendar_event", target: "2026-11-03 14:00", title: "Design focus: no meetings", details: "Deep work on the current design." }),
     ],
   },
-  // ---- these describe a plan only ----
+  // ---- the five oldest templates, rebuilt so that every step REALLY does something (they used to only describe a plan) ----
   {
-    id: "invoices", icon: "Receipt", title: "Chase unpaid invoices",
-    body: "Spot invoices more than 7 days late and draft a polite reminder for each client.",
-    request: "Every weekday at 9am, find invoices more than 7 days overdue and draft a polite reminder for each client. Ask me before anything is sent.",
+    id: "invoices", pack: "finance", icon: "Receipt", title: "Chase unpaid invoices", needs: "Stripe, Gmail (send)",
+    body: "The AI reads your latest Stripe payments and emails YOU a short list of the ones that failed or look overdue, with client and amount, so you know who to chase. It does not email your clients. You press Approve before the email is sent.",
+    request: "Every weekday morning, look at my latest Stripe payments and email me the ones that failed or look overdue. Ask me before it is sent.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 9, minute: 0 },
     steps: [
-      step("trigger", { how: "schedule", when: "Every weekday at 9am" }),
-      step("find", { where: "payments", what: "invoices more than 7 days overdue" }),
-      step("write", { what: "email", about: "a polite reminder for each client" }),
-      step("approve", { what: "the reminders before they are sent" }),
-      step("send", { how: "email", to: "each overdue client", about: "payment reminder" }),
+      step("trigger", { how: "schedule", when: "Every weekday at 9:00" }),
+      step("ai", { task: "List payments that failed or look overdue: client, amount, how late. Up to 5 short lines.", uses: "app", address: "stripe" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Invoices to chase", details: "{answer}" }),
     ],
   },
   {
-    id: "report", icon: "FileBarChart", title: "Send a weekly client report",
-    body: "Gather what you finished this week and write a short summary for each client to check.",
-    request: "Every Friday at 4pm, summarise what I finished this week for each client and draft an email with the summary. Ask me before anything is sent.",
+    id: "report", pack: "everyday", icon: "FileBarChart", title: "Send a weekly client report", needs: "Linear, Gmail (send)",
+    body: "The AI reads your open Linear tasks and emails YOU a short report you can check and forward to your clients. It does not email your clients itself. You press Approve before the email is sent.",
+    request: "Every Friday afternoon, look at my Linear tasks and email me a short report I can send to my clients. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 5, hour: 16, minute: 0 },
     steps: [
-      step("trigger", { how: "schedule", when: "Every Friday at 4pm" }),
-      step("find", { where: "other", what: "what I finished this week, by client" }),
-      step("write", { what: "report", about: "a short summary for each client" }),
-      step("approve", { what: "each summary before it goes out" }),
-      step("send", { how: "email", to: "each client", about: "weekly summary" }),
+      step("trigger", { how: "schedule", when: "Every Friday at 16:00" }),
+      step("ai", { task: "Write a short client-ready report from my tasks: what is in progress and what is next. 5 short lines.", uses: "linear", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Weekly report draft", details: "{answer}" }),
     ],
   },
   {
-    id: "inbox", icon: "Inbox", title: "Sort your inbox",
-    body: "Look through newsletters and client mail, then get one short digest.",
-    request: "Every morning at 8am, file newsletters into Reading, star emails from clients and send me one short digest.",
+    id: "inbox", pack: "everyday", icon: "Inbox", title: "Sort your inbox", needs: "Google, Gmail (send)",
+    body: "The AI looks at who wrote to you and the subjects of your latest 10 emails, and emails you one short morning digest: what needs you and what can wait. It never reads the text inside an email and does not move or star anything. You press Approve before the email is sent.",
+    request: "Every morning, look at my latest emails and email me one short digest of what needs me. Ask me before it is sent.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 0 },
     steps: [
-      step("trigger", { how: "schedule", when: "Every morning at 8am" }),
-      step("find", { where: "inbox", what: "newsletters and mail from clients" }),
-      step("write", { what: "summary", about: "one short digest of what needs me" }),
-      step("send", { how: "email", to: "me", about: "morning digest" }),
+      step("trigger", { how: "schedule", when: "Every weekday at 8:00" }),
+      step("ai", { task: "Which emails need me and which can wait? Use sender and subject. 4 short lines.", uses: "gmail", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Your morning digest", details: "{answer}" }),
     ],
   },
   {
-    id: "leads", icon: "UserPlus", title: "Follow up new leads",
-    body: "Reply to each new enquiry and note when to chase it.",
-    request: "When a new lead fills in my contact form, thank them within an hour and remind me to follow up after 3 days.",
+    id: "leads", pack: "marketing", icon: "UserPlus", title: "Follow up new leads", needs: "Google, Linear",
+    body: "The AI looks at the senders and subjects of your latest 10 emails, picks the one that looks like a new enquiry, and you approve a Linear task to reply to it. It does not email the lead for you. It never reads the text inside an email.",
+    request: "Every weekday, look at my latest emails, find a new enquiry, and add a task in Linear to follow up. Ask me before it is added.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 10, minute: 0 },
     steps: [
-      step("trigger", { how: "lead", when: "Within an hour" }),
-      step("write", { what: "reply", about: "a friendly thank-you" }),
-      step("approve", { what: "the reply before it is sent" }),
-      step("send", { how: "email", to: "the new lead", about: "thank you" }),
-      step("row", { to: "Lead tracker", values: "name, email, follow-up date (3 days later)" }),
+      step("trigger", { how: "schedule", when: "Every weekday at 10:00" }),
+      step("ai", { task: "One line starting with Reply to: the email that looks like a new enquiry. If none: Reply to: nobody.", uses: "gmail", address: "" }),
+      step("issue", { title: "{answer}", details: "Made from my latest emails by Hushwork.", team: "" }),
     ],
   },
   {
-    id: "admin", icon: "FolderOpen", title: "Keep admin tidy",
-    body: "Find receipts and contracts, then log the deadlines in one place.",
-    request: "Every week, gather my receipts and contracts into one folder and add upcoming deadlines to my calendar.",
+    id: "admin", pack: "finance", icon: "FolderOpen", title: "Keep admin tidy", needs: "Google, Gmail (send)",
+    body: "The AI reads the names of your 10 most recently changed Google Drive files and emails you which ones look like receipts or contracts. It never opens a file and does not move anything. You press Approve before the email is sent.",
+    request: "Every Monday, look at my recent Drive files and email me which ones look like receipts or contracts. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 1, hour: 9, minute: 0 },
     steps: [
       step("trigger", { how: "schedule", when: "Every Monday at 9:00" }),
-      step("find", { where: "inbox", what: "receipts and contracts" }),
-      step("write", { what: "summary", about: "the deadlines found in contracts" }),
-      step("row", { to: "Deadlines tracker", values: "document, deadline date" }),
+      step("ai", { task: "From my 10 latest file names, which look like receipts or contracts? 3 short lines.", uses: "drive", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Receipts and contracts this week", details: "{answer}" }),
     ],
   },
 ];

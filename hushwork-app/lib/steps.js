@@ -64,7 +64,7 @@ export const STEP_KINDS = {
   },
   send: {
     label: "Send a message",
-    help: "Say who gets it. Nothing is sent: this is a plan.",
+    help: "Only describes who would get a message. NOTHING is sent: it is a plan. To really send an email, a Slack message and more, use \"Do something in another app\".",
     icon: "Send",
     fields: [
       choice("how", "How", { email: "By email", slack: "On Slack", other: "Another way" }),
