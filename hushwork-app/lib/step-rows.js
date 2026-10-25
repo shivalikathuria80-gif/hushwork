@@ -4,6 +4,7 @@
 import { ICON_NAMES } from "./ai/icon-names.js";
 import { NOTE, STEP_KINDS, blankFields, isTypedKind } from "./steps.js";
 import { checkSteps } from "./validate.js";
+import { accessOf } from "./skills/bundles.js";
 
 let counter = 0;
 const newKey = () => ++counter;
@@ -43,6 +44,19 @@ export function rowForKind(row, kind) {
   if (!isTypedKind(kind) || row.kind === kind) return row;
   // A new kind starts with blank fields (the old ones belong to another kind) and its own icon.
   return { ...row, kind, fields: blankFields(kind), icon: STEP_KINDS[kind].icon };
+}
+
+// The rows to add when a SKILL is picked in the Builder: its step, and, when it writes and nothing before it in the list is an approval, an "Ask me first"
+// row ahead of it (the real gate is the Approve click on the Runs page; the row tells the person where the writing starts).
+// `skill` is a registry skill (lib/skills/bundles.js); `existing` the rows already in the list. A skill whose words come from an AI step ({answers}) uses plain
+// words instead when no Ask the AI step is in the list yet (otherwise the run would stop with "there is no answer to put in"). Returns the new rows, in order.
+export function rowsForSkill(skill, existing) {
+  const rows = [];
+  if (accessOf(skill) === "write" && !existing.some((row) => row.kind === "approve")) {
+    rows.push({ ...newRow("approve"), fields: { what: "What is written below, before it happens" } });
+  }
+  rows.push({ ...newRow(skill.step.kind), fields: { ...skill.step.fields, ...(skill.alone && !existing.some((row) => row.kind === "ai") ? skill.alone : {}) } });
+  return rows;
 }
 
 // ---- drag and drop (the browser's own dragging; the screens call these when something is dropped) ----

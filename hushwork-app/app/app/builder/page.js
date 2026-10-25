@@ -5,11 +5,12 @@ import Builder from "@/components/app/Builder";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { builderStart } from "@/lib/builder-start";
+import { connectionStates } from "@/lib/skills/connection-status";
 
 export const metadata = { title: "Builder - Hushwork", robots: { index: false, follow: false } };
 
 // The page shell (heading and intro) is built ahead of time. What the Builder opens with depends on the address
-// (`?template=` or `?draft=`) and on who is signed in, so it is decided in BuilderLoader, behind <Suspense>.
+// (`?template=`, `?skill=` or `?draft=`) and on who is signed in, so it is decided in BuilderLoader, behind <Suspense>.
 export default function BuilderPage({ searchParams }) {
   return (
     <main id="main" className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
@@ -51,8 +52,15 @@ async function BuilderLoader({ searchParams }) {
       </Notice>
     );
   }
+  // Which apps are connected, so a step whose app is missing can say so in place. If this cannot be read the Builder simply shows no warnings.
+  let connections;
+  try {
+    connections = await connectionStates(await createClient(), user.id);
+  } catch {
+    connections = undefined;
+  }
   // A different draft or template is a different Builder: the key makes React start fresh instead of reusing the old one.
-  return <Builder key={start.draft?.id ?? start.name ?? "new"} initial={start} />;
+  return <Builder key={start.draft?.id ?? start.name ?? "new"} initial={start} connections={connections} />;
 }
 
 function Notice({ title, children }) {

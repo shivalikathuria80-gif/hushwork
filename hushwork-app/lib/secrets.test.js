@@ -300,7 +300,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "app/app/skills/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js"]);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/skills/connection-status.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookup in the apps list and the actions in the actions list");

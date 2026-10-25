@@ -53,7 +53,11 @@ On the home screen of the app describe a job ("send a message to my account ever
 
 Open **Skills**. Each bundle (Finance and operations, Marketing and growth, Dev and admin) lists the apps it needs, exactly what each skill can read and write, and its ready-made workflows. Press **Turn on**: the workflows are saved to **Workflows** (nothing runs, nothing connects, no schedule is made). Open one in the Builder to change it, or press **Run**. Writing steps still wait for your **Approve** click. One setup step: paste `supabase/skills.sql` in Supabase.
 
-## 8. If something goes wrong
+## 8. The Builder explains every step
+
+In the **Builder** each step has a card: **Why** it is there and **Evidence** (Planned until it has run; on the Runs page it says Verified, Failed or Not sure for real). Press "How it runs and what if it fails" for more. If a step needs an app you have not connected, the card says so right there: press **Connect** (a new tab), then **I connected it: check again**, or let the AI just think, or remove the step. The **Skills** list on the left adds a ready-made step; one that writes brings an "Ask me first" step with it.
+
+## 9. If something goes wrong
 
 - A red message under an Approve button says what happened and, when an app refused, what the app said. "Not allowed" for Notion almost always means the page is not shared with the connection.
 - "Google refused" or "Linear refused": press Disconnect, then Connect again.

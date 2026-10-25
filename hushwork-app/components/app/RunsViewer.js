@@ -6,6 +6,7 @@ import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import ResumeRun from "./ResumeRun";
+import StepStudioCard from "./StepStudioCard";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isPlanOnly, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
@@ -233,6 +234,14 @@ export default async function RunsViewer({ searchParams }) {
                   icon={step.icon} title={step.title} sub={step.detail}
                   right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : isPlanOnly(step) ? <span className="text-xs text-mute" title="This step only describes what would happen. It does nothing when run.">Plan only</span> : null}
                 />
+                {step.kind && step.kind !== "trigger" && (
+                  <li className="list-none pb-1">
+                    <StepStudioCard
+                      step={step}
+                      evidence={doneAt.has(index) ? { state: "verified", text: "It ran, and its result was saved (shown below)." } : unknownAt.has(index) ? { state: "unknown", text: "" } : stoppedAt.has(index) ? { state: "failed", text: stoppedAt.get(index).outcome } : { state: "planned", text: "" }}
+                    />
+                  </li>
+                )}
                 {unknownAt.has(index) && !doneAt.has(index) && (
                   <li className="list-none pb-3 pt-1">
                     <p role="alert" className="flex items-start gap-2 rounded-xl bg-raised px-3 py-2 pl-2.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">Not sure if this happened.</b> It was started, but Hushwork never saw whether it finished (the connection may have dropped). Look in the app first. It is not sent again by itself.</span></p>

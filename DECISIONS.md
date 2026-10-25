@@ -83,6 +83,7 @@ Last updated: 2026-10-24
 | D-039 | Shared workflow memory is data, not instructions | ✅ | 2026-10-25 |
 | D-040 | Safe run recovery: started, done, failed, and never send twice | ✅ | 2026-10-25 |
 | D-041 | Skills and Skill Bundles (plugins) add no new power | ✅ | 2026-10-25 |
+| D-042 | Workflow Studio: one Builder, step cards that explain themselves | ✅ | 2026-10-25 |
 
 ---
 
@@ -359,6 +360,16 @@ Last updated: 2026-10-24
 - **Lesson (2026-10-25):** the first `skills.sql` and `memory.sql` capped rows with a policy that counted rows in its own table; Postgres refuses that (error 42P17, "infinite recursion detected in policy") so every Turn on failed. The caps are triggers now, `supabase/policy-recursion-fix.sql` repairs a database that has the first version, and `lib/sql-rls.test.js` fails if any policy reads its own table. The pretend database in the tests cannot see this kind of mistake, so a real run on the live database is still the final check.
 - **Options considered:** Bundles that unlock extra tools or skip approvals (rejected: they would add risk for no gain). Storing bundles in the database (rejected: they are code, reviewed and tested; the table only holds which ones a person turned on).
 - **Where:** `lib/skills/bundles.js`, `lib/skills/enable.js`, `lib/actions/skills.js`, `app/app/skills/page.js`, `components/app/BundleCard.js`, `components/app/EnableBundle.js`, `supabase/skills.sql`; tests `lib/skills/*.test.js`, `lib/sql-rls.test.js`, `lib/secrets.test.js`
+
+### D-042: Workflow Studio: one Builder, step cards that explain themselves
+- **Date:** 2026-10-25
+- **Status:** ✅ Approved. (The Gemini handoff called this "D-027". That number was already taken by the real-actions decision, so this is D-042.)
+- **Decision:** Every way of starting a workflow ends in the same editable Builder: a **goal** (the workspace box, then "Open in the Builder"), a **template**, or a **skill** (`/app/builder?skill=<id>`, from the Skills page or the new Skills list in the Builder). Under every step the Builder shows a **Workflow Studio card** (`components/app/StepStudioCard.js`): **Why** the step exists, **Evidence** (Planned, Verified, Failed or Not sure), and, folded away, **How** it runs (which skill and plugin), what it **Produces** and **what happens if it fails**. The Runs page shows the same card under each step, where the evidence is real: *Verified* only when a saved result exists, *Failed* with the saved reason, *Not sure* for a step whose end was never seen; a step that has not run is only *Planned*. When an app a step needs is not connected, the card shows a warning in place with next actions: **Connect** (opens Connections in a new tab, so unsaved work is not lost), **check again**, **choose another way** (an Ask the AI step can just think), or **remove the step**. An app that can never be connected yet (Vercel, Xero, Cloudflare) says so and offers no Connect button. A skill that writes brings an "Ask me first" row with it.
+- **Reason:** A workflow should say what it is doing and why, and say what is missing before it fails, not after.
+- **A deliberate difference from the handoff:** the handoff asked to save `skillId`, `pluginId`, `requirementStatus` and `transparency` inside every step. They are **worked out from the step each time instead** (`lib/studio/capabilities.js`). Saved copies would go stale the moment someone connects an app or edits a step (a saved "missing_connection" would be wrong an hour later), the saved plan format and the database stay exactly as they were, and the step checks (`checkSteps`) would have stripped unknown fields anyway.
+- **Not changed:** approval gates and recovery (`lib/run-core.js`, `lib/run-state.js`), the database, sign-in, token encryption and the AI fallback. Nothing on a card can run anything: the buttons only edit the draft or open a page.
+- **Not built:** a separate "start from a plugin" entry (`?plugin=`). A plugin is reached through its skills: the Builder's Skills list says which apps each skill needs and whether they are connected.
+- **Where:** `lib/studio/capabilities.js`, `lib/skills/connection-status.js`, `lib/skills/bundles.js` (`skillStart`), `lib/step-rows.js` (`rowsForSkill`), `lib/builder-start.js`, `components/app/StepStudioCard.js`, `components/app/Builder.js`, `components/app/StepEditor.js` (`renderExtra`), `components/app/RunsViewer.js`; tests `lib/studio/capabilities.test.js`
 
 ---
 

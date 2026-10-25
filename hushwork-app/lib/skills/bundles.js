@@ -15,7 +15,8 @@ import { checkSteps } from "../validate.js";
 import { describeSchedule, checkSchedule } from "../schedule.js";
 
 const step = (kind, fields) => ({ kind, fields });
-const skill = (id, name, icon, about, { reads = "", writes = "", needs = [] }, s) => ({ id, name, icon, about, reads, writes, needs, step: s });
+// `alone`: for a skill that writes words taken from an earlier AI step ({answer}), the plain words it uses when it is the only step of a workflow (see skillStart).
+const skill = (id, name, icon, about, { reads = "", writes = "", needs = [], alone = null }, s) => ({ id, name, icon, about, reads, writes, needs, alone, step: s });
 
 // ---- the skills ----------------------------------------------------------------------------------------------------------------------------------------
 export const SKILLS = [
@@ -66,10 +67,10 @@ export const SKILLS = [
     { reads: "Nothing." },
     step("approve", { what: "Everything that writes below, before it happens" })),
   skill("email-me", "Email me the result", "Mail", "Sends ONE email to your own address with what the AI steps said. You read it and press Approve first.",
-    { writes: "Sends one email to your own address through Gmail (send). It waits for your Approve click.", needs: ["gmailsend"] },
+    { writes: "Sends one email to your own address through Gmail (send). It waits for your Approve click.", needs: ["gmailsend"], alone: { title: "A note from Hushwork", details: "Write your message here." } },
     step("action", { action: "gmail_send", target: "{myEmail}", title: "Your Hushwork result", details: "{answers}" })),
   skill("linear-task", "Create a Linear task", "ListTodo", "Adds ONE new task in Linear from what the last AI step said (for example a Reply to: line).",
-    { writes: "Creates one new Linear task. It cannot change or delete existing tasks. It waits for your Approve click.", needs: ["linear"] },
+    { writes: "Creates one new Linear task. It cannot change or delete existing tasks. It waits for your Approve click.", needs: ["linear"], alone: { title: "A task to do", details: "" } },
     step("issue", { title: "{answer}", details: "Made by Hushwork from your latest emails.", team: "" })),
 ];
 
@@ -177,6 +178,19 @@ export function buildWorkflow(bundle, workflow) {
   }
   const checked = checkSteps(raw);
   return checked.value ? { name: workflow.title, prompt: workflow.request, steps: checked.value } : null;
+}
+
+// A new workflow that starts from ONE skill (the Builder's ?skill=<id>): a Start step ("When I ask"), then the skill. A skill that writes gets an
+// "Ask you to approve" step first, and its words are plain ones (an email cannot say {answers} when no AI step came before it). Returns { name, prompt, steps } or null.
+export function skillStart(id) {
+  const one = findSkill(id);
+  if (!one || one.step.kind === "approve") return null;
+  const writes = accessOf(one) === "write";
+  const raw = [step("trigger", { how: "manual", when: "" })];
+  if (writes) raw.push(step("approve", { what: "What is written below, before it happens" }));
+  raw.push({ kind: one.step.kind, fields: { ...one.step.fields, ...(one.alone ?? {}) } });
+  const checked = checkSteps(raw);
+  return checked.value ? { name: one.name, prompt: `When I ask: ${one.about}`.slice(0, 300), steps: checked.value } : null;
 }
 
 // What a person is told before turning a bundle on: per skill what it reads and what it writes, which apps it needs, and what each workflow does.

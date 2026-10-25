@@ -26,6 +26,7 @@ import { DRAG_KIND, DRAG_ROW, blockById, blockIdFor, blockName, insertRow, moveR
 //   showErrors  true after a failed "Done": then empty titles show their error even if the person never touched them
 //   busy        true while saving: fields are read-only and buttons do nothing
 //   heading, subheading   the words above the list (they differ for a preview and for a saved draft)
+//   renderExtra  (optional) a function (row, index) that returns more to show under a step's blanks: the Builder uses it for the Workflow Studio card
 //   simple      true is the Builder's calm look: each step shows its name and only the blanks to fill in (no kind picker, no icon
 //               picker, no "shown in the plan as" line, no Add step button: blocks are added from the Builder's list)
 //   dnd         true turns on drag and drop (the Builder does): drag a step by its handle to move it, or drop a step kind
@@ -52,7 +53,7 @@ const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-m
 const inputBase = "h-11 w-full rounded-xl border bg-surface px-3 text-[15px] placeholder:text-hint focus-visible:border-accent read-only:opacity-90";
 const COUNTER_FROM = 160; // the character counter appears from here
 
-export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false, simple = false }) {
+export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false, simple = false, renderExtra = null }) {
   const reduce = usePrefersReducedMotion();
   const [openIcon, setOpenIcon] = useState(null); // key of the step whose icon panel is open (only one at a time)
   const [touched, setTouched] = useState(() => new Set()); // keys of titles the person has already left
@@ -415,6 +416,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                       })}
                     </div>
                   )}
+                  {renderExtra?.(row, index)}
                   {shownAs && !simple && (
                     <p className="mt-3 text-sm text-mute">
                       Shown in the plan as: <span className="font-medium text-ink">{shownAs.title}</span>{shownAs.detail ? `. ${shownAs.detail}` : ""}

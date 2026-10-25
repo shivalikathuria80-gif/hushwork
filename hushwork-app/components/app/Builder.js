@@ -1,31 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { unstable_rethrow } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import useWarnBeforeLeaving from "../useWarnBeforeLeaving";
 import StepEditor, { ADD_ID, fieldId, firstPart, problemPart, toWorking } from "./StepEditor";
+import StepStudioCard from "./StepStudioCard";
 import { saveDraft, updateDraft, renameDraft } from "@/lib/actions/drafts";
 import { syncScheduleFromStart } from "@/lib/actions/schedules";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
 import { planOnlyWarning } from "@/lib/run-engine";
-import { BLOCKS, DRAG_KIND, newRowForBlock } from "@/lib/step-rows";
+import { BLOCKS, DRAG_KIND, newRowForBlock, rowsForSkill } from "@/lib/step-rows";
+import { SKILLS, accessOf } from "@/lib/skills/bundles";
+import { requirementOf } from "@/lib/studio/capabilities";
 
 // The Builder: build a workflow by hand from a short list of blocks (lib/step-rows.js). It reuses the step editor (the same rows, the same
 // checks) and adds a name, a palette and Save. It saves the same kind of draft as the workspace does, and it still runs
 // nothing: a workflow here is only a plan.
 //
 // `initial` comes from the server (lib/builder-start.js):
-//   { start: "new" }  { start: "template", name, prompt, steps }  { start: "draft", draft: { id, name, prompt, version }, steps }
+//   { start: "new" }  { start: "template" | "skill", name, prompt, steps }  { start: "draft", draft: { id, name, prompt, version }, steps }
+// `connections` (optional) says which apps are connected ({ id: true | false | null | "unavailable" }, lib/skills/connection-status.js): the Workflow Studio cards use it
+// to warn, in place, about a step whose app is missing. Without it no warning is shown.
 // Saving a NEW workflow makes a draft; saving an opened draft changes it in place (the version check is the same one the
 // workspace uses: if it was changed somewhere else, nothing is overwritten and "Load latest" brings the saved copy in).
 
 const FAILED = "Could not save. Check your connection and try again.";
 const inputClass = "mt-1 h-11 w-full rounded-xl border bg-surface px-3 text-[15px] placeholder:text-hint focus-visible:border-accent read-only:opacity-90";
 
-export default function Builder({ initial }) {
+export default function Builder({ initial, connections }) {
+  const router = useRouter();
   const startSteps = initial.steps ?? [];
   const [name, setName] = useState(initial.draft?.name ?? initial.name ?? "");
   const [about, setAbout] = useState(initial.draft?.prompt ?? initial.prompt ?? "");
@@ -69,6 +75,19 @@ export default function Builder({ initial }) {
     setMessage(null);
     announce(`${label} step added as step ${working.length + 1} of ${LIMITS.planSteps}.`);
   }
+
+  // A skill from the palette: its step, and an "Ask me first" row ahead of it when it writes and nothing before it asks.
+  function addSkill(skill) {
+    const rows = rowsForSkill(skill, working);
+    if (working.length + rows.length > LIMITS.planSteps) { announce(`A workflow can have up to ${LIMITS.planSteps} steps. Delete one to add another.`); return; }
+    setWorking((current) => [...current, ...rows]);
+    focusLater.current = { key: rows.at(-1).key, part: firstPart(rows.at(-1)) };
+    setMessage(null);
+    announce(`${skill.name} added${rows.length > 1 ? ", with an Ask me first step before it" : ""}.`);
+  }
+  // The Workflow Studio card's buttons: remove a step whose app is missing, or switch it to its stand-in way.
+  const removeRow = (key) => { setWorking((rows) => rows.filter((row) => row.key !== key)); announce("Step removed."); };
+  const changeFields = (key, fields) => { setWorking((rows) => rows.map((row) => (row.key === key ? { ...row, fields: { ...row.fields, ...fields } } : row))); announce("Step changed."); };
 
   // Checks everything the way the server will. Returns { name, steps } or null after showing what to fix.
   function check() {
@@ -233,12 +252,42 @@ export default function Builder({ initial }) {
               </li>
             ))}
           </ul>
+
+          <h2 id="skills-heading" className="mt-6 text-sm font-medium">Skills</h2>
+          <p className="mt-1 text-sm text-mute">Ready-made steps. A skill that writes brings an “Ask me first” step with it.</p>
+          <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1" aria-labelledby="skills-heading">
+            {SKILLS.filter((one) => one.step.kind !== "approve").map((one) => {
+              const need = requirementOf(one.step, connections);
+              const note = need.status === "missing_connection" ? `Needs ${need.missing.map((m) => m.name).join(", ")}` : need.status === "unavailable" ? "Cannot be connected yet" : accessOf(one) === "write" ? "Writes: needs Approve" : accessOf(one) === "think" ? "AI writes text" : "Reads only";
+              return (
+                <li key={one.id}>
+                  <button
+                    type="button" onClick={() => addSkill(one)} aria-disabled={atMax || saving || undefined}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-line bg-surface p-2 text-left transition-[background-color,border-color] duration-120 ease-standard hover:border-line-strong hover:bg-raised active:bg-line aria-disabled:opacity-50"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-subtle text-accent-text"><Icon name={one.icon} size={18} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium"><span className="sr-only">Add skill </span>{one.name}</span>
+                      <span className={`block text-sm ${need.status === "missing_connection" || need.status === "unavailable" ? "text-error" : "text-mute"}`}>{note}</span>
+                    </span>
+                    <Icon name="Plus" size={16} className="shrink-0 text-mute" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </aside>
 
         <section aria-labelledby="builder-steps-heading" className="min-w-0">
           <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
             <StepEditor
               steps={working} onChange={setWorking} announce={announce} showErrors={showErrors} busy={saving} focusOnOpen={false} dnd simple
+              renderExtra={(row) => (
+                <StepStudioCard
+                  step={row} connections={connections} busy={saving}
+                  onRemove={() => removeRow(row.key)} onChoose={(fields) => changeFields(row.key, fields)} onCheckAgain={() => router.refresh()}
+                />
+              )}
               heading={<span id="builder-steps-heading">Your workflow</span>}
               subheading={draft ? "Press Save changes when you are done." : "Not saved yet. Press Save when you are done."}
             />

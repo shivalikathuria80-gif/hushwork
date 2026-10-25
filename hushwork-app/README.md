@@ -351,6 +351,17 @@ The **Skills** page (`/app/skills`, `app/app/skills/page.js` and `components/app
 
 Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules), `lib/skills/enable.test.js`, `lib/skills/bundles.integration.test.js` (the real run code), `lib/sql-rls.test.js` (RLS on every per-person table). Why: `../DECISIONS.md` D-041.
 
+## Workflow Studio: one Builder, cards that explain every step
+
+Every way of starting a workflow ends in the same Builder: a **goal** (the workspace box), a **template**, or a **skill** (`/app/builder?skill=<id>`: from "Start a workflow with this skill" on the Skills page, or the **Skills** list on the Builder's left side). Under each step the Builder shows a card (`components/app/StepStudioCard.js`):
+
+- **Why** the step exists, and **Evidence**: *Planned* in the Builder (nothing has run). On the Runs page the same card says *Verified* only when a saved result exists, *Failed* (with the saved reason) or *Not sure* (started, end never seen).
+- Folded away: **How** it runs (the skill and the plugin it uses), what it **Produces**, and **what happens if it fails** (a step that writes is never sent again by itself after a dropped connection).
+- A **warning in place** when an app the step needs is not connected: *Connect* (opens Connections in a new tab), *I connected it: check again*, *Let the AI just think* (for an Ask the AI step) or *Remove this step*. Apps that cannot be connected yet say so. If Hushwork cannot check (for example Composio is not set up) it shows a soft note instead of a warning. You can always save anyway.
+- A skill that writes added from the list brings an "Ask me first" row with it.
+
+All of it is worked out from the step each time (`lib/studio/capabilities.js`), not saved with the workflow, so it cannot go stale. The buttons only edit the draft; nothing on a card runs anything. Why: `../DECISIONS.md` D-042. Tests: `lib/studio/capabilities.test.js`.
+
 ## Memory (Settings > Memory)
 
 Short facts you save (up to 50, 300 characters each), for example "Timezone: India (IST)". The AI plan writer and the **Ask the AI** step receive them as background. They are **data, not instructions** (D-039): only facts you wrote and that are verified are sent, inside `<memory>` tags with look-alike angle brackets, and the prompt says to ignore any instructions in them. Text that looks like a secret is refused. They are not given to the AI beside an MCP server. Saved facts are sent to Groq with your AI requests; they are part of **Download my data** and are deleted with your account. Set up once: paste `../supabase/memory.sql` into the Supabase SQL Editor. Without it the AI simply runs without memory. Code: `lib/ai/memory.js`, `lib/actions/memory.js`, `components/app/MemorySettings.js`.

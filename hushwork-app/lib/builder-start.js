@@ -8,12 +8,14 @@
 // Returns one of:
 //   { start: "new" }                                            an empty workflow
 //   { start: "template", name, prompt, steps }                  a starter template (checked steps)
+//   { start: "skill", name, prompt, steps }                     one ready-made skill (?skill=<id>): a Start step, then the skill (see lib/skills/bundles.js)
 //   { start: "draft", draft: { id, name, prompt, version }, steps }   one of the person's saved drafts
 //   { start: "missing" }                                        a draft that does not exist (or is not theirs: same answer)
 //   { start: "failed" }                                         the database could not be read
 import { checkId } from "./validate.js";
 import { readSavedStep } from "./steps.js";
 import { templateById } from "./templates.js";
+import { skillStart } from "./skills/bundles.js";
 
 const text = (value) => (typeof value === "string" ? value : "");
 // Address parameters can be a list (?draft=a&draft=b); only a single plain value counts.
@@ -39,6 +41,8 @@ export async function builderStart(supabase, userId, params) {
     };
   }
 
+  const skill = skillStart(single(params?.skill));
+  if (skill) return { start: "skill", name: skill.name, prompt: skill.prompt, steps: skill.steps };
   const template = templateById(single(params?.template));
   if (template) return { start: "template", name: template.title, prompt: template.request, steps: template.steps };
   return { start: "new" };

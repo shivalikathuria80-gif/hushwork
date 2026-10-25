@@ -48,6 +48,7 @@ export default function BundleCard({ info, on, disabled = false, states }) {
               <p className="mt-1 text-sm text-mute">{one.about}</p>
               {one.reads && <p className="mt-1 text-sm"><b className="font-medium">Reads:</b> {one.reads}</p>}
               {one.writes && <p className="mt-1 text-sm"><b className="font-medium">Writes:</b> {one.writes}</p>}
+              {one.access !== "control" && <p className="mt-2 text-sm"><Link href={`/app/builder?skill=${one.id}`} className="font-medium text-accent-text hover:underline">Start a workflow with this skill</Link></p>}
             </li>
           ))}
         </ul>

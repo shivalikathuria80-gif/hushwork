@@ -86,5 +86,5 @@ test("draft wins over template when both are given", async () => {
 test("builder-start.js imports nothing from Next.js, Supabase or React", () => {
   const source = fs.readFileSync(path.join(root, "lib/builder-start.js"), "utf8");
   const imports = [...source.matchAll(/^import .* from "(.+)";$/gm)].map((match) => match[1]);
-  assert.deepEqual(imports, ["./validate.js", "./steps.js", "./templates.js"]);
+  assert.deepEqual(imports, ["./validate.js", "./steps.js", "./templates.js", "./skills/bundles.js"]);
 });

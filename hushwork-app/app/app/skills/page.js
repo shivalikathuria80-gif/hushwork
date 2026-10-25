@@ -3,10 +3,7 @@ import { Icon } from "@/components/icons";
 import BundleCard from "@/components/app/BundleCard";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { connectorStatus } from "@/lib/connector-status";
-import { getComposioKey } from "@/lib/connectors/composio-env";
-import { listConnected } from "@/lib/connectors/composio";
-import { COMPOSIO_APPS } from "@/lib/connectors/composio-apps";
+import { connectionStates } from "@/lib/skills/connection-status";
 import { BUNDLES, describeBundle } from "@/lib/skills/bundles";
 import { enabledBundleIds, SKILLS_FAILED } from "@/lib/skills/enable";
 
@@ -34,23 +31,10 @@ export default function SkillsPage() {
   );
 }
 
-// Which apps are connected: yes, no, or null when that cannot be checked (for example Composio is not set up on this server).
-async function connectionChecker(supabase, user) {
-  const own = await connectorStatus(supabase, user.id);
-  const key = getComposioKey();
-  const listed = key ? await listConnected({ key, userId: user.id }) : null;
-  const toolkits = listed && !listed.error ? new Set(listed.accounts.map((account) => account.toolkit)) : null;
-  return (connection) => {
-    if (connection.own) return Boolean(own[connection.id]?.usable);
-    const app = COMPOSIO_APPS.find((one) => one.id === connection.id);
-    return app && toolkits ? toolkits.has(app.toolkit) : null;
-  };
-}
-
 async function Bundles() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [{ ids, missing, failed }, isConnected] = await Promise.all([enabledBundleIds(supabase, user.id), connectionChecker(supabase, user)]);
+  const [{ ids, missing, failed }, connected] = await Promise.all([enabledBundleIds(supabase, user.id), connectionStates(supabase, user.id)]);
   return (
     <>
       {missing && <p role="status" className="mt-6 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{SKILLS_FAILED.setup}</p>}
@@ -58,7 +42,7 @@ async function Bundles() {
       <ul className="mt-8 grid gap-4">
         {BUNDLES.map((bundle) => {
           const info = describeBundle(bundle);
-          const states = Object.fromEntries(info.connections.map((connection) => [connection.id, connection.unavailable ? "unavailable" : isConnected(connection)]));
+          const states = Object.fromEntries(info.connections.map((connection) => [connection.id, connected[connection.id] ?? null]));
           return <BundleCard key={bundle.id} info={info} on={ids.has(bundle.id)} disabled={missing} states={states} />;
         })}
       </ul>
