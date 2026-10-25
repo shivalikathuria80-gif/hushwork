@@ -453,7 +453,7 @@ test("shared workflow memory is data, not instructions: person-written and verif
   const grants = sql.split("\n").filter((line) => /^grant /.test(line)).join("\n");
   assert.ok(!/source|verification_status/.test(grants), "a person can never choose a fact's source or verification: the defaults (person, verified) stand");
   assert.match(sql, /check \(source in \('person', 'workflow', 'ai'\)\)/);
-  assert.match(sql, /< 50/, "the number of facts is capped by the database");
+  assert.match(sql, />= 50/, "the number of facts is capped by the database (a trigger, not a policy)");
   const memory = files.find((file) => file.name === "lib/ai/memory.js").text;
   assert.ok(memory.includes('.eq("source", "person")') && memory.includes('.eq("verification_status", "verified")') && memory.includes('.eq("user_id", userId)'), "only the person's own verified facts are loaded");
   assert.ok(memory.includes("looksSensitive") && memory.includes(".replace(/</g,"), "secrets are refused and angle brackets are neutralised");
