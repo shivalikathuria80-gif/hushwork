@@ -9,7 +9,7 @@ const steps = (task) => planToSteps(keywordPlan(task));
 
 test("keyword preview: every kind of task becomes a Start step and ONE Ask the AI step that looks in the right place", () => {
   const cases = [
-    ["Follow up new leads", "gmail", ""], ["Keep my receipts and contracts tidy", "drive", ""], ["Chase overdue invoices", "app", "stripe"],
+    ["Follow up new leads", "gmail", ""], ["Keep my receipts and contracts tidy", "drive", ""], ["Chase overdue invoices", "app", "stripeinvoices"], ["Check my payments", "app", "stripe"],
     ["Sort my inbox every morning", "gmail", ""], ["Weekly client report", "linear", ""], ["Sum up my calendar for the week", "calendar", ""],
     ["Plan my next launch", "nothing", ""],
   ];

@@ -17,6 +17,8 @@ test("pluginsOf: the apps a step needs come from what it reads or writes, and no
   assert.deepEqual(pluginsOf(ai("calendar")), ["google"]);
   assert.deepEqual(pluginsOf(ai("linear")), ["linear"]);
   assert.deepEqual(pluginsOf(ai("app", "stripe")), ["stripe"]);
+  assert.deepEqual(pluginsOf(ai("app", "stripeinvoices")), ["stripe"], "a second lookup shares its app's sign-in");
+  assert.deepEqual(pluginsOf({ kind: "app", fields: { app: "stripeinvoices" } }), ["stripe"]);
   assert.deepEqual(pluginsOf(ai("app", "not-an-app")), [], "an unknown app name needs nothing we can name");
   for (const free of ["nothing", "web", "mcp"]) assert.deepEqual(pluginsOf(ai(free, "https://example.com/")), [], free);
   assert.deepEqual(pluginsOf({ kind: "app", fields: { app: "todoist", what: "" } }), ["todoist"]);

@@ -5,7 +5,7 @@ import { APP_LIST } from "./connectors/app-list.js";
 import { COMPOSIO_APPS } from "./connectors/composio-apps.js";
 
 test("every connection has a logo: each app in the list, each Composio app (Slack included), and the four Google products", () => {
-  for (const app of [...APP_LIST, ...COMPOSIO_APPS]) assert.ok(hasLogo(app.id), `${app.id} has a logo`);
+  for (const app of [...APP_LIST, ...COMPOSIO_APPS.filter((one) => !one.lookupOf)]) assert.ok(hasLogo(app.id), `${app.id} has a logo`); // a second lookup shares its app's box and logo
   for (const id of ["calendar", "sheets", "gmail", "drive", "slack", "mcp"]) assert.ok(hasLogo(id), id);
 });
 

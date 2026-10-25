@@ -208,12 +208,12 @@ export const TEMPLATES = [
   },
   {
     id: "launchnotes", pack: "marketing", icon: "FileText", title: "Launch notes page in Notion", needs: "Google, Notion",
-    body: "The AI looks at your latest Drive files and creates a Notion page called Launch notes with a one-line summary of what you worked on. First change the page id in the step to the Notion page it should go under. You press Approve before it is created.",
+    body: "The AI looks at your latest Drive files and creates a Notion page called Launch notes with a short summary of what you worked on written on it. First change the page id in the step to the Notion page it should go under. You press Approve before it is created.",
     request: "When I ask, create a Launch notes page in Notion with a summary of what I worked on. Ask me before it is created.",
     steps: [
       step("trigger", { how: "manual", when: "" }),
-      step("ai", { task: "Say in 8 words or fewer what I worked on most lately, from my latest file names.", uses: "drive", address: "" }),
-      step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Launch notes: {answer}", details: "" }),
+      step("ai", { task: "Sum up in 3 short lines what I worked on most lately, from my latest file names.", uses: "drive", address: "" }),
+      step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Launch notes", details: "{answer}" }),
     ],
   },
   {
@@ -282,12 +282,12 @@ export const TEMPLATES = [
   },
   {
     id: "designlog", pack: "design", icon: "FileText", title: "Design log page in Notion", needs: "Google, Notion",
-    body: "The AI looks at the names of your latest Drive files and creates a Notion page called Design log with a one-line summary. First change the page id in the step to the Notion page it should go under. You press Approve before it is created.",
+    body: "The AI looks at the names of your latest Drive files and creates a Notion page called Design log with a short summary written on it. First change the page id in the step to the Notion page it should go under. You press Approve before it is created.",
     request: "When I ask, create a Design log page in Notion that sums up my latest design files. Ask me before it is created.",
     steps: [
       step("trigger", { how: "manual", when: "" }),
-      step("ai", { task: "Say in 8 words or fewer which design work I changed most lately, from my latest file names.", uses: "drive", address: "" }),
-      step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Design log: {answer}", details: "" }),
+      step("ai", { task: "Sum up in 3 short lines which design work I changed most lately, from my latest file names.", uses: "drive", address: "" }),
+      step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Design log", details: "{answer}" }),
     ],
   },
   {

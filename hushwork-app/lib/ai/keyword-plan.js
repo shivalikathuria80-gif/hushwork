@@ -10,7 +10,8 @@ const LOOKS = [
   [/lead|enquir|prospect/, "gmail", "Which new enquiries need a reply? Say who and why. Up to 4 short lines."],
   [/calendar|meeting|my week|agenda/, "calendar", "Sum up my next 7 days in 5 short lines. Point out the busiest day."],
   [/receipt|contract|admin|expense/, "drive", "From my 10 latest file names, which look like receipts or contracts? 4 short lines."],
-  [/invoice|pay|overdue|stripe/, "stripe", "List payments that failed or look overdue: client, amount, how late. Up to 5 short lines."],
+  [/invoice|overdue|unpaid/, "stripeinvoices", "List invoices that are open or overdue: client, amount, how late. Up to 5 short lines."],
+  [/pay|stripe/, "stripe", "List payments that failed or look odd: client, amount. Up to 5 short lines."],
   [/inbox|newsletter|gmail|email/, "gmail", "Which emails need me and which can wait? Use sender and subject. 4 short lines."],
   [/report|friday|summar|client|task|linear/, "linear", "Write a short client-ready report from my tasks: what is in progress and what is next."],
 ];

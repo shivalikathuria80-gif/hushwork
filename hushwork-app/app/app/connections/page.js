@@ -142,7 +142,7 @@ async function MoreApps({ searchParams }) {
         <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{listed.error}</p>
       ) : (
         <ul className="mt-4 space-y-3">
-          {COMPOSIO_APPS.map((app) => (
+          {COMPOSIO_APPS.filter((app) => !app.lookupOf).map((app) => (
             <li key={app.id} className="rounded-xl border border-line p-3">
               <div className="flex flex-wrap items-center gap-3">
                 <AppLogo id={app.id} label={app.name} />

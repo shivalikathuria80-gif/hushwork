@@ -57,7 +57,7 @@ test("skills: reading skills that look at an app name a real app that can be con
     if (uses === "app") {
       const app = findComposioApp(address);
       assert.ok(app && !app.unavailable, `${one.id}: ${address} can be connected`);
-      assert.ok(one.needs.includes(address), `${one.id}: lists ${address} as a need`);
+      assert.ok(one.needs.includes(app.lookupOf ?? address), `${one.id}: lists ${app.lookupOf ?? address} as a need`);
     }
     if (uses === "web") assert.ok(checkRequestUrl(address).value, `${one.id}: valid web address`);
     if (uses === "gmail" || uses === "drive" || uses === "calendar") assert.ok(one.needs.includes("google"), `${one.id}: needs Google`);
@@ -153,7 +153,7 @@ test("the three examples from the plan exist as workflows with the steps they pr
   assert.deepEqual(chaser.schedule, { frequency: "weekly", weekday: 5, hour: 10, minute: 0 }, "every Friday at 10:00");
   const steps = buildWorkflow(fb, chaser).steps;
   assert.deepEqual(steps.map((s) => s.kind), ["trigger", "ai", "ai", "ai", "approve", "action"], "unpaid payments, client emails, a reminder draft, approval, then the email");
-  assert.equal(steps[1].fields.address, "stripe");
+  assert.equal(steps[1].fields.address, "stripeinvoices", "unpaid INVOICES, not payments");
   assert.equal(steps[2].fields.uses, "gmail");
   const [tb, triage] = find("client-triage");
   assert.equal(triage.start.how, "manual", "on demand");

@@ -23,9 +23,9 @@ export function pluginsOf(step) {
     case "ai":
       if (["gmail", "drive", "calendar"].includes(f.uses)) return ["google"];
       if (f.uses === "linear") return ["linear"];
-      if (f.uses === "app") return findComposioApp(f.address) ? [f.address] : [];
+      if (f.uses === "app") return findComposioApp(f.address) ? [findComposioApp(f.address).lookupOf ?? f.address] : []; // a second lookup shares its app's sign-in
       return []; // nothing, a web address (public pages only) or an MCP server (no sign-in)
-    case "app": return findComposioApp(f.app) ? [f.app] : [];
+    case "app": return findComposioApp(f.app) ? [findComposioApp(f.app).lookupOf ?? f.app] : [];
     case "action": return findAction(f.action) ? [findAction(f.action).app] : [];
     case "issue": return ["linear"];
     case "row": return ["google"];

@@ -21,9 +21,9 @@ const skill = (id, name, icon, about, { reads = "", writes = "", needs = [], alo
 // ---- the skills ----------------------------------------------------------------------------------------------------------------------------------------
 export const SKILLS = [
   // finance
-  skill("stripe-unpaid", "Find unpaid payments", "CreditCard", "Looks at your latest Stripe payments and lists the ones that failed or look overdue: client, amount, how late.",
-    { reads: "Your latest Stripe payments (read only: it cannot charge, refund or change anything).", needs: ["stripe"] },
-    step("ai", { task: "List payments that failed or look overdue: client, amount, how late. Up to 5 short lines.", uses: "app", address: "stripe" })),
+  skill("stripe-unpaid", "Find unpaid invoices", "CreditCard", "Looks at your latest Stripe invoices and lists the ones that are open or overdue: client, amount, how late.",
+    { reads: "Your latest Stripe invoices (read only: it cannot create, send, pay or change anything).", needs: ["stripe"] },
+    step("ai", { task: "List invoices that are open or overdue: client, amount, how late. Up to 5 short lines.", uses: "app", address: "stripeinvoices" })),
   skill("stripe-summary", "Summarise payments", "FileBarChart", "Sums up your latest Stripe payments: how many, the total, the biggest, and anything odd.",
     { reads: "Your latest Stripe payments (read only).", needs: ["stripe"] },
     step("ai", { task: "Sum up my latest payments in 4 short lines: how many, the total, the biggest, and anything that looks odd.", uses: "app", address: "stripe" })),
@@ -85,8 +85,8 @@ export const BUNDLES = [
     skills: ["stripe-unpaid", "gmail-clients", "draft-reminder", "drive-expenses", "stripe-summary", "ask-approval", "email-me"],
     workflows: [
       {
-        id: "invoice-chaser", title: "Invoice Chaser", body: "Every Friday: finds unpaid payments, matches the client email addresses, drafts a polite reminder and emails you the lot to review. It does not email your clients.",
-        request: "Every Friday at 10:00, find unpaid payments, match the client email addresses, draft a reminder and email it to me. Ask me before it is sent.",
+        id: "invoice-chaser", title: "Invoice Chaser", body: "Every Friday: finds unpaid invoices, matches the client email addresses, drafts a polite reminder and emails you the lot to review. It does not email your clients.",
+        request: "Every Friday at 10:00, find unpaid invoices, match the client email addresses, draft a reminder and email it to me. Ask me before it is sent.",
         start: { how: "schedule", when: "Every Friday at 10:00" }, schedule: { frequency: "weekly", weekday: 5, hour: 10, minute: 0 },
         flow: ["stripe-unpaid", "gmail-clients", "draft-reminder", "ask-approval", ["email-me", { title: "Invoices to chase" }]],
       },

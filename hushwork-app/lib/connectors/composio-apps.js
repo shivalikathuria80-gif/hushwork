@@ -11,6 +11,7 @@
 //             delete or send), and that needs no input from a person (it is always called with nothing to fill in).
 //   what      what the lookup returns, in plain words ("your open tasks")
 //   about     one plain sentence on the Connections page
+//   lookupOf  (optional) the id of the app whose sign-in this lookup shares (a second read-only tool of the same app). It has no Connect button or box of its own.
 //   unavailable  (optional) a plain sentence saying why this app cannot be connected yet. Such an app shows that sentence instead of a Connect
 //             button, and the server refuses to start its sign-in. Checked against Composio's toolkit pages on 2026-10-23.
 export const COMPOSIO_APPS = [
@@ -29,7 +30,9 @@ export const COMPOSIO_APPS = [
   { id: "pagerduty", name: "PagerDuty", toolkit: "pagerduty", tool: "PAGERDUTY_FETCH_INCIDENT_LIST", what: "your latest incidents", about: "Hushwork can read your PagerDuty incidents. It cannot acknowledge, resolve or change anything." },
   // Talking and money
   { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels, and send one message when a step says so and you approve it. It cannot edit or delete messages." },
-  { id: "stripe", name: "Stripe", toolkit: "stripe", tool: "STRIPE_LIST_CHARGES", what: "your latest payments", about: "Hushwork can read your latest Stripe payments. It cannot charge, refund or change anything." },
+  { id: "stripe", name: "Stripe", toolkit: "stripe", tool: "STRIPE_LIST_CHARGES", what: "your latest payments", about: "Hushwork can read your latest Stripe payments and your latest invoices (paid, open and overdue). It cannot charge, refund, send or change anything." },
+  // A second lookup on the SAME sign-in as Stripe (`lookupOf`): it has no Connect button of its own, Connecting Stripe allows both tools. If Stripe was connected before invoices were added, press Disconnect and Connect once more.
+  { id: "stripeinvoices", name: "Stripe invoices", toolkit: "stripe", tool: "STRIPE_LIST_INVOICES", lookupOf: "stripe", what: "your latest invoices (paid, open and overdue)", about: "Hushwork can read your latest Stripe invoices. It cannot create, send, pay or change anything." },
   { id: "xero", name: "Xero", toolkit: "xero", tool: "XERO_GET_CONTACTS", what: "your contacts", about: "Hushwork can read your Xero contacts. It cannot create invoices or change anything.", unavailable: "Composio cannot lend its sign-in for Xero, so it needs a Xero developer app set up by hand. Not available yet." },
   { id: "mailchimp", name: "Mailchimp", toolkit: "mailchimp", tool: "MAILCHIMP_LIST_CAMPAIGNS", what: "your email campaigns", about: "Hushwork can list your Mailchimp campaigns. It cannot send or change anything." },
   // Personal

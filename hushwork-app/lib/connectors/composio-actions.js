@@ -55,12 +55,13 @@ export const COMPOSIO_ACTIONS = [
     labels: { target: "Starts", title: "Event", details: "Notes" },
   },
   {
-    id: "notion_page", app: "notion", name: "Create a Notion page", tool: "NOTION_CREATE_NOTION_PAGE", needsTarget: true, noDetails: true, example: "00000000000000000000000000000000",
+    id: "notion_page", app: "notion", name: "Create a Notion page", tool: "NOTION_CREATE_NOTION_PAGE", needsTarget: true, example: "00000000000000000000000000000000",
     target: { pattern: /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/, hint: "Write the id of the Notion page it goes under: the long code (32 letters and numbers) at the end of that page's address." },
-    candidates: { parent_id: ["parent_id"], title: ["title"] },
-    meaning: (v) => ({ parent_id: v.target, title: v.title }),
+    // `markdown` is the text on the page (Composio's create-page tool takes it in the same call). Empty means an empty page with just the title.
+    candidates: { parent_id: ["parent_id"], title: ["title"], markdown: ["markdown"] },
+    meaning: (v) => ({ parent_id: v.target, title: v.title, markdown: v.details }),
     done: () => "Created a Notion page",
-    labels: { target: "Under page", title: "Page title" },
+    labels: { target: "Under page", title: "Page title", details: "Text on the page" },
   },
   {
     id: "todoist_task", app: "todoist", name: "Add a Todoist task", tool: "TODOIST_CREATE_TASK", needsTarget: false,

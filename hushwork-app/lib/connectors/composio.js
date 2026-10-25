@@ -104,7 +104,8 @@ async function call(key, method, path, { query, body, fetchImpl = fetch, notFoun
 
 // The tools an app's sign-in is limited to at Composio: its ONE read-only lookup, plus the tools of the actions Hushwork can do in it
 // (composio-actions.js). Nothing else can be run with that sign-in, whatever anyone asks.
-export const allowedTools = (app) => [app.tool, ...actionsForApp(app.id).map((action) => action.tool)];
+// (An app's second lookups, `lookupOf`, share its sign-in, so the sign-in allows all of the toolkit's lookups.)
+export const allowedTools = (app) => [...new Set(COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).map((action) => action.tool)]))];
 const sameTools = (list, wanted) => Array.isArray(list) && list.length === wanted.length && wanted.every((tool) => list.includes(tool));
 
 // The sign-in blueprint ("auth config") for an app, limited to its allowed tools. Found if it already exists, made if not.
@@ -239,7 +240,7 @@ export async function checkComposioConnections({ key, userId, fetchImpl }) {
     }));
     return { name: app.name, ok: read.ok, note: read.ok ? `Works. It answered with ${app.what}.` : said(read), actions };
   }));
-  const off = COMPOSIO_APPS.filter((app) => app.unavailable || !connected.has(app.toolkit)).map((app) => app.name);
+  const off = COMPOSIO_APPS.filter((app) => !app.lookupOf && (app.unavailable || !connected.has(app.toolkit))).map((app) => app.name);
   return { rows, off };
 }
 

@@ -7,6 +7,7 @@ import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import ResumeRun from "./ResumeRun";
 import StepStudioCard from "./StepStudioCard";
+import { summarizeRun } from "@/lib/studio/run-summary";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isPlanOnly, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
@@ -163,6 +164,7 @@ export default async function RunsViewer({ searchParams }) {
       // the page still works without it: the steps just offer Approve
     }
   }
+  const summary = selected.live ? { line: "" } : summarizeRun({ steps: selected.results, doneAt, stoppedAt, unknownAt }); // one plain line of what was really done, built only from saved results
   const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step, index }) => !doneAt.has(index) && isApprovable(step));
   // A row step that uses {answer} shows the real words, so you read exactly what will be written before you press Approve.
   const needsAnswer = approvals.some(({ step }) => (isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG)) || ((isLinearCreate(step) || isActionStep(step)) && `${step.fields?.title}${step.fields?.details}`.includes(ANSWER_TAG)));
@@ -200,6 +202,12 @@ export default async function RunsViewer({ searchParams }) {
                 : "All steps are done."}
           </p>
         </div>
+        {summary.line && (
+          <p id="run-summary" className="mt-3 flex items-start gap-2 text-[15px] font-medium">
+            <Icon name={summary.state === "done" ? "CircleCheck" : summary.state === "waiting" ? "Info" : "CircleAlert"} className={`mt-0.5 shrink-0 ${summary.state === "done" ? "text-success" : summary.state === "waiting" ? "text-info" : "text-error"}`} />
+            <span>{summary.line}</span>
+          </p>
+        )}
         {!selected.live && (auto === "done" || auto === "stopped") && (
           <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
             <Icon name={auto === "done" ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${auto === "done" ? "text-success" : "text-error"}`} />

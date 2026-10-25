@@ -98,4 +98,4 @@ export function fakeComposio(tools = {}, { groq = [] } = {}) {
 }
 
 export const GMAIL_TOOL = { inputs: { recipient_email: { required: true }, subject: {}, body: { required: true } } };
-export const NOTION_TOOL = { inputs: { parent_id: { required: true }, title: { required: true } } };
+export const NOTION_TOOL = { inputs: { parent_id: { required: true }, title: { required: true }, markdown: {} } };

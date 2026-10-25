@@ -68,7 +68,7 @@ test("Weekly Post Ideas: the AI thinks (reads no app), the email goes to the per
 
 test("Invoice Chaser without Google connected stops at the Gmail step with a clear reason, writes nothing, and can be continued later", async () => {
   const { workflow, who } = await withBundle("finance-ops", "Invoice Chaser");
-  const composio = fakeComposio({ STRIPE_LIST_CHARGES: { answer: OK }, GMAIL_SEND_EMAIL: GMAIL_TOOL }, { groq: ["TOOL", "Ana: 500, 9 days late."] });
+  const composio = fakeComposio({ STRIPE_LIST_INVOICES: { answer: OK }, GMAIL_SEND_EMAIL: GMAIL_TOOL }, { groq: ["TOOL", "Ana: 500, 9 days late."] });
   try {
     const run = await startPracticeRun({ id: workflow.id, auto: true }, who);
     const gmailStep = workflow.plan.findIndex((step) => step.kind === "ai" && step.fields.uses === "gmail");
@@ -78,6 +78,6 @@ test("Invoice Chaser without Google connected stops at the Gmail step with a cle
     assert.equal(emailAt(workflow) > gmailStep, true);
     const resumed = await resumeRun({ runId: run.runId }, who);
     assert.equal(resumed.auto.skipped, 1, "the Stripe step that already worked is not asked again");
-    assert.equal(posts(composio).filter((call) => call.path === "/tools/execute/STRIPE_LIST_CHARGES").length, 1);
+    assert.equal(posts(composio).filter((call) => call.path === "/tools/execute/STRIPE_LIST_INVOICES").length, 1);
   } finally { composio.restore(); }
 });

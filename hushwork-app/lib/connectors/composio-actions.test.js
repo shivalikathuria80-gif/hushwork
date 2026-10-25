@@ -126,7 +126,7 @@ test("nothing is sent when the tool does not match what we know, and every probl
   assert.ok(!failed.error.includes("SECRET"), "but the sentence is always ours");
 });
 
-test("a calendar event and a Notion page: the start time and the page id are checked, the words go to the tool's own boxes, and Notion never sends the details box", () => {
+test("a calendar event and a Notion page: the start time and the page id are checked, the words go to the tool's own boxes, and a Notion page carries its text in the tool's `markdown` box", () => {
   const event = findAction("calendar_event");
   for (const good of ["2026-11-05 15:00", "2027-01-31 00:00", "2026-12-31 23:59"]) assert.deepEqual(checkTarget(event, good), { value: good }, good);
   for (const bad of ["", "2026-13-05 15:00", "2026-11-32 15:00", "2026-11-05 24:00", "2026-11-05 15:60", "2026-11-05T15:00", "tomorrow 3pm", "2026-11-05", "2026-11-05 15:00\nbcc"]) assert.ok(checkTarget(event, bad).error, bad);
@@ -138,11 +138,18 @@ test("a calendar event and a Notion page: the start time and the page id are che
   const page = findAction("notion_page");
   for (const good of ["0123456789abcdef0123456789abcdef", "01234567-89ab-cdef-0123-456789abcdef"]) assert.deepEqual(checkTarget(page, good), { value: good }, good);
   for (const bad of ["", "abc", "0123456789abcdef0123456789abcdeg", "https://notion.so/x-0123456789abcdef0123456789abcdef"]) assert.ok(checkTarget(page, bad).error, bad);
-  assert.equal(page.noDetails, true);
-  const pageInputs = readToolInputs({ input_parameters: { parent_id: { required: true }, title: { required: true }, icon: {} } });
-  assert.deepEqual(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "ignored words" }, pageInputs).arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Notes" });
+  assert.equal(page.noDetails, undefined, "a Notion page can carry text now");
+  const pageInputs = readToolInputs({ input_parameters: { parent_id: { required: true }, title: { required: true }, markdown: {}, icon: {} } });
+  assert.deepEqual(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "# Hello\n- one" }, pageInputs).arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Notes", markdown: "# Hello\n- one" });
+  assert.deepEqual(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "" }, pageInputs).arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Notes" }, "no text means an empty page with the title");
+  const oldTool = readToolInputs({ input_parameters: { parent_id: { required: true }, title: { required: true } } });
+  assert.ok(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "words" }, oldTool).error, "a tool with no place for the text is never sent the text by guessing");
   assert.deepEqual(allowedTools(findComposioApp("gcalwrite")), ["GOOGLECALENDAR_LIST_CALENDARS", "GOOGLECALENDAR_CREATE_EVENT"]);
   assert.deepEqual(allowedTools(findComposioApp("notion")), ["NOTION_SEARCH_NOTION_PAGE", "NOTION_CREATE_NOTION_PAGE"]);
+  // Stripe has two lookups on one sign-in: connecting Stripe (or its invoices) allows both, and nothing else
+  assert.deepEqual(allowedTools(findComposioApp("stripe")), ["STRIPE_LIST_CHARGES", "STRIPE_LIST_INVOICES"]);
+  assert.deepEqual(allowedTools(findComposioApp("stripeinvoices")), ["STRIPE_LIST_CHARGES", "STRIPE_LIST_INVOICES"]);
+  assert.equal(findComposioApp("stripeinvoices").lookupOf, "stripe");
 });
 
 test("{myEmail}: allowed only for an email, becomes the signed-in person's own address (never one from the step), and a missing address is a clear message", async () => {

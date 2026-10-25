@@ -166,7 +166,7 @@ test("test all connections (Composio part): only connected apps are tried, a wor
     if (path === "/tools/execute/SLACK_LIST_ALL_CHANNELS") return json({ successful: true, data: { channels: [] } });
     if (path === "/tools/execute/NOTION_SEARCH_NOTION_PAGE") return json({ successful: false, error: "Forbidden: page not shared with the integration" });
     if (path === "/tools/SLACK_SEND_MESSAGE") return json({ input_parameters: { channel: { required: true }, markdown_text: { required: true } } });
-    if (path === "/tools/NOTION_CREATE_NOTION_PAGE") return json({ input_parameters: { parent_id: { required: true }, title: { required: true }, bot_token: { required: true } } });
+    if (path === "/tools/NOTION_CREATE_NOTION_PAGE") return json({ input_parameters: { parent_id: { required: true }, title: { required: true }, markdown: {}, bot_token: { required: true } } });
     return json({}, 404);
   };
   const result = await checkComposioConnections({ key: "ak_k", userId: "u-1", fetchImpl });

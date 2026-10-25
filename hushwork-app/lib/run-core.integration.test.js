@@ -248,3 +248,17 @@ test("without a memory table (not set up yet) the AI step still works, with no m
     assert.ok(!composio.calls.find((call) => call.path === "groq").body.messages[1].content.includes("<memory>"));
   } finally { composio.restore(); }
 });
+
+// ---- a Notion page now carries text ----
+test("a Notion page carries the AI's text (line breaks kept) in the tool's markdown box, once, and the card shows exactly that text", async () => {
+  const plan = finishSteps({ steps: [trigger, aiStep("Sum up my week.", "Ask the AI"), { icon: "FileText", title: "Create a page", detail: "{answer}", block: "action", choice: "notion_page", a: "0123456789abcdef0123456789abcdef", b: "Week notes" }] });
+  const { workflow, who } = setup({ plan });
+  const composio = fakeComposio({ NOTION_CREATE_NOTION_PAGE: { ...NOTION_TOOL, answer: { successful: true, data: { id: "p1" } } } }, { groq: ["Monday: standup\n- Dentist at 5\n\nTuesday: free"] });
+  try {
+    const result = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.deepEqual(result.auto, { done: 2, stoppedAt: 0 });
+    const sent = livePosts(composio);
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].body.arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Week notes", markdown: "Monday: standup\n- Dentist at 5\nTuesday: free" }); // the AI step trims blank lines; line breaks stay
+  } finally { composio.restore(); }
+});
