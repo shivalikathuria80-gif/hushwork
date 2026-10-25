@@ -28,8 +28,8 @@ export function json(body, status = 200, headers = {}) {
 
 export const STEPS = [
   { icon: "Clock", title: "Run every weekday", detail: "9:00 am" },
-  { icon: "CreditCard", title: "Find overdue invoices", detail: "Stripe, older than 7 days" },
-  { icon: "PenLine", title: "Draft a polite reminder", detail: "In your tone" },
+  { icon: "CreditCard", title: "Overdue invoices", detail: "Stripe, older than 7 days" },
+  { icon: "PenLine", title: "Polite reminder", detail: "In your tone" },
 ];
 
 // What the AI service answers when all is well: the plan as JSON text inside the usual envelope.

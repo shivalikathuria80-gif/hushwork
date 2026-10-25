@@ -207,13 +207,69 @@ export function ensureRealSend(steps, task = "") {
   return steps.length >= LIMITS.planSteps ? [...steps.slice(0, -1), made] : [...steps, made];
 }
 
-// Everything an AI answer goes through: lenient clean, the send-to-me safety net, approval step, then the strict gate that saved drafts use.
+// THE SAFETY NET FOR PLAIN NOTES. A model sometimes ignores the blocks and answers with plain notes ("Read important emails", "Draft replies", "Store
+// drafts in Notion"). A note only describes: run it and nothing happens. So a note is turned into the real step that does the same job, decided by the
+// first word of its title:
+//   a reading verb (read, check, find, summarise...)  -> an Ask the AI step that looks where the words say (inbox, calendar, Drive, Linear, an app)
+//   a writing verb (draft, write, reply, prepare...)  -> the same Ask the AI step as the look before it (steps cannot see each other's answers, so the
+//                                                         job is added to that step), or its own Ask the AI step when nothing came before
+//   a sending/storing verb (store, save, send, email...) -> ONE real email to the person themself that carries the answer(s), once, and only when
+//                                                         no step really sends yet. Notion pages cannot hold text yet, so "store it in Notion" becomes this email.
+// A note whose first word is none of those (a heading, a stop sign) is left as it was. Every result is checked by the normal rules.
+const WORDS = (list) => new Set(list.split(" "));
+const READ_VERBS = WORDS("read check find look search list review summarise summarize sum pick scan fetch get filter open collect gather pull identify sort classify triage analyse analyze monitor watch");
+const WRITE_VERBS = WORDS("draft write compose reply prepare generate think plan rewrite translate suggest");
+const OUT_VERBS = WORDS("store save send email mail post notify forward deliver share upload add log record file archive");
+const APP_WORDS = [[/stripe|payment|invoice|charge/, "stripe"], [/github|pull request/, "github"], [/notion/, "notion"], [/todoist/, "todoist"], [/slack/, "slack"], [/hubspot|crm|\bdeals?\b/, "hubspot"], [/jira/, "jira"], [/sentry/, "sentry"], [/pagerduty|incident/, "pagerduty"], [/mailchimp|newsletter/, "mailchimp"], [/trello|board/, "trello"], [/airtable/, "airtable"]];
+function lookingAt(words) {
+  const t = words.toLowerCase();
+  if (/\b(?:e-?mails?|inbox|gmail|mail|messages?)\b/.test(t)) return "gmail";
+  if (/calendar|meeting|appointment|agenda/.test(t)) return "calendar";
+  if (/\b(?:drive|files?|documents?|receipts?|contracts?)\b/.test(t)) return "drive";
+  if (/\b(?:linear|tasks?|tickets?)\b/.test(t)) return "linear";
+  for (const [pattern, id] of APP_WORDS) if (pattern.test(t)) return id;
+  return "nothing";
+}
+const firstWord = (title) => (String(title).toLowerCase().match(/[a-z]+/) ?? [""])[0];
+const isApprovalNote = (step) => !step.kind && step.icon === "ShieldCheck";
+const askAi = (choice, job) => checkSteps([AI_BLOCKS.ai(choice, tidy(job).slice(0, 110))]).value?.[0] ?? null;
+
+export function realizeNotes(steps, task = "") {
+  const out = [];
+  for (const step of steps) {
+    if (step.kind || isApprovalNote(step)) { out.push(step); continue; }
+    const word = firstWord(step.title);
+    const job = `${step.title}. ${step.detail}`;
+    if (READ_VERBS.has(word)) {
+      out.push(askAi(lookingAt(job), job) ?? step);
+    } else if (WRITE_VERBS.has(word)) {
+      let before = out.length - 1;
+      while (before >= 0 && isApprovalNote(out[before])) before -= 1; // a stop sign between them does not matter
+      const last = out[before];
+      if (last?.kind === "ai" && last.fields.uses !== "nothing") {
+        const merged = askAi(last.fields.uses === "app" ? last.fields.address : last.fields.uses, `${last.fields.task.replace(/[.\s]+$/, "")}. Then ${tidy(step.title).toLowerCase()}.`);
+        if (merged) { out[before] = merged; continue; }
+      }
+      out.push(askAi("nothing", job) ?? step);
+    } else if (OUT_VERBS.has(word) && !out.some(REALLY_SENDS) && !steps.some(REALLY_SENDS)) {
+      const answers = out.filter((one) => one.kind === "ai").length;
+      const address = SENDS_TO_ADDRESS.test(String(task)) ? String(task).match(ADDRESS)?.[0] : ""; // "email friend@example.com ..." goes to that address
+      const email = checkSteps([AI_BLOCKS.action("gmail_send", address || "{myEmail}", "Your result from Hushwork", answers > 1 ? "{answers}" : answers === 1 ? "{answer}" : tidy(String(task)).slice(0, 100) || "A message from Hushwork")]).value?.[0];
+      out.push(email ?? step);
+    } else {
+      out.push(step);
+    }
+  }
+  return out;
+}
+
+// Everything an AI answer goes through: lenient clean, plain notes become real steps (realizeNotes), the send-to-me safety net, approval step, then the strict gate that saved drafts use.
 // Returns the final steps, or null if the answer cannot be used. `firstPass` is only swapped by a test, to prove the
 // strict gate still refuses what a faulty first pass lets through. `task` is the person's words (for the safety net).
 export function finishSteps(parsed, firstPass = cleanAiSteps, task = "") {
   const steps = firstPass(parsed);
   if (!steps) return null;
-  const checked = cleanPlan(JSON.stringify(withApproval(ensureRealSend(steps, task))));
+  const checked = cleanPlan(JSON.stringify(withApproval(ensureRealSend(realizeNotes(steps, task), task))));
   return checked.error ? null : checked.value;
 }
 

@@ -151,7 +151,7 @@ test("finishSteps: the strict gate refuses what a faulty first pass lets through
 
 test("finishSteps: the whole chain, ending in the strict gate", () => {
   const out = finishSteps({ steps: [{ icon: "Clock", title: "Run every morning", detail: "8:00 am" }, { icon: "Mail", title: "Email each client", detail: "PDF attached" }] });
-  assert.deepEqual(out.map((step) => step.icon), ["Clock", "ShieldCheck", "Mail"]);
+  assert.deepEqual(out.map((step) => step.icon), ["Clock", "ShieldCheck", "Send"], "a note that sends becomes a real email step (to the person), behind an approval step");
   assert.equal(finishSteps({ steps: [] }), null);
   assert.equal(finishSteps("nope"), null);
 });
@@ -237,8 +237,10 @@ test("blocks: a step whose blanks fail the normal checks, a plain note, or an un
       raw(5, 5, 5, 5, "Numbers", "Numbers"),
     ],
   });
-  assert.ok(steps.every((s) => s.kind === undefined || s.kind === "approve"), "none of them became a typed step");
-  assert.ok(steps.some((s) => s.title === "Send reminders") && steps.some((s) => s.title === "Call a site"));
+  assert.ok(steps.every((s) => ["approve", "ai", "action", undefined].includes(s.kind)), "only real kinds, and no web call");
+  assert.equal(steps.find((s) => s.title === "Call a site").kind, undefined, "a web call the AI wrote stays a plain note");
+  assert.equal(steps.find((s) => s.title === "Ask the AI")?.kind, "ai", "'Think about it' is a job for the AI");
+  assert.equal(steps.filter((s) => s.kind === "action").length, 1, "'Send reminders' became ONE real email step");
   assert.ok(steps.every((s) => s.kind !== "send" && s.kind !== "find" && s.kind !== "write"), "the AI can no longer make a step that only describes");
 });
 
@@ -373,3 +375,59 @@ test("an address written in the task counts too: 'email friend@example.com about
   assert.equal(finishSteps(notes, undefined, "Chase overdue invoices").some((step) => step.kind === "action"), false);
 });
 
+
+// ---- plain notes become real steps (the model sometimes ignores the blocks) ----
+const note = (title, detail, icon = "Sparkles") => ({ icon, title, detail }); // no block: what a model that ignores the blocks sends
+
+test("notes: the plan that came back as four plain notes (read emails, approve, draft replies, store in Notion) now becomes steps that really run", async () => {
+  const { isPlanOnly, isApprovable } = await import("../run-engine.js");
+  const task = "read my most important emails and draft replies (do not send). Store the drafts in Notion page 403a704cf11a80b38709d2b802e4cc28.";
+  const steps = finishSteps({ steps: [
+    note("Read important emails", "Open Gmail and filter unread important ones.", "Inbox"),
+    note("Ask you to approve", "Nothing is sent until you say yes", "ShieldCheck"),
+    note("Draft replies", "Write concise replies, do not send.", "PenLine"),
+    note("Store drafts in Notion", "Save drafts to Notion page 403a704cf11a80b38709d2b802e4cc28.", "FileText"),
+  ] }, undefined, task);
+  assert.ok(steps.every((s) => !isPlanOnly(s)), "no step is left that only describes: " + steps.map((s) => s.title).join(" | "));
+  const ai = steps.filter((s) => s.kind === "ai");
+  assert.equal(ai.length, 1, "reading and drafting are ONE Ask the AI step (steps cannot see each other's answers)");
+  assert.equal(ai[0].fields.uses, "gmail");
+  assert.match(ai[0].fields.task, /Then draft replies/);
+  const email = steps.find((s) => s.kind === "action");
+  assert.ok(email && isApprovable(email) && email.fields.target === "{myEmail}" && email.fields.details === "{answer}", "the drafts come to the person by email");
+  assert.ok(steps.findIndex((s) => s.title === "Ask you to approve") < steps.indexOf(email), "an approval step stays before the email");
+});
+
+test("notes: a reading note looks where its words say; a writing note alone just thinks; an unknown first word stays a note", () => {
+  const where = (title, detail) => finishSteps({ steps: [note(title, detail)] })[0];
+  assert.equal(where("Check calendar", "Next 7 days").fields.uses, "calendar");
+  assert.equal(where("Find receipts", "In my files").fields.uses, "drive");
+  assert.equal(where("Review tasks", "Open Linear tasks").fields.uses, "linear");
+  assert.deepEqual([where("List payments", "Late ones").fields.uses, where("List payments", "Late ones").fields.address], ["app", "stripe"]);
+  assert.equal(where("Summarise the week", "Short").fields.uses, "nothing", "nowhere to look means the AI just thinks");
+  assert.equal(where("Write a newsletter", "About my launch").kind, "ai");
+  assert.equal(where("Describe a work task", "Try something you do every week").kind, undefined, "a heading is left as it was");
+  assert.equal(where("Weekly review", "Every Friday").kind, undefined);
+});
+
+test("notes: a store or send note becomes ONE email to the person, never twice, and never when a real send is already there", () => {
+  const two = finishSteps({ steps: [note("Check email", "Inbox"), note("Send summary", "To me", "Send"), note("Store copy", "In a file")] });
+  assert.equal(two.filter((s) => s.kind === "action").length, 1);
+  assert.equal(two.filter((s) => !s.kind && s.title === "Store copy").length, 1, "the second one stays a note rather than a second email");
+  const already = finishSteps({ steps: [note("Send summary", "Now", "Send"), { icon: "Send", title: "x", detail: "x", block: "action", choice: "slack_message", a: "general", b: "Hello" }] });
+  assert.equal(already.filter((s) => s.kind === "action").length, 1, "an existing real send is never joined by a second one");
+  const manyAnswers = finishSteps({ steps: [note("Check email", "Inbox"), note("Review tasks", "Linear"), note("Email me", "Both")] });
+  assert.equal(manyAnswers.find((s) => s.kind === "action").fields.details, "{answers}");
+});
+
+test("notes: whatever notes arrive, the result passes the strict gate unchanged", () => {
+  const verbs = ["Read", "Draft", "Store", "Check", "Send", "Think", "Describe", "Review", "字", "", "Ask you to approve"];
+  const bits = ["emails", "inbox", "the week", "x".repeat(300), "<b>hi</b>", "Notion", "payments", "", "calendar"];
+  let seed = 11;
+  const pick = (list) => list[(seed = (seed * 1103515245 + 12345) % 2147483648) % list.length];
+  for (let round = 0; round < 300; round++) {
+    const steps = finishSteps({ steps: Array.from({ length: 1 + (round % 8) }, () => note(`${pick(verbs)} ${pick(bits)}`.trim() || "A step", pick(bits), pick(["Sparkles", "Send", "Mail", "ShieldCheck", "Inbox"]))) });
+    if (!steps) continue;
+    assert.deepEqual(cleanPlan(JSON.stringify(steps)).value, steps, `round ${round}`);
+  }
+});

@@ -157,7 +157,7 @@ test("a good answer is cleaned and carries only numbers about usage", async () =
   assert.deepEqual(result.usage, { in: 812, out: 300, reasoning: 120 });
   const icons = result.steps.map((step) => step.icon);
   assert.ok(icons.includes("ShieldCheck"), "an approval step was added before the send step");
-  assert.ok(icons.indexOf("ShieldCheck") < icons.indexOf("Mail"));
+  assert.ok(icons.indexOf("ShieldCheck") < icons.indexOf("Send"), "the note that sends became a real email step (icon Send), after the approval");
 });
 
 test("with no key nothing is sent", async () => {
