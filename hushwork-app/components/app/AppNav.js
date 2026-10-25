@@ -78,6 +78,7 @@ export default function AppNav({ userBadge }) {
           <NavLink href="/app/workflows" icon="Folder" onNavigate={close}>Workflows</NavLink>
           <NavLink href="/app/builder" icon="Workflow" onNavigate={close}>Builder</NavLink>
           <NavLink href="/app/templates" icon="ListTodo" onNavigate={close}>Templates</NavLink>
+          <NavLink href="/app/skills" icon="ListChecks" onNavigate={close}>Skills</NavLink>
           <div aria-hidden="true" className="my-2 border-t border-line" />
           <NavLink href="/app/runs" icon="History" onNavigate={close}>Runs</NavLink>
           <NavLink href="/app/connections" icon="Plug" onNavigate={close}>Connections</NavLink>

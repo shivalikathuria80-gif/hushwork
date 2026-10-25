@@ -33,6 +33,8 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
       if (!table) return { data: null, error: { code: "42P01" } };
       if (this.asksState && this.mode === "select" && client.breakStateReads) return { data: null, error: { code: "XX000" } };
       if (this.mode === "insert") {
+        const unique = client.unique?.[this.name]; // columns that may not repeat, like a real UNIQUE constraint (set by a test)
+        if (unique && table.some((row) => unique.every((column) => row[column] === (this.values[column] ?? (column === "user_id" && asUser && !admin ? asUser : undefined))))) return { data: null, error: { code: "23505" } };
         tick += 1000;
         const row = { id: randomUUID(), created_at: new Date(tick).toISOString(), ...(asUser && !admin ? { user_id: asUser } : {}), ...this.values };
         table.push(row);
@@ -58,7 +60,7 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
 // ---- a pretend Composio -------------------------------------------------------------------------------------------------------------------------
 // Replaces the global fetch for the length of a test. `tools` maps a tool name to { inputs, answer } where `inputs` is the tool's input list and
 // `answer` is what running it says ({ successful, data, error }), a number for an HTTP status, or "drop" for a dropped connection; a LIST gives
-// the answer of the first try, the second try, and so on (the last one repeats). `groq` is the list of texts the AI answers with.
+// the answer of the first try, the second try, and so on (the last one repeats). `groq` is the list of texts the AI answers with ("TOOL" makes it ask for its first tool; the next entry is then its answer).
 // Every call is remembered in `calls`.
 export function fakeComposio(tools = {}, { groq = [] } = {}) {
   const calls = [];
@@ -70,7 +72,10 @@ export function fakeComposio(tools = {}, { groq = [] } = {}) {
     if (u.hostname.includes("groq")) {
       calls.push({ method: init.method ?? "GET", path: "groq", body: init.body ? JSON.parse(init.body) : undefined });
       const text = groq[Math.min(calls.filter((call) => call.path === "groq").length - 1, groq.length - 1)] ?? "A short answer.";
-      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { role: "assistant", content: text } }] }), text: async () => "" };
+      // "TOOL" = the AI asks to use the first tool it was offered (like a real model does), then the next entry is its answer
+      const body = JSON.parse(init.body);
+      if (text === "TOOL" && body.tools?.length) return { ok: true, status: 200, json: async () => ({ choices: [{ message: { role: "assistant", content: "", tool_calls: [{ id: "call_1", type: "function", function: { name: body.tools[0].function.name, arguments: "{}" } }] } }] }), text: async () => "" };
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { role: "assistant", content: text === "TOOL" ? "A short answer." : text } }] }), text: async () => "" };
     }
     const body = init.body ? JSON.parse(init.body) : undefined;
     calls.push({ method: init.method ?? "GET", path, body });

@@ -65,6 +65,7 @@ Sign-in, saved workflows and everything else need your Supabase project to have 
 | `schedules.sql` (and `schedules-index.sql` if you made the table before the index existed) | schedules | scheduled runs |
 | `usage.sql` | counters + the `take_usage` function | limits that hold across servers |
 | `memory.sql` | the `workflow_memories` table (your saved facts) | Settings > Memory (the AI works without it) |
+| `skills.sql` | the `enabled_bundles` table (which bundles you turned on) | the Skills page's Turn on button |
 | `clock.sql` | the once-a-minute clock (`pg_cron` + `pg_net`) | scheduled runs online. Edit your password into it first |
 
 Then, in the Supabase dashboard (links go to the project `mgvaqoishxsqecpjfnuo`; change them for your own):
@@ -328,6 +329,27 @@ Runs are never edited, so a step's state is told by small records added under it
 - If the "started" record cannot be saved, nothing is sent. If the state cannot be read, writing is blocked.
 
 Tests: `lib/run-recovery.integration.test.js` (real server code, pretend database and Composio) and `lib/run-state.test.js`. Why: `../DECISIONS.md` D-040.
+
+## Skills and Skill Bundles (plugins)
+
+A **skill** is one small capability: one typed step plus plain words saying what it **reads** and what it **writes** (for example "Find unpaid payments" reads your latest Stripe payments; "Email me the result" sends one email to you). A **bundle** is a package of skills for one kind of work, with the apps it needs and ready-made workflows built only from its own skills. The registry is `lib/skills/bundles.js` (plain data, no database).
+
+| Bundle | Connections | Ready-made workflows |
+|---|---|---|
+| `finance-ops` Finance and operations | Stripe, Google, Gmail (send) | **Invoice Chaser** (Fridays 10:00), **Expense Categorizer** (Mondays 9:00), **Weekly Money Report** (Fridays 16:00) |
+| `marketing-growth` Marketing and growth | Gmail (send) | **Campaign Repurposer** (when asked), **Weekly Post Ideas** (Mondays 9:00) |
+| `dev-admin` Dev and admin | Google, Linear, Gmail (send), GitHub, PagerDuty | **Client Project Triage** (when asked), **Weekly Dev Digest** (Mondays 9:00) |
+
+The **Skills** page (`/app/skills`, `app/app/skills/page.js` and `components/app/BundleCard.js`) shows each bundle, which apps it needs and whether they are connected, exactly what every skill can read and write, and a **Turn on** button.
+
+- **Turn on** (`lib/skills/enable.js`): saves a row in `enabled_bundles` first (a double click cannot save twice), then saves the bundle's workflows as drafts in your own Workflows list (a workflow you already have by that name is kept). It connects no app, makes no schedule and runs nothing. If saving fails the row is taken back.
+- **Turn off** removes the row only. The saved workflows stay.
+- **Schedules:** the suggested time is shown. To use it, open the workflow in the Builder and press Save: that creates the schedule (reads only until you tick "Let it write by itself").
+- **Safety:** reading skills only read; writing skills (email, Linear task) still wait for Approve; every writing workflow has an "Ask you to approve" step before its first write and emails only you (`{myEmail}`). The AI steps do not see each other's answers, so an email carries them all with `{answers}`.
+- **Limits worth knowing:** Invoice Chaser reads Stripe *payments* and emails the review pack to you (it cannot email each client). Client Project Triage reads Gmail senders and subjects; Slack can only list channel names. Campaign Repurposer needs the blog post's address typed into its two Ask the AI steps.
+- **Set up once:** paste `../supabase/skills.sql` in the Supabase SQL Editor. Until then the page shows the bundles and says one step is missing.
+
+Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules), `lib/skills/enable.test.js`, `lib/skills/bundles.integration.test.js` (the real run code), `lib/sql-rls.test.js` (RLS on every per-person table). Why: `../DECISIONS.md` D-041.
 
 ## Memory (Settings > Memory)
 

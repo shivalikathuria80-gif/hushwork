@@ -125,6 +125,13 @@ Settings > Memory lets a person save short facts the AI may use as background (t
 1. Paste `supabase/memory.sql` into Supabase (SQL Editor, New query, paste, Run).
 2. Nothing else. Until it is pasted, Settings > Memory says one setup step is missing and the AI runs without memory; nothing else breaks.
 
+## 12c. Skills (optional, one paste)
+
+The Skills page lets a person turn on a Skill Bundle (a package of ready-made workflows). It needs one table.
+
+1. Paste `supabase/skills.sql` into Supabase (SQL Editor, New query, paste, Run).
+2. Nothing else. Until it is pasted, the Skills page still shows the bundles and says one setup step is missing.
+
 ## 13. Moving to your own web address (when you buy one)
 
 Nothing here can be done for you: buying the address is your job. The order matters.

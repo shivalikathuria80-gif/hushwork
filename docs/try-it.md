@@ -49,7 +49,11 @@ On the home screen of the app describe a job ("send a message to my account ever
 - When a run stops at a step, press **Continue from where it stopped** on the Runs page. Steps already done are skipped, so nothing is sent twice. If a step says **Not sure if this happened**, look in the app first (is the email there?), then press **It was not done, try again** only if it was not.
 - **Settings > Memory** keeps short facts (your timezone, who gets the reports) that the AI may use as background. Do not save passwords or keys. (One setup step: paste `supabase/memory.sql` in Supabase.)
 
-## 7. If something goes wrong
+## 7. Skills: turn on a ready-made bundle
+
+Open **Skills**. Each bundle (Finance and operations, Marketing and growth, Dev and admin) lists the apps it needs, exactly what each skill can read and write, and its ready-made workflows. Press **Turn on**: the workflows are saved to **Workflows** (nothing runs, nothing connects, no schedule is made). Open one in the Builder to change it, or press **Run**. Writing steps still wait for your **Approve** click. One setup step: paste `supabase/skills.sql` in Supabase.
+
+## 8. If something goes wrong
 
 - A red message under an Approve button says what happened and, when an app refused, what the app said. "Not allowed" for Notion almost always means the page is not shared with the connection.
 - "Google refused" or "Linear refused": press Disconnect, then Connect again.

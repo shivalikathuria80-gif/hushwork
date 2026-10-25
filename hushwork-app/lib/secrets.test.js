@@ -300,7 +300,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js"]);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "app/app/skills/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookup in the apps list and the actions in the actions list");
@@ -461,4 +461,16 @@ test("shared workflow memory is data, not instructions: person-written and verif
   const core = files.find((file) => file.name === "lib/run-core.js").text;
   assert.ok(core.includes('memory: uses === "mcp" ? ""'), "memory is never given to the AI beside an MCP server");
   assert.ok(!/supabase\/admin|createAdminClient/.test(files.find((file) => file.name === "lib/actions/memory.js").text), "memory actions use the person's own client");
+});
+
+test("Skill Bundles add no new power: turning one on only saves drafts, uses the person's own client, and never touches schedules, runs, apps or keys", () => {
+  const enable = files.find((file) => file.name === "lib/skills/enable.js").text.replace(/^\s*\/\/.*$/gm, ""); // the code, without its comments
+  for (const forbidden of ["supabase/admin", "createAdminClient", "run-core", "schedule", "composio", "runActionTool", "fetch(", "process.env"]) assert.ok(!enable.includes(forbidden), `enabling a bundle never uses ${forbidden}`);
+  assert.ok(!/from\("(schedules|runs|connections)"\)/.test(enable), "it never reads or writes schedules, runs or connections");
+  const actions = files.find((file) => file.name === "lib/actions/skills.js").text;
+  assert.ok(actions.startsWith('"use server";') && actions.includes("await requireUser()") && !/supabase\/admin|createAdminClient/.test(actions), "the buttons are Server Actions for a signed-in person, with their own client");
+  const bundles = files.find((file) => file.name === "lib/skills/bundles.js").text;
+  assert.ok(!/from\("|fetch\(|process\.env/.test(bundles), "the registry is plain data: no database, no web calls, no settings");
+  const page = files.find((file) => file.name === "app/app/skills/page.js").text;
+  assert.ok(page.includes("<Suspense") && page.includes("requireUser()"), "the page reads the session inside Suspense");
 });

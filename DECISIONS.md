@@ -82,6 +82,7 @@ Last updated: 2026-10-24
 | D-038 | Vercel, Xero and Cloudflare cannot be connected through Composio | ✅ | 2026-10-24 |
 | D-039 | Shared workflow memory is data, not instructions | ✅ | 2026-10-25 |
 | D-040 | Safe run recovery: started, done, failed, and never send twice | ✅ | 2026-10-25 |
+| D-041 | Skills and Skill Bundles (plugins) add no new power | ✅ | 2026-10-25 |
 
 ---
 
@@ -348,6 +349,15 @@ Last updated: 2026-10-24
 - **Reason:** Without this, a run that failed halfway could only be restarted from the beginning, and an email whose answer was lost could be sent again. A duplicate email or task is worse than a stopped run.
 - **Options considered:** Editing the run row to track state (rejected: runs have no UPDATE permission on purpose). Retrying unknown steps automatically (rejected: cannot be made safe without the other app's help).
 - **Where:** `lib/run-state.js`, `lib/run-core.js` (`writeGate`, `markPending`, `afterFailedWrite`, `runAutomatically`, `resumeRun`), `components/app/ResumeRun.js`, `components/app/ApproveSend.js`, `components/app/RunsViewer.js`, tests `lib/run-recovery.integration.test.js`, `lib/run-state.test.js`
+
+### D-041: Skills and Skill Bundles (plugins) add no new power
+- **Date:** 2026-10-25
+- **Status:** ✅ Approved (the SQL must be pasted by the owner: `supabase/skills.sql`)
+- **Decision:** A **skill** is one typed step (lib/steps.js) with words that say what it reads and writes. A **bundle** is a named package of skills (finance-ops, marketing-growth, dev-admin) with the apps it needs and ready-made workflows built only from its own skills (`lib/skills/bundles.js`). The Skills page (`/app/skills`) shows each bundle, what each skill can read and write, which apps are connected, and one button to turn it on. Turning it on saves a row in `enabled_bundles` FIRST (so a double click cannot save twice) and then saves the bundle's workflows as drafts in the person's own list; it never connects an app, never makes a schedule and never runs anything. Turning it off removes the row only; the saved workflows stay. A skill can only do what its step kind can do: reading skills only read, writing skills (email, Linear task) still wait for the Approve click (or Auto mode / a "Let it write by itself" schedule, which are the person's own choices). Every workflow that writes has an "Ask you to approve" step before its first write and only ever emails the person themself (`{myEmail}`). Tests keep it true.
+- **Reason:** People think in jobs ("chase unpaid invoices"), not in single steps. A bundle gives a whole job in one click without giving the AI any new power or weakening Approve.
+- **What is honest about the three examples:** Invoice Chaser reads Stripe payments (not invoices) and emails the review pack to YOU, with a reminder draft; it does not email clients, because a step cannot pick a different address each time. Client Project Triage reads Gmail (senders and subjects only); Slack can only list channel names, not read messages. Campaign Repurposer starts "when I ask" (no "new post" trigger exists), and its review queue is your inbox; the post's address is typed into the two Ask the AI steps.
+- **Options considered:** Bundles that unlock extra tools or skip approvals (rejected: they would add risk for no gain). Storing bundles in the database (rejected: they are code, reviewed and tested; the table only holds which ones a person turned on).
+- **Where:** `lib/skills/bundles.js`, `lib/skills/enable.js`, `lib/actions/skills.js`, `app/app/skills/page.js`, `components/app/BundleCard.js`, `components/app/EnableBundle.js`, `supabase/skills.sql`; tests `lib/skills/*.test.js`, `lib/sql-rls.test.js`, `lib/secrets.test.js`
 
 ---
 
