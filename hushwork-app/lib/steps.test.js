@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NOTE, STEP_KINDS, STEP_KIND_ORDER, blankFields, describeStep, isTypedKind, planToSteps, readSavedStep, stepsToPlan } from "./steps.js";
-import { BLOCKS, DRAG_KIND, DRAG_ROW, blockIdFor, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
+import { BLOCKS, PALETTE_BLOCKS, DESCRIBING_BLOCKS, DRAG_KIND, DRAG_ROW, blockIdFor, blockName, insertRow, moveRow, newRow, newRowForBlock, parseDragKind, rowForKind, toWorking } from "./step-rows.js";
 import { plainSteps } from "./update-plan.js";
 import { LIMITS, checkSteps, cleanPlan, sameSteps } from "./validate.js";
 import { ICON_NAMES } from "./ai/icon-names.js";
@@ -371,6 +371,9 @@ test("parseDragKind: only free text or a real kind is accepted from a drag", () 
 });
 test("blocks: every block makes a valid starting row, the Linear block is a find step already set to Linear, and bad ids do nothing", () => {
   assert.equal(new Set(BLOCKS.map((block) => block.id)).size, BLOCKS.length);
+  assert.deepEqual(PALETTE_BLOCKS.map((block) => block.id).filter((id) => DESCRIBING_BLOCKS.includes(id)), [], "the Builder does not offer a block that only describes");
+  assert.equal(PALETTE_BLOCKS.length, BLOCKS.length - DESCRIBING_BLOCKS.length);
+  assert.ok(PALETTE_BLOCKS.some((block) => block.id === "ai") && PALETTE_BLOCKS.some((block) => block.id === "action"), "Ask the AI and Do in another app stay");
   for (const block of BLOCKS) {
     assert.ok(ICON_NAMES.includes(block.icon), `${block.id}: icon ${block.icon}`);
     assert.ok(block.label && block.help);

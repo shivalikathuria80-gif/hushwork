@@ -38,10 +38,14 @@ test("the instructions: the safety rules stay word for word, and the REAL blocks
   assert.ok(SYSTEM_PROMPT.includes(`Icons you may use: ${ICON_NAMES.join(", ")}.`));
   // the blocks: every block the code understands is named, and the real ones are explained
   for (const block of Object.keys(AI_BLOCKS)) assert.ok(SYSTEM_PROMPT.includes(block), `the prompt names the ${block} block`);
-  assert.ok(SYSTEM_PROMPT.includes("one of note, trigger, find, linear, write, approve, send, row, ai, issue, action, app."));
+  assert.ok(SYSTEM_PROMPT.includes("one of note, trigger, approve, ai, row, issue, action."), "only blocks that really do something are offered");
+  for (const gone of ["find", "linear", "write", "send", "app"]) assert.ok(!new RegExp("one of [^.]*\\b" + gone + "\\b").test(SYSTEM_PROMPT), `${gone} is no longer offered`);
+  assert.ok(SYSTEM_PROMPT.includes("Never add a separate find, look-up, draft or write step: they do nothing, and ai does the job."), "the AI is told to use Ask the AI to look, find, sum up and write");
+  for (const app of ["todoist", "notion", "airtable", "hubspot", "jira", "github", "sentry", "pagerduty", "slack", "stripe", "mailchimp", "googletasks", "trello"]) assert.ok(SYSTEM_PROMPT.includes(app), `ai can look in ${app}`);
+  for (const app of ["xero", "vercel", "cloudflare", "gmailsend", "gcalwrite"]) assert.ok(!SYSTEM_PROMPT.includes(app), `${app} is not offered`);
   for (const id of ["gmail_send", "slack_message", "github_issue", "calendar_event", "notion_page", "todoist_task"]) assert.ok(SYSTEM_PROMPT.includes(id), `action ${id} is taught`);
   assert.ok(SYSTEM_PROMPT.includes("{myEmail}") && /send to me, my account, myself or my email/.test(SYSTEM_PROMPT), "'send to me' becomes an email to the person's own address");
-  assert.ok(SYSTEM_PROMPT.includes("it does NOT send anything"), "the plan-only send is described honestly");
+  assert.ok(!SYSTEM_PROMPT.includes("plan-only"), "no block that only describes is taught");
   assert.ok(!/[\u{2013}\u{2014}]/u.test(SYSTEM_PROMPT), "no dashes that read like an AI wrote them");
 });
 
@@ -182,20 +186,45 @@ test("blocks: the AI's answers become typed steps whose title and detail are wor
   const steps = finishSteps({
     steps: [
       raw("trigger", "schedule", "Every Monday at 9", "", "x"),
-      raw("linear", "", "", ""),
-      raw("find", "inbox", "unpaid invoices", ""),
-      raw("write", "summary", "this week", ""),
-      raw("approve", "", "the reminders", ""),
-      raw("send", "email", "each client", "payment reminder"),
-      raw("row", "", "Invoice tracker", "client, amount"),
+      raw("ai", "gmail", "Which emails need me?", ""),
+      raw("ai", "stripe", "Which payments failed?", ""),
       raw("ai", "linear", "Which task first?", ""),
+      raw("approve", "", "the reminders", ""),
+      raw("row", "", "Invoice tracker", "client, amount"),
     ],
   });
-  assert.deepEqual(steps.map((s) => s.kind), ["trigger", "find", "find", "write", "approve", "send", "row", "ai"]);
-  assert.deepEqual(steps[1].fields, { where: "linear", what: "My open tasks" });
-  assert.equal(steps[5].detail, "By email, to each client: payment reminder");
-  assert.deepEqual(steps[7].fields, { task: "Which task first?", uses: "linear", address: "" });
+  assert.deepEqual(steps.map((s) => s.kind), ["trigger", "ai", "ai", "ai", "approve", "row"]);
+  assert.deepEqual(steps[1].fields, { task: "Which emails need me?", uses: "gmail", address: "" });
+  assert.deepEqual(steps[2].fields, { task: "Which payments failed?", uses: "app", address: "stripe" });
+  assert.deepEqual(steps[3].fields, { task: "Which task first?", uses: "linear", address: "" });
   assert.ok(steps.every((s) => s.title && s.icon));
+});
+
+test("blocks: the old look-up blocks (find, linear, write, app) become the real Ask the AI step, so a plan never holds a step that only describes", async () => {
+  const { isAiStep, isPlanOnly } = await import("../run-engine.js");
+  const steps = finishSteps({
+    steps: [
+      raw("find", "inbox", "unpaid invoices", ""),
+      raw("find", "calendar", "this week", ""),
+      raw("find", "files", "receipts", ""),
+      raw("find", "payments", "late payments", ""),
+      raw("find", "sheet", "my tracker", ""),
+      raw("linear", "", "", ""),
+      raw("write", "email", "the week", ""),
+      raw("app", "github", "my reviews", ""),
+      raw("app", "nope", "x", ""),
+    ],
+  });
+  assert.ok(steps.every((s) => s.kind === "ai"), "every one is an Ask the AI step");
+  assert.deepEqual(steps.map((s) => s.fields.uses), ["gmail", "calendar", "drive", "app", "nothing", "linear", "nothing", "app", "nothing"]);
+  assert.equal(steps[3].fields.address, "stripe");
+  assert.equal(steps[7].fields.address, "github");
+  assert.equal(steps[0].fields.task, "Find: unpaid invoices");
+  assert.equal(steps[6].fields.task, "Write email about the week.");
+  for (const s of steps) assert.ok(isAiStep(s) && !isPlanOnly(s), "it can really run");
+  assert.ok(steps.every((s) => s.fields.task.length <= 110));
+  const long = finishSteps({ steps: [raw("find", "inbox", "x".repeat(300), "")] });
+  assert.equal(long[0].kind, "ai", "even a long job is cut to fit, not dropped");
 });
 
 test("blocks: a step whose blanks fail the normal checks, a plain note, or an unknown block stays a plain note with the AI's own words", () => {
@@ -203,7 +232,6 @@ test("blocks: a step whose blanks fail the normal checks, a plain note, or an un
     steps: [
       raw("send", "carrier pigeon", "each client", "", "Send reminders", "By pigeon"),
       raw("note", "", "", "", "Think about it", "Quietly"),
-      raw("find", "inbox", "", "", "Look in the inbox", "For anything"),
       raw("request", "", "https://evil.example", "", "Call a site", "Fetch it"),
       raw("__proto__", "", "", "", "Odd", "Odd"),
       raw(5, 5, 5, 5, "Numbers", "Numbers"),
@@ -211,12 +239,14 @@ test("blocks: a step whose blanks fail the normal checks, a plain note, or an un
   });
   assert.ok(steps.every((s) => s.kind === undefined || s.kind === "approve"), "none of them became a typed step");
   assert.ok(steps.some((s) => s.title === "Send reminders") && steps.some((s) => s.title === "Call a site"));
+  assert.ok(steps.every((s) => s.kind !== "send" && s.kind !== "find" && s.kind !== "write"), "the AI can no longer make a step that only describes");
 });
 
-test("blocks: the AI can never produce a web call (it must not choose addresses) and a typed send still gets an approval step first", () => {
+test("blocks: the AI can never produce a web call (it must not choose addresses) and a real send still gets an approval step first", () => {
   assert.equal(Object.hasOwn(AI_BLOCKS, "request"), false);
-  const steps = finishSteps({ steps: [raw("find", "inbox", "unpaid invoices", ""), raw("send", "email", "each client", "reminder")] });
-  assert.deepEqual(steps.map((s) => s.title), ["Look something up", "Ask you to approve", "Send a message"]);
+  for (const gone of ["find", "linear", "write", "send", "app"]) assert.equal(Object.hasOwn(AI_BLOCKS, gone), false, `${gone} is not offered any more`);
+  const steps = finishSteps({ steps: [raw("ai", "gmail", "Which invoices are unpaid?", ""), raw("action", "gmail_send", "{myEmail}", "Unpaid invoices", "{answer}")] });
+  assert.deepEqual(steps.map((s) => s.title), ["Ask the AI", "Ask you to approve", "Send an email (Gmail)"]);
 });
 
 test("blocks: whatever the AI sends, the result passes the strict gate again unchanged (the property check)", () => {
@@ -233,13 +263,14 @@ test("blocks: whatever the AI sends, the result passes the strict gate again unc
 });
 
 test("blocks: two approval steps in a row become one", () => {
-  const steps = finishSteps({ steps: [raw("find", "inbox", "unpaid invoices", ""), raw("approve", "", "the list", ""), raw("approve", "", "before sending", ""), raw("send", "email", "each client", "reminder")] });
-  assert.deepEqual(steps.map((s) => s.title), ["Look something up", "Ask you to approve", "Send a message"]);
+  const steps = finishSteps({ steps: [raw("ai", "gmail", "Which invoices are unpaid?", ""), raw("approve", "", "the list", ""), raw("approve", "", "before sending", ""), raw("action", "gmail_send", "{myEmail}", "Unpaid invoices", "{answer}")] });
+  assert.deepEqual(steps.map((s) => s.title), ["Ask the AI", "Ask you to approve", "Send an email (Gmail)"]);
 });
 
 test("blocks: the block name may come in any letter case or with spaces", () => {
   const steps = finishSteps({ steps: [raw(" Linear ", "", "", ""), raw("AI", "Linear", "Which first?", "")] });
-  assert.deepEqual(steps.map((s) => s.kind), ["find", "ai"]);
+  assert.deepEqual(steps.map((s) => s.kind), ["ai", "ai"]);
+  assert.equal(steps[0].fields.uses, "linear", "the old Linear block is an Ask the AI step now");
   assert.equal(steps[1].fields.uses, "linear");
 });
 
@@ -250,10 +281,11 @@ test("the plain fallback: three fields per step and none of the block instructio
   assert.ok(SYSTEM_PROMPT_PLAIN.includes("ShieldCheck"));
 });
 
-test("blocks: an AI step may look at Linear, the calendar, the inbox or Drive; any other word means just think", () => {
+test("blocks: an AI step may look at Linear, the calendar, the inbox, Drive or a connectable app; any other word means just think", () => {
   for (const tool of ["linear", "calendar", "gmail", "drive"]) assert.equal(AI_BLOCKS.ai(tool, "Sum up").fields.uses, tool);
-  for (const odd of ["", "nothing", "web", "mcp", "Gmail", "__proto__", "everything"]) assert.equal(AI_BLOCKS.ai(odd, "Sum up").fields.uses, "nothing", odd);
-  assert.match(SYSTEM_PROMPT, /gmail if it is about their email inbox/);
+  for (const app of ["stripe", "github", "notion", "todoist", "slack", "pagerduty"]) assert.deepEqual(AI_BLOCKS.ai(app, "Sum up").fields, { task: "Sum up", uses: "app", address: app }, app);
+  for (const odd of ["", "nothing", "web", "mcp", "Gmail", "__proto__", "everything", "xero", "vercel", "cloudflare", "gmailsend", "gcalwrite"]) assert.deepEqual(AI_BLOCKS.ai(odd, "Sum up").fields, { task: "Sum up", uses: "nothing", address: "" }, odd);
+  assert.match(SYSTEM_PROMPT, /gmail \(their email inbox\)/);
 });
 
 test("blocks: an issue block becomes a Create a Linear task step with no team (a person adds one later), and passes the normal checks", () => {
@@ -307,7 +339,9 @@ test("the send-to-me safety net leaves everything else alone", () => {
 
 test("an invalid action choice or app falls back to a plain note instead of a broken step", () => {
   const steps = finishSteps({ steps: [{ icon: "Send", title: "Do a thing", detail: "x", block: "action", choice: "launch_rocket", a: "x", b: "y" }, { icon: "Plug", title: "Look", detail: "x", block: "app", choice: "nope", a: "x", b: "" }] });
-  assert.ok(steps.every((step) => step.kind === undefined || step.kind === "approve"), "no invented step kinds");
+  assert.equal(steps.find((step) => step.title === "Do a thing").kind, undefined, "an invented action stays a plain note");
+  assert.deepEqual(steps.find((step) => step.kind === "ai").fields, { task: "Look up: x", uses: "nothing", address: "" }, "an unknown app means the AI just thinks");
+  assert.ok(steps.every((step) => ["ai", "approve", undefined].includes(step.kind)), "no invented step kinds");
 });
 
 test("the keyword preview's canned steps also get a real email when the words say send-to-me, and are left exactly alone otherwise", async () => {

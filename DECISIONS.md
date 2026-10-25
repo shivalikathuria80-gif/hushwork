@@ -84,6 +84,7 @@ Last updated: 2026-10-24
 | D-040 | Safe run recovery: started, done, failed, and never send twice | ✅ | 2026-10-25 |
 | D-041 | Skills and Skill Bundles (plugins) add no new power | ✅ | 2026-10-25 |
 | D-042 | Workflow Studio: one Builder, step cards that explain themselves | ✅ | 2026-10-25 |
+| D-043 | The AI plan writer only uses blocks that really work | ✅ | 2026-10-25 |
 
 ---
 
@@ -370,6 +371,13 @@ Last updated: 2026-10-24
 - **Not changed:** approval gates and recovery (`lib/run-core.js`, `lib/run-state.js`), the database, sign-in, token encryption and the AI fallback. Nothing on a card can run anything: the buttons only edit the draft or open a page.
 - **Not built:** a separate "start from a plugin" entry (`?plugin=`). A plugin is reached through its skills: the Builder's Skills list says which apps each skill needs and whether they are connected.
 - **Where:** `lib/studio/capabilities.js`, `lib/skills/connection-status.js`, `lib/skills/bundles.js` (`skillStart`), `lib/step-rows.js` (`rowsForSkill`), `lib/builder-start.js`, `components/app/StepStudioCard.js`, `components/app/Builder.js`, `components/app/StepEditor.js` (`renderExtra`), `components/app/RunsViewer.js`; tests `lib/studio/capabilities.test.js`
+
+### D-043: The AI plan writer only uses blocks that really work
+- **Date:** 2026-10-25
+- **Status:** ✅ Approved (the owner's request)
+- **Decision:** The AI plan writer is offered only `trigger`, `approve`, `ai`, `row`, `issue` and `action` (and `note` when nothing fits). `find`, `linear`, `write`, `send` and `app` are cut: three of them only described and did nothing, and **Ask the AI** can already look, find, sum up and write in Linear, the calendar, the inbox, Drive and 13 connected apps. A leftover old block in an answer is rewritten into the matching Ask the AI step. A typed step that only reads never gets an approval step in front of it. The keyword preview builds the same real steps. The Builder's palette hides the describe-only blocks. Plans saved earlier are untouched and still open.
+- **Reason:** The owner kept getting AI plans full of steps that ran and did nothing, while a working alternative existed.
+- **Where:** `lib/ai/plan.js`, `lib/ai/keyword-plan.js`, `lib/step-rows.js` (`PALETTE_BLOCKS`), `components/app/Composer.js`; tests `lib/ai/plan.test.js`, `lib/ai/keyword-plan.test.js`, `lib/steps.test.js`
 
 ---
 

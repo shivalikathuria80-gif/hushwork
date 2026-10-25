@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { makeFakeSupabase, fakeComposio, GMAIL_TOOL, NOTION_TOOL } from "./test-server-support.js";
 import { finishSteps } from "./ai/plan.js";
+import { checkSteps } from "./validate.js";
 
 process.env["COMPOSIO" + "_API_KEY"] = "ak_test_key_not_real"; // the setting names are built in two pieces so the secret-name scanners do not trip on a test
 const { startPracticeRun, approveActionStep } = await import("./run-core.js");
@@ -181,9 +182,12 @@ test("when the AI says nothing usable, the email is NOT sent and the reason is s
   } finally { composio.restore(); }
 });
 
+// What older plans hold: a Start and the plan-only "Send a message" step. The AI can no longer make this step, but plans saved before still have it.
+const oldPlanWithSend = (how, to, about) => checkSteps([{ kind: "trigger", fields: { how: "manual", when: "" } }, { kind: "send", fields: { how, to, about } }]).value;
+
 test("a workflow SAVED EARLIER with the old 'Send a message' by email (the AI used to write these) now really sends, after Approve, to the address in the step", async () => {
   // the exact shape that was saved: a Start, an approval note and a plan-only Send with a real address
-  const plan = finishSteps({ steps: [{ icon: "Zap", title: "When I ask", detail: "x", block: "trigger", choice: "manual", a: "", b: "" }, { icon: "Send", title: "Send a message", detail: "x", block: "send", choice: "email", a: "friend@example.com", b: "Hi, I made a new app. Come and see it." }] });
+  const plan = oldPlanWithSend("email", "friend@example.com", "Hi, I made a new app. Come and see it.");
   assert.ok(plan.some((step) => step.kind === "send"), "this plan holds the old plan-only step");
   const { workflow, supabase, who } = setup({ plan });
   const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
@@ -200,8 +204,8 @@ test("a workflow SAVED EARLIER with the old 'Send a message' by email (the AI us
 });
 
 test("an old Send that cannot be a real email (Slack, 'other', no address, a bad address) stays a plan-only description and sends nothing", async () => {
-  for (const [how, to] of [["slack", "#general"], ["other", "my accountant"], ["email", ""], ["email", "not an address"], ["email", "two@example.com three@example.com"]]) {
-    const plan = finishSteps({ steps: [{ icon: "Zap", title: "When I ask", detail: "x", block: "trigger", choice: "manual", a: "", b: "" }, { icon: "Send", title: "Send a message", detail: "x", block: "send", choice: how, a: to, b: "hello" }] });
+  for (const [how, to] of [["slack", "#general"], ["other", "my accountant"], ["email", "each client"], ["email", "not an address"], ["email", "two@example.com three@example.com"]]) {
+    const plan = oldPlanWithSend(how, to, "hello");
     const { workflow, who } = setup({ plan });
     const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
     try {

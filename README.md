@@ -32,7 +32,7 @@ npm install
 npm run dev
 ```
 
-Run the tests with `npm test` (458 tests, including ones that run the real server code with a pretend database and a pretend Composio) and `npm run lint`. GitHub runs both on every push.
+Run the tests with `npm test` (463 tests, including ones that run the real server code with a pretend database and a pretend Composio) and `npm run lint`. GitHub runs both on every push.
 
 ## Project notes
 

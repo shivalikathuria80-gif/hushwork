@@ -85,6 +85,11 @@ export const BLOCKS = [
   { id: "action", label: "Do in another app", help: "REALLY sends: email, Slack, GitHub...", icon: "Send" },
   { id: NOTE, label: "Note", help: "Your own words", icon: "FileText" },
 ];
+// What the Builder's palette OFFERS. The three blocks that only describe (Find something, Write something, Send a message) are not offered any more: they
+// do nothing when run, and Ask the AI looks, finds, writes and sums up for real, "Do in another app" really sends. Plans saved earlier may still hold them;
+// they keep working as plan-only steps and keep their names (BLOCKS above still lists them).
+export const DESCRIBING_BLOCKS = ["find", "write", "send"];
+export const PALETTE_BLOCKS = BLOCKS.filter((block) => !DESCRIBING_BLOCKS.includes(block.id));
 export const PRESET_BLOCKS = {
   linear: { kind: "find", fields: { where: "linear", what: "My open tasks" } },
   mcp: { kind: "ai", fields: { task: "", uses: "mcp", address: "" } },

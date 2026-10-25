@@ -5,7 +5,7 @@ import { unstable_rethrow, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Btn, EASE, StepRow, Switch } from "../ui";
 import { Icon } from "../icons";
-import { planFor } from "../AgentBox";
+import { keywordPlan } from "@/lib/ai/keyword-plan";
 import StepEditor, { ADD_ID, fieldId, problemPart, toWorking } from "./StepEditor";
 import useWarnBeforeLeaving from "../useWarnBeforeLeaving";
 import { saveDraft, updateDraft } from "@/lib/actions/drafts";
@@ -221,7 +221,7 @@ export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref 
   // `sent` is true when the text DID go to the AI service first (it failed, was slow, or was abandoned). Then the card must not
   // say "No AI was used". It stays false when the text never left: AI off, switch off, offline, or refused before sending.
   const showKeyword = (task, notice, { canRetry = false, retryAfter, sent = false } = {}) =>
-    showPlan(planFor(task, []), { source: "keyword", notice, canRetry, retryAfter, sent }, notice);
+    showPlan(keywordPlan(task), { source: "keyword", notice, canRetry, retryAfter, sent }, notice);
 
   async function preview() {
     const task = text.trim();

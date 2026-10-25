@@ -12,7 +12,7 @@ import { syncScheduleFromStart } from "@/lib/actions/schedules";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
 import { planOnlyWarning } from "@/lib/run-engine";
-import { BLOCKS, DRAG_KIND, newRowForBlock, rowsForSkill } from "@/lib/step-rows";
+import { PALETTE_BLOCKS, DRAG_KIND, newRowForBlock, rowsForSkill } from "@/lib/step-rows";
 import { SKILLS, accessOf } from "@/lib/skills/bundles";
 import { requirementOf } from "@/lib/studio/capabilities";
 
@@ -228,7 +228,7 @@ export default function Builder({ initial, connections }) {
           <h2 id="palette-heading" className="text-sm font-medium">Blocks</h2>
           <p className="mt-1 text-sm text-mute">Drag a block into your workflow, or press it.</p>
           <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            {BLOCKS.map((item) => (
+            {PALETTE_BLOCKS.map((item) => (
               <li
                 key={item.id}
                 // Dragging a card carries its block id (see StepEditor's drop code). Pressing the card adds it at the end,
