@@ -27,6 +27,8 @@ for (const [file, table] of Object.entries(PER_PERSON)) {
     // every policy checks that the row is the signed-in person's
     const policies = sql.match(/create policy[\s\S]*?;\n/g) ?? [];
     assert.ok(policies.length >= 2, "has policies");
+    // a policy that reads its own table makes Postgres stop with error 42P17 ("infinite recursion detected in policy"): such a rule has to be a trigger
+    for (const policy of policies) assert.ok(!new RegExp(`from public\\.${table}\\b`, "i").test(policy), `a policy must not look inside its own table: ${policy.slice(0, 60)}`);
     for (const policy of policies) {
       assert.match(policy, /\(select auth\.uid\(\)\) = user_id/, `a policy checks the owner: ${policy.slice(0, 60)}`);
       assert.match(policy, /to authenticated/, "only for signed-in people");
@@ -61,13 +63,15 @@ test("RLS: every table made in supabase/ is either checked above or is one of th
 
 test("the new tables: workflow memories and enabled bundles cap the rows per person and check their words in the database", () => {
   const memory = noComments(read("memory.sql"));
-  assert.match(memory, /< 50/);
+  assert.match(memory, /count\(\*\) from public\.workflow_memories t where t\.user_id = new\.user_id\) >= 50/, "the cap is a trigger");
+  assert.match(memory, /create trigger workflow_memories_cap\s+before insert/);
   assert.match(memory, /source in \('person', 'workflow', 'ai'\)/);
   assert.match(memory, /verification_status in \('verified', 'unverified', 'rejected'\)/);
   assert.ok(!/grant insert \([^)]*(source|verification_status)/.test(memory), "a person cannot write who the fact came from or whether it is verified");
   assert.ok(!/grant update \([^)]*(source|verification_status|user_id)/.test(memory), "nor change them later");
   const skills = noComments(read("skills.sql"));
-  assert.match(skills, /< 20/);
+  assert.match(skills, /count\(\*\) from public\.enabled_bundles t where t\.user_id = new\.user_id\) >= 20/, "the cap is a trigger");
+  assert.match(skills, /create trigger enabled_bundles_cap\s+before insert/);
   assert.match(skills, /unique \(user_id, bundle_id\)/);
   assert.match(skills, /bundle_id ~ '\^\[a-z\]\[a-z0-9-\]\{1,39\}\$'/);
   assert.ok(!/grant update/.test(skills), "a row is on or off: nothing to update");

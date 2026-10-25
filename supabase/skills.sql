@@ -7,7 +7,7 @@
 -- (lib/skills/bundles.js), not here, so this table only stores the bundle's short id. Turning a bundle on also saves its ready-made
 -- workflows as drafts in the person's own `workflows` list; it never connects an app, never makes a schedule and never runs anything.
 --
--- Same rules as every other table: Row Level Security on, only signed-in people, only their own rows, at most 20 rows each.
+-- Same rules as every other table: Row Level Security on, only signed-in people, only their own rows, at most 20 rows each (a trigger counts them).
 -- A person can only choose the bundle id; user_id and created_at are filled in by the database.
 
 create table public.enabled_bundles (
@@ -35,13 +35,27 @@ create policy "owner can read own enabled bundles"
   to authenticated
   using ((select auth.uid()) = user_id);
 
-create policy "owner can enable bundles for themself (at most 20)"
+create policy "owner can enable bundles for themself"
   on public.enabled_bundles for insert
   to authenticated
-  with check (
-    (select auth.uid()) = user_id
-    and (select count(*) from public.enabled_bundles e where e.user_id = (select auth.uid())) < 20
-  );
+  with check ((select auth.uid()) = user_id);
+
+-- The cap is a TRIGGER, not a policy: a policy that looks inside its own table makes Postgres stop with "infinite recursion detected in policy" (42P17).
+create or replace function public.enabled_bundles_cap() returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select count(*) from public.enabled_bundles t where t.user_id = new.user_id) >= 20 then
+    raise exception 'at most 20 bundles per person' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger enabled_bundles_cap
+  before insert on public.enabled_bundles
+  for each row execute function public.enabled_bundles_cap();
 
 create policy "owner can disable own bundles"
   on public.enabled_bundles for delete

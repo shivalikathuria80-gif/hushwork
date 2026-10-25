@@ -11,7 +11,7 @@
 --     app, which saves them as person + verified; the database refuses any other values from a signed-in person.
 --   * The app refuses facts that look like secrets (card numbers, keys, tokens) before saving them. They never leave your account except
 --     inside an AI request.
---   * Row Level Security: only signed-in people, only their own rows, at most 50 facts each.
+--   * Row Level Security: only signed-in people, only their own rows, at most 50 facts each (a trigger counts them).
 
 create table public.workflow_memories (
   id uuid primary key default gen_random_uuid(),
@@ -48,13 +48,27 @@ create policy "owner can read own memories"
   to authenticated
   using ((select auth.uid()) = user_id);
 
-create policy "owner can add own memories (at most 50)"
+create policy "owner can add own memories"
   on public.workflow_memories for insert
   to authenticated
-  with check (
-    (select auth.uid()) = user_id
-    and (select count(*) from public.workflow_memories m where m.user_id = (select auth.uid())) < 50
-  );
+  with check ((select auth.uid()) = user_id);
+
+-- The cap is a TRIGGER, not a policy: a policy that looks inside its own table makes Postgres stop with "infinite recursion detected in policy" (42P17).
+create or replace function public.workflow_memories_cap() returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select count(*) from public.workflow_memories t where t.user_id = new.user_id) >= 50 then
+    raise exception 'at most 50 facts per person' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger workflow_memories_cap
+  before insert on public.workflow_memories
+  for each row execute function public.workflow_memories_cap();
 
 create policy "owner can change own memories"
   on public.workflow_memories for update

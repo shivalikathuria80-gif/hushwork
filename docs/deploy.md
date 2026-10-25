@@ -131,6 +131,7 @@ The Skills page lets a person turn on a Skill Bundle (a package of ready-made wo
 
 1. Paste `supabase/skills.sql` into Supabase (SQL Editor, New query, paste, Run).
 2. Nothing else. Until it is pasted, the Skills page still shows the bundles and says one setup step is missing.
+3. If you pasted `skills.sql` or `memory.sql` **before 2026-10-25** and Turn on or Remember fails, paste `supabase/policy-recursion-fix.sql` once (the first versions counted rows inside their own policy, which Postgres refuses with error 42P17). Newer copies of the two files are already fixed.
 
 ## 13. Moving to your own web address (when you buy one)
 
