@@ -197,7 +197,8 @@ export function readSavedResults(value) {
   if (!Array.isArray(value)) return [];
   const text = (v) => (typeof v === "string" ? v : "");
   return value.map((r) => {
-    const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : "done" };
+    const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : r?.status === "pending" ? "pending" : "done" };
+    if (r?.note === true) read.note = true; // a stop note: words for the person, not a step's state
     if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
     if (Number.isInteger(r?.fromStep) && r.fromStep >= 0 && r.fromStep < 100) read.fromStep = r.fromStep; // which step of that practice run
     if (isTypedKind(r?.kind) && r.fields && typeof r.fields === "object") {

@@ -285,7 +285,7 @@ test("Linear task creating: the only write is one fixed issueCreate request in i
   assert.deepEqual(only, ["lib/connectors/linear-create.js"], "no other file sends a change to Linear");
   const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveLinearCreate"));
-  const order = ["loadPracticeStep(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "linearAuthorization(", "limitError(", "createIssue("].map((call) => body.indexOf(call));
+  const order = ["loadPracticeStep(", "writeGate(", "fillAnswerText(", "looksSensitive(", "linearAuthorization(", "limitError(", "markPending(", "createIssue("].map((call) => body.indexOf(call));
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
@@ -313,7 +313,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   assert.ok(order.every((index) => index > 0));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
   const writing = action.slice(action.indexOf("export async function approveActionStep"));
-  const writeOrder = ["loadPracticeStep(", "checkTarget(", "isExampleTarget(", "wasApproved(", "fillAnswerText(", "looksSensitive(", "getComposioKey(", "limitError(", "runActionTool("].map((call) => writing.indexOf(call));
+  const writeOrder = ["loadPracticeStep(", "checkTarget(", "isExampleTarget(", "writeGate(", "fillAnswerText(", "looksSensitive(", "getComposioKey(", "limitError(", "markPending(", "runActionTool("].map((call) => writing.indexOf(call));
   assert.ok(writeOrder.every((index) => index > 0));
   assert.deepEqual(writeOrder, [...writeOrder].sort((a, b) => a - b), "a Composio write checks the step, the place, the once-only rule, the words and the limits before anything is sent");
   const flow = files.find((file) => file.name === "lib/connections/composio-flow.js").text;
@@ -361,7 +361,7 @@ test("Auto mode: only an explicit true turns it on; it uses the very same Approv
 });
 
 test("every jsonb containment lookup on saved runs is handed JSON TEXT, never a JavaScript array (the database client would turn an array into a Postgres list that matches nothing)", () => {
-  for (const name of ["lib/run-answer.js", "components/app/RunsViewer.js"]) {
+  for (const name of ["lib/run-state.js", "components/app/RunsViewer.js"]) {
     const text = files.find((file) => file.name === name).text;
     const calls = text.match(/\.contains\([^)]*\)/g) ?? [];
     assert.ok(calls.length > 0, name);
@@ -422,7 +422,7 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
 test("a run that stops says WHY: the reason is saved as its own small record (runs are never edited), and a scheduled run says which schedule started it", () => {
   const core = files.find((file) => file.name === "lib/run-core.js").text;
   const loop = core.slice(core.indexOf("async function runAutomatically"), core.indexOf("export async function startPracticeRun"));
-  assert.ok(loop.indexOf("saveStopNote(") > 0 && loop.indexOf("saveStopNote(") < loop.indexOf("stoppedAt: index + 1"), "the reason is saved before the run reports that it stopped");
+  assert.ok(loop.indexOf("saveStopNote(") > 0 && loop.indexOf("saveStopNote(") < loop.indexOf("stoppedAt: index + 1", loop.indexOf("saveStopNote(")), "the reason is saved before the run reports that it stopped");
   const note = core.slice(core.indexOf("async function saveStopNote"), core.indexOf("export async function runAutomatically"));
   assert.ok(note.includes('status: "failed"') && note.includes("saveLiveRun(") && !/\.update\(/.test(note), "an added record, never an edit of the run");
   const start = core.slice(core.indexOf("export async function startPracticeRun"), core.indexOf("// The \"Approve and call the address\""));
@@ -445,4 +445,20 @@ test("Test all my connections only LOOKS: it never calls a write, is for the sig
   const composio = files.find((file) => file.name === "lib/connectors/composio.js").text;
   const check = composio.slice(composio.indexOf("export async function checkComposioConnections"));
   assert.ok(!check.includes("runActionTool("), "an action is only checked for fit, never run");
+});
+
+test("shared workflow memory is data, not instructions: person-written and verified only, own rows only, never beside an MCP server, nothing it needs from the all-access client", () => {
+  const sql = fs.readFileSync(path.join(root, "..", "supabase", "memory.sql"), "utf8");
+  assert.match(sql, /enable row level security/);
+  const grants = sql.split("\n").filter((line) => /^grant /.test(line)).join("\n");
+  assert.ok(!/source|verification_status/.test(grants), "a person can never choose a fact's source or verification: the defaults (person, verified) stand");
+  assert.match(sql, /check \(source in \('person', 'workflow', 'ai'\)\)/);
+  assert.match(sql, /< 50/, "the number of facts is capped by the database");
+  const memory = files.find((file) => file.name === "lib/ai/memory.js").text;
+  assert.ok(memory.includes('.eq("source", "person")') && memory.includes('.eq("verification_status", "verified")') && memory.includes('.eq("user_id", userId)'), "only the person's own verified facts are loaded");
+  assert.ok(memory.includes("looksSensitive") && memory.includes(".replace(/</g,"), "secrets are refused and angle brackets are neutralised");
+  assert.ok(files.find((file) => file.name === "lib/ai/agent.js").text.includes("MEMORY_RULE") && files.find((file) => file.name === "lib/ai/groq.js").text.includes("MEMORY_RULE"), "every prompt that receives memory carries the 'not instructions' rule");
+  const core = files.find((file) => file.name === "lib/run-core.js").text;
+  assert.ok(core.includes('memory: uses === "mcp" ? ""'), "memory is never given to the AI beside an MCP server");
+  assert.ok(!/supabase\/admin|createAdminClient/.test(files.find((file) => file.name === "lib/actions/memory.js").text), "memory actions use the person's own client");
 });

@@ -4,6 +4,8 @@ import ThemeToggle from "@/components/app/ThemeToggle";
 import { requireUser } from "@/lib/auth";
 import { aiStatus } from "@/lib/ai-status";
 import DeleteAccount from "@/components/app/DeleteAccount";
+import MemorySettings from "@/components/app/MemorySettings";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Settings - Hushwork", robots: { index: false, follow: false } };
 
@@ -46,8 +48,29 @@ export default function SettingsPage() {
           <p className="mt-3 text-sm text-mute">What happens to your text is explained on the <Link href="/privacy">privacy page</Link>.</p>
         </div>
       </section>
+
+      <section aria-labelledby="memory-heading" className="mt-8">
+        <h2 id="memory-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Memory</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="mb-3 text-sm text-mute">Short facts the AI may use as background when it plans or answers (your timezone, who gets the reports). They are only facts: the AI is told to ignore any instructions written in them. Do not save passwords, keys or card numbers. Saved facts are sent to Groq with your AI requests.</p>
+          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
+            <Memory />
+          </Suspense>
+        </div>
+      </section>
     </main>
   );
+}
+
+async function Memory() {
+  const user = await requireUser();
+  const { data, error } = await (await createClient()).from("workflow_memories").select("id, key, value").eq("user_id", user.id).order("created_at", { ascending: true }).limit(50);
+  if (error) {
+    const missing = error.code === "42P01" || error.code === "PGRST205";
+    if (!missing) console.error("Loading memory failed:", error.code);
+    return <p className="text-[15px]">{missing ? "Memory needs one setup step: paste supabase/memory.sql into the Supabase SQL Editor and press Run." : "Could not load your saved facts. Try again in a minute."}</p>;
+  }
+  return <MemorySettings facts={data.map((row) => ({ id: String(row.id), key: String(row.key), value: String(row.value) }))} />;
 }
 
 async function AccountEmail() {

@@ -7,6 +7,7 @@
 // budget). Whatever goes wrong becomes a short code in `why`; Groq's own error text is never read out, logged or shown,
 // because it can quote what the model wrote.
 import { PLAN_SCHEMA, PLAN_SCHEMA_PLAIN, SYSTEM_PROMPT, SYSTEM_PROMPT_PLAIN, finishSteps, wrapTask } from "./plan.js";
+import { MEMORY_RULE, withMemory } from "./memory.js";
 
 // The model's name. To use a different model, change this one line (the bigger `openai/gpt-oss-120b` is the next step up).
 // Groq retires models now and then; if the terminal prints `ai-plan failed why=model_missing`, this is the line to update.
@@ -61,7 +62,7 @@ export async function writeWithGroq(text, keys = {}) {
   return first;
 }
 
-async function attempt(text, { groqKey, fetchImpl, now = Date.now }, rich) {
+async function attempt(text, { groqKey, fetchImpl, now = Date.now, memory = "" }, rich) { // memory: the person's saved facts as a <memory> block (lib/ai/memory.js), or ""
   if (!groqKey) return fail("off");
   const left = coolOffLeft(now());
   if (left > 0) return fail("busy", { status: 429, retryAfter: left }); // still cooling off: answered here, Groq not called
@@ -69,8 +70,8 @@ async function attempt(text, { groqKey, fetchImpl, now = Date.now }, rich) {
   const body = {
     model: GROQ_MODEL,
     messages: [
-      { role: "system", content: rich ? SYSTEM_PROMPT : SYSTEM_PROMPT_PLAIN }, // fixed text first
-      { role: "user", content: wrapTask(text) }, // the person's words last, marked as data
+      { role: "system", content: (rich ? SYSTEM_PROMPT : SYSTEM_PROMPT_PLAIN) + (memory ? `\n${MEMORY_RULE}` : "") }, // fixed text first
+      { role: "user", content: withMemory(wrapTask(text), memory) }, // the person's words last, marked as data (their saved facts too)
     ],
     temperature: 0.5,
     max_completion_tokens: 1600,

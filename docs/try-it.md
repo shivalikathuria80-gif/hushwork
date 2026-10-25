@@ -44,7 +44,12 @@ Every template says what it needs ("Works with Google, Gmail (send)").
 
 On the home screen of the app describe a job ("send a message to my account every morning"). The plan uses real steps: an email like that really goes to your own address after Approve. A step marked **Plan only** never does anything; swap it for **Do something in another app**.
 
-## 6. If something goes wrong
+## 6. Continue a run that stopped, and Memory
+
+- When a run stops at a step, press **Continue from where it stopped** on the Runs page. Steps already done are skipped, so nothing is sent twice. If a step says **Not sure if this happened**, look in the app first (is the email there?), then press **It was not done, try again** only if it was not.
+- **Settings > Memory** keeps short facts (your timezone, who gets the reports) that the AI may use as background. Do not save passwords or keys. (One setup step: paste `supabase/memory.sql` in Supabase.)
+
+## 7. If something goes wrong
 
 - A red message under an Approve button says what happened and, when an app refused, what the app said. "Not allowed" for Notion almost always means the page is not shared with the connection.
 - "Google refused" or "Linear refused": press Disconnect, then Connect again.

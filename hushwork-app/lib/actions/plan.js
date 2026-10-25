@@ -6,6 +6,7 @@ import { getGroqKey } from "@/lib/ai/key";
 import { makePreview } from "@/lib/ai/preview";
 import { AI_LIMITS } from "@/lib/ai/plan";
 import { takeDbSlot } from "@/lib/db-limits";
+import { loadMemory } from "@/lib/ai/memory";
 import { createClient } from "@/lib/supabase/server";
 
 // The Server Action behind "Preview plan" when AI planning is on. A Server Action is a function the page can call
@@ -21,5 +22,5 @@ export async function previewPlan(input) {
   const prompt = checkPrompt(input?.prompt);
   if (prompt.error) return { error: prompt.code }; // "empty" or "too_long": the screen has its own wording
   const supabase = await createClient();
-  return makePreview({ prompt: prompt.value, userId: user.id, groqKey: getGroqKey(), dbTake: () => takeDbSlot(supabase, "ai_plan", AI_LIMITS.perUserMinute, AI_LIMITS.perUserDay) });
+  return makePreview({ prompt: prompt.value, userId: user.id, groqKey: getGroqKey(), memory: await loadMemory(supabase, user.id), dbTake: () => takeDbSlot(supabase, "ai_plan", AI_LIMITS.perUserMinute, AI_LIMITS.perUserDay) });
 }

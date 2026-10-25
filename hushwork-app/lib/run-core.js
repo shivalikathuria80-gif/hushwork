@@ -11,6 +11,7 @@ import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
 import { runAgent, summarizeData } from "@/lib/ai/agent";
+import { loadMemory } from "@/lib/ai/memory";
 import { looksSensitive } from "@/lib/ai/plan";
 import { getLinearKey } from "@/lib/connectors/linear-env";
 import { getApp, getConnectionsKey } from "@/lib/connectors/oauth-env";
@@ -19,12 +20,13 @@ import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox } from "@/lib/connectors/google-gmail";
 import { fetchRecentFiles } from "@/lib/connectors/google-drive";
-import { appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
-import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers, wasApproved } from "@/lib/run-answer";
-import { createIssue } from "@/lib/connectors/linear-create";
+import { SHEETS_FAILED, appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
+import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers } from "@/lib/run-answer";
+import { PENDING_MESSAGE, UNCHECKED_MESSAGE, loadStepStates, stepStatus } from "@/lib/run-state";
+import { LINEAR_CREATE_FAILED, createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
-import { checkComposioConnections, runActionTool, runReadTool } from "@/lib/connectors/composio";
+import { COMPOSIO_FAILED, checkComposioConnections, runActionTool, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
@@ -51,25 +53,51 @@ const AUTO_ACTIONS = [
 // are never changed once saved), so the Runs page can say why instead of leaving the person to guess. `run` = { id, user_id, workflow_id, workflow_name }.
 async function saveStopNote(supabase, run, index, step, reason) {
   const title = `Stopped at step ${index + 1}${step?.title ? `: ${String(step.title).slice(0, 80)}` : ""}`;
-  return saveLiveRun(supabase, { ...run, stepIndex: index }, { icon: "CircleAlert", title, detail: "", status: "failed", outcome: String(reason).slice(0, 400) });
+  return saveLiveRun(supabase, { ...run, stepIndex: index }, { icon: "CircleAlert", title, detail: "", status: "failed", note: true, outcome: String(reason).slice(0, 400) }); // note: true = only words for the person, it never changes a step's state (lib/run-state.js)
 }
 
+// Doing the steps again is SAFE: a step that is already done is skipped (this is also how "Continue from where it stopped" works), a step whose end
+// Hushwork never saw ("pending") stops the run for the person to decide, and a step that failed is tried again. `skipped` is only present when > 0.
 export async function runAutomatically(runId, results, who, { allowWrites = true, run = null } = {}) {
   let done = 0;
+  let skipped = 0;
+  const states = await loadStepStates(who.supabase, who.user.id, runId);
+  const counted = () => (skipped ? { skipped } : {});
   for (let index = 0; index < Math.min(results.length, 20); index += 1) {
     const step = results[index];
     if (!isApprovable(step)) continue;
     if (!allowWrites && isWriteStep(step)) continue; // a scheduled run only writes when the person ticked "allow writing" for that schedule
     const action = AUTO_ACTIONS.find(([matches]) => matches(step))?.[1];
     if (!action) continue;
+    const state = states?.get(index)?.status;
+    if (state === "done") { skipped += 1; continue; }
+    if (state === "pending") return { done, stoppedAt: index + 1, reason: PENDING_MESSAGE, ...counted() };
     const outcome = await action({ runId, index }, who);
     if (outcome?.error) {
       if (run) await saveStopNote(who.supabase, run, index, step, outcome.error);
-      return { done, stoppedAt: index + 1, reason: String(outcome.error).slice(0, 400) };
+      return { done, stoppedAt: index + 1, reason: String(outcome.error).slice(0, 400), ...counted() };
     }
     done += 1;
   }
-  return { done, stoppedAt: 0 };
+  return { done, stoppedAt: 0, ...counted() };
+}
+
+// "Continue from where it stopped": does the steps of a run that are not done yet, in order, and skips the ones that are. Safe to press twice: a done
+// step is never done again, and a step whose result is unknown stops it. Returns { ok: true, auto } or { error }.
+export async function resumeRun(input, who) {
+  const { user, supabase } = who;
+  const id = checkId(input?.runId);
+  if (id.error) return { error: "That run no longer exists." };
+  const { data: rows, error } = await supabase.from("runs").select("user_id, workflow_id, workflow_name, mode, results").eq("id", id.value).eq("user_id", user.id);
+  if (error) {
+    console.error("loading a run to resume failed:", error.code);
+    return { error: "Could not load that run. Check your connection and try again." };
+  }
+  const row = rows?.[0];
+  if (!row || row.mode !== "practice") return { error: "That run no longer exists." };
+  const auto = await runAutomatically(id.value, readSavedResults(row.results), who, { allowWrites: true, run: { id: id.value, user_id: user.id, workflow_id: row.workflow_id, workflow_name: row.workflow_name } });
+  revalidatePath("/app", "layout");
+  return { ok: true, auto };
 }
 
 export async function startPracticeRun(input, who) {
@@ -167,11 +195,43 @@ function limitError(limits, userId, now, what) {
 
 // Saves what really happened as a separate "live" run. Best effort: the real action already happened, so a failure to
 // save is reported but never turned into "it failed".
+const insertLive = (supabase, run, record) => supabase
+  .from("runs")
+  .insert({ ...ownerOf(supabase, run.user_id), workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [{ ...record, from: run.id, fromStep: run.stepIndex }] })
+  .select("id");
+
+// SAFE RECOVERY. Every step that WRITES somewhere (send, create, add) leaves a small record BEFORE it asks the other app ("pending"), and another
+// when it ends ("done" or "failed"). The newest record of a step is its state (lib/run-state.js). So: a step that is done is never done again; a step
+// that is failed may be tried again; a step that is "pending" (we never saw the end: a dropped connection, a crash) is UNKNOWN and is never sent again
+// by itself, only if the person says it was not done. If the "started" record cannot be saved, nothing is sent.
+const RECORD_FIRST = "Hushwork could not record that this step was starting, so it was not done. Try again in a moment.";
+
+async function writeGate(supabase, userId, run, input) {
+  const state = await stepStatus(supabase, userId, run);
+  if (state.error) return { error: UNCHECKED_MESSAGE };
+  if (state.status === "done") return { error: ALREADY };
+  if (state.status === "pending" && input?.confirmRetry !== true) return { error: PENDING_MESSAGE, pending: true };
+  return null;
+}
+async function markStep(supabase, run, step, status, outcome) {
+  const { error } = await insertLive(supabase, run, { ...step, status, outcome: String(outcome).slice(0, 400) });
+  if (error) console.error(`recording a ${status} step failed:`, error.code);
+  return !error;
+}
+const markPending = (supabase, run, step) => markStep(supabase, run, step, "pending", "Started. Hushwork has not seen the result yet.");
+
+// A refusal Hushwork can SEE (a clear "no") is marked failed, so the step can be tried again. A dropped connection or a busy server is not a clear
+// answer (the other app may have done it), so the step stays "pending" (unknown).
+const UNSURE = new Set([COMPOSIO_FAILED.network, COMPOSIO_FAILED.busy, LINEAR_CREATE_FAILED.busy, LINEAR_CREATE_FAILED.network, SHEETS_FAILED.busy, SHEETS_FAILED.network]);
+const isUnsure = (result) => result?.unsure === true || UNSURE.has(result?.error);
+async function afterFailedWrite(supabase, run, step, message, result) {
+  if (isUnsure(result)) return { error: `${message} Hushwork could not tell whether it went through, so this step is marked unknown and will not be sent again by itself.` };
+  await markStep(supabase, run, step, "failed", message);
+  return { error: message };
+}
+
 async function saveLiveRun(supabase, run, record) {
-  const { data, error } = await supabase
-    .from("runs")
-    .insert({ ...ownerOf(supabase, run.user_id), workflow_id: run.workflow_id, workflow_name: run.workflow_name, mode: "live", status: "done", results: [{ ...record, from: run.id, fromStep: run.stepIndex }] })
-    .select("id");
+  const { data, error } = await insertLive(supabase, run, record);
   if (error) {
     console.error("saving the live run failed:", error.code);
     return { ok: true, runId: "", note: "It was done, but the record could not be saved." };
@@ -388,7 +448,7 @@ export async function approveAiStep(input, who) {
     };
   }
 
-  const answer = await runAgent({ task, tools, groqKey });
+  const answer = await runAgent({ task, tools, groqKey, memory: uses === "mcp" ? "" : await loadMemory(supabase, user.id) }); // never beside an MCP server: the model could copy a fact into its input
   if (!answer.ok) return { error: answer.error };
   if (toolError) return { error: toolError };
   const lookedAt = !answer.calls.length ? "" : uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address";
@@ -476,7 +536,8 @@ export async function approveLinearCreate(input, who) {
   const loaded = await loadPracticeStep(supabase, user, input, isLinearCreate);
   if (loaded.error) return loaded;
   const { run, step } = loaded;
-  if (await wasApproved(supabase, user.id, run, "issue")) return { error: ALREADY };
+  const gate = await writeGate(supabase, user.id, run, input);
+  if (gate) return gate;
 
   const usesAnswer = `${step.fields.title}${step.fields.details}`.includes("{answer}");
   const answer = usesAnswer ? await findAnswer(supabase, user.id, run) : "";
@@ -496,8 +557,9 @@ export async function approveLinearCreate(input, who) {
   linearCreateLimits().minute.take(user.id, now);
   linearCreateLimits().day.take(user.id, now);
 
+  if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
   const made = await createIssue({ authorization, title: title.text, details: details.text, team: step.fields.team });
-  if (!made.ok) return { error: made.error };
+  if (!made.ok) return afterFailedWrite(supabase, run, step, made.error, made);
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Created the task ${made.id} in Linear: ${title.text}${made.url ? ` (${made.url})` : ""}`.slice(0, 700) });
 }
 
@@ -556,7 +618,8 @@ export async function approveActionStep(input, who) {
   const target = resolveTarget(action, checked.value, checked.value === MY_EMAIL ? await accountEmail(who) : "");
   if (target.error) return { error: target.error };
   if (isExampleTarget(action, target.value)) return { error: EXAMPLE_NOTICE };
-  if (await wasApproved(supabase, user.id, run, "action")) return { error: ALREADY };
+  const gate = await writeGate(supabase, user.id, run, input);
+  if (gate) return gate;
 
   const usesAnswer = `${step.fields.title}${step.fields.details}`.includes("{answer}");
   const answer = usesAnswer ? await findAnswer(supabase, user.id, run) : "";
@@ -577,8 +640,9 @@ export async function approveActionStep(input, who) {
   actionLimits().day.take(user.id, now);
 
   const values = { target: target.value, title: title.text, details: details.text };
+  if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
   const done = await runActionTool({ key: composioKey, userId: user.id, action, values });
-  if (!done.ok) return { error: withSaid(done) };
+  if (!done.ok) return afterFailedWrite(supabase, run, step, withSaid(done), done);
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${action.done(values)}: ${title.text}${details.text ? `\n${details.text}` : ""}`.slice(0, 700) });
 }
 
@@ -590,7 +654,8 @@ export async function approveSheetsRow(input, who) {
   const loaded = await loadPracticeStep(supabase, user, input, isSheetsRow);
   if (loaded.error) return loaded;
   const { run, step } = loaded;
-  if (await wasApproved(supabase, user.id, run, "row")) return { error: ALREADY };
+  const gate = await writeGate(supabase, user.id, run, input);
+  if (gate) return gate;
   const sheet = parseSheetUrl(step.fields.to);
   const parsed = parseCells(step.fields.values);
   if (sheet.error || parsed.error) return { error: sheet.error ?? parsed.error };
@@ -608,8 +673,9 @@ export async function approveSheetsRow(input, who) {
   sheetsLimits().minute.take(user.id, now);
   sheetsLimits().day.take(user.id, now);
 
+  if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
   const added = await appendRow({ authorization, spreadsheetId: sheet.id, cells: row.cells });
-  if (!added.ok) return { error: added.error };
+  if (!added.ok) return afterFailedWrite(supabase, run, step, added.error, added);
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Added one row to your Google Sheet (${row.cells.length} ${row.cells.length === 1 ? "box" : "boxes"}): ${row.cells.join(" | ")}`.slice(0, 700) });
 }
 

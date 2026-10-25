@@ -5,6 +5,7 @@ import { Icon } from "../icons";
 import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
+import ResumeRun from "./ResumeRun";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isPlanOnly, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
@@ -122,7 +123,7 @@ export default async function RunsViewer({ searchParams }) {
   const doneByRun = new Map();
   for (const run of runs) {
     const first = run.live ? run.results[0] : null;
-    if (first?.from && Number.isInteger(first.fromStep) && first.status !== "failed") doneByRun.set(first.from, (doneByRun.get(first.from) ?? new Set()).add(first.fromStep)); // a "stopped" note is not a finished step
+    if (first?.from && Number.isInteger(first.fromStep) && first.status === "done") doneByRun.set(first.from, (doneByRun.get(first.from) ?? new Set()).add(first.fromStep)); // a stopped note or a step that was only started is not a finished step
   }
   const waitingIn = (run) => (run.live ? 0 : run.results.filter((step, index) => isApprovable(step) && !doneByRun.get(run.id)?.has(index)).length);
   const runIds = new Set(runs.filter((run) => !run.live).map((run) => run.id));
@@ -144,15 +145,17 @@ export default async function RunsViewer({ searchParams }) {
   // no longer offers Approve. (A step that failed saved nothing, so it still offers Approve and the person can try again.)
   const doneAt = new Map();
   const stoppedAt = new Map(); // step number -> the saved note saying why it stopped (a later success wins)
+  const unknownAt = new Map(); // step number -> started but never seen to finish: it may have happened, so it is never sent again by itself
   if (!selected.live) {
     try {
       const { data } = await (await createClient()).from("runs").select("results, created_at")
-        .eq("user_id", user.id).eq("mode", "live").contains("results", JSON.stringify([{ from: selected.id }])) /* JSON text on purpose (see wasApproved in lib/run-answer.js) */.order("created_at", { ascending: true }).limit(60);
+        .eq("user_id", user.id).eq("mode", "live").contains("results", JSON.stringify([{ from: selected.id }])) /* JSON text on purpose (see loadStepStates in lib/run-state.js) */.order("created_at", { ascending: true }).limit(60);
       for (const row of data ?? []) {
         const first = readSavedResults(row.results)[0];
         if (first && first.from === selected.id && Number.isInteger(first.fromStep)) {
-          if (first.status === "failed") stoppedAt.set(first.fromStep, first);
-          else { doneAt.set(first.fromStep, first); stoppedAt.delete(first.fromStep); }
+          if (first.status === "failed") { stoppedAt.set(first.fromStep, first); if (!first.note) unknownAt.delete(first.fromStep); } // a clear refusal settles an unknown step; a note only explains
+          else if (first.status === "pending") { unknownAt.set(first.fromStep, first); stoppedAt.delete(first.fromStep); }
+          else { doneAt.set(first.fromStep, first); stoppedAt.delete(first.fromStep); unknownAt.delete(first.fromStep); }
         }
       }
     } catch {
@@ -230,7 +233,12 @@ export default async function RunsViewer({ searchParams }) {
                   icon={step.icon} title={step.title} sub={step.detail}
                   right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : isPlanOnly(step) ? <span className="text-xs text-mute" title="This step only describes what would happen. It does nothing when run.">Plan only</span> : null}
                 />
-                {stoppedAt.has(index) && !doneAt.has(index) && (
+                {unknownAt.has(index) && !doneAt.has(index) && (
+                  <li className="list-none pb-3 pt-1">
+                    <p role="alert" className="flex items-start gap-2 rounded-xl bg-raised px-3 py-2 pl-2.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">Not sure if this happened.</b> It was started, but Hushwork never saw whether it finished (the connection may have dropped). Look in the app first. It is not sent again by itself.</span></p>
+                  </li>
+                )}
+                {stoppedAt.has(index) && !doneAt.has(index) && !unknownAt.has(index) && (
                   <li className="list-none pb-3 pt-1">
                     <p role="alert" className="flex items-start gap-2 rounded-xl bg-raised px-3 py-2 pl-2.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">It stopped here.</b> {stoppedAt.get(index).outcome} You can fix that and press Approve on this step to try again.</span></p>
                   </li>
@@ -245,10 +253,13 @@ export default async function RunsViewer({ searchParams }) {
             ))}
           </ol>
         )}
+        {!selected.live && [...stoppedAt.keys()].some((step) => !doneAt.has(step) && !unknownAt.has(step)) && (
+          <div className="mt-4"><ResumeRun key={selected.id} runId={selected.id} /></div>
+        )}
         {approvals.map(({ step, index }) => (
           <div key={index} className="mt-6">
             <ApproveSend
-              runId={selected.id} index={index}
+              runId={selected.id} index={index} unknown={unknownAt.has(index)}
               kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isActionStep(step) ? "action" : isSheetsRow(step) ? "sheets" : "request"}
               connected={isAiStep(step) ? aiOn : isLinearLookup(step) || isLinearCreate(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true}
               message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer, answers, user.email) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}

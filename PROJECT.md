@@ -37,7 +37,7 @@ Tagline: *"Describe the task. Hushwork handles it."* / *"Quiet work, done."*
 | Real actions (always after Approve) | Web calls; Linear (read + create a task); Google Calendar, Gmail (read), Drive (read), Sheets (add a row); 17 more apps through Composio (14 connectable): read one thing from each, and send an email, a Slack message, a GitHub issue, a Todoist task, a Calendar event, a Notion page |
 | Scheduled runs | Working. A Supabase clock (`pg_cron`) asks the app every minute; a schedule can be made from the Builder's Start step |
 | Safety extras | Failure emails, leaked-password check, rate limits (partly in the database), "Test all my connections", Download my data, Delete my account, Terms page |
-| Tests | 389 automated tests (`npm test`), including tests that run the real server code with a pretend database and Composio |
+| Tests | 411 automated tests (`npm test`), including tests that run the real server code with a pretend database and Composio |
 | Domain | Wants `hushwork.in`, registrar not chosen yet |
 
 ## 4. Architecture (how it works)
@@ -107,6 +107,8 @@ Tagline: *"Describe the task. Hushwork handles it."* / *"Quiet work, done."*
 8. A template or plan never holds a real person's address: use `{myEmail}`. Made-up values (a page id of zeros, `your-name/your-repo`) are refused until changed.
 9. A step that only describes must never look like one that works: it is named "Plan only" in the Builder and on the Runs page, and no template is plan-only.
 10. What an app said when it refused is cleaned, cut short, and dropped if it looks secret or contains an API key.
+11. A step that writes saves a "started" record before it calls the other app. A step that is done is never done again, and a step whose end was never seen is never sent again by itself (the person decides). D-040.
+12. Saved memory facts are data: only the person's own verified facts reach the AI, wrapped in `<memory>` tags and never beside an MCP server. D-039.
 
 ## 7. Current priorities
 

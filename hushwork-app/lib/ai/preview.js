@@ -37,7 +37,7 @@ const RETRYABLE = ["busy", "timeout", "rejected", "unusable", "refused"];
 const sharedLimits = () => (globalThis.__hushworkAiLimits ??= makeAiLimits());
 
 // prompt, userId: already checked. groqKey: from key.js (null when there is none). now/fetchImpl/limiters/log: for tests.
-export async function makePreview({ prompt, userId, groqKey, now = Date.now, fetchImpl, limiters = sharedLimits(), log = console.log, dbTake = async () => ({ ok: true }) }) {
+export async function makePreview({ prompt, userId, groqKey, now = Date.now, fetchImpl, limiters = sharedLimits(), log = console.log, dbTake = async () => ({ ok: true }), memory = "" }) {
   // A keyword answer: no steps, the screen builds the keyword plan itself and shows `notice`.
   const keyword = (why, { status, remaining, retryAfter } = {}) => ({
     source: "keyword",
@@ -63,7 +63,7 @@ export async function makePreview({ prompt, userId, groqKey, now = Date.now, fet
   const started = now();
   let result;
   try {
-    result = await writePlan(prompt, { groqKey, fetchImpl, now });
+    result = await writePlan(prompt, { groqKey, fetchImpl, now, memory });
   } catch {
     result = { ok: false, why: "unusable" }; // a bug on our side must not crash the page
   }

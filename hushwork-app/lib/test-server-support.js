@@ -18,6 +18,7 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
     eq(column, value) { this.filters.push((row) => row[column] === value); return this; }
     gte(column, value) { this.filters.push((row) => String(row[column]) >= String(value)); return this; }
     contains(column, json) {
+      this.asksState = true; // the app's "what state is each step in?" question
       const needle = JSON.parse(json); // the app passes JSON text on purpose
       this.filters.push((row) => Array.isArray(row[column]) && needle.every((one) => row[column].some((have) => subset(one, have))));
       return this;
@@ -30,6 +31,7 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
     run() {
       const table = tables[this.name];
       if (!table) return { data: null, error: { code: "42P01" } };
+      if (this.asksState && this.mode === "select" && client.breakStateReads) return { data: null, error: { code: "XX000" } };
       if (this.mode === "insert") {
         tick += 1000;
         const row = { id: randomUUID(), created_at: new Date(tick).toISOString(), ...(asUser && !admin ? { user_id: asUser } : {}), ...this.values };
@@ -55,7 +57,8 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
 
 // ---- a pretend Composio -------------------------------------------------------------------------------------------------------------------------
 // Replaces the global fetch for the length of a test. `tools` maps a tool name to { inputs, answer } where `inputs` is the tool's input list and
-// `answer` is what running it says ({ successful, data, error }) or a number for an HTTP status. `groq` is the list of texts the AI answers with.
+// `answer` is what running it says ({ successful, data, error }), a number for an HTTP status, or "drop" for a dropped connection; a LIST gives
+// the answer of the first try, the second try, and so on (the last one repeats). `groq` is the list of texts the AI answers with.
 // Every call is remembered in `calls`.
 export function fakeComposio(tools = {}, { groq = [] } = {}) {
   const calls = [];
@@ -76,7 +79,11 @@ export function fakeComposio(tools = {}, { groq = [] } = {}) {
     if (described && (init.method ?? "GET") === "GET") return tools[described[1]] ? reply(200, { input_parameters: tools[described[1]].inputs }) : reply(404, { error: "no such tool" });
     const executed = path.match(/^\/tools\/execute\/([A-Z0-9_]+)$/);
     if (executed) {
-      const answer = tools[executed[1]]?.answer;
+      const given = tools[executed[1]]?.answer;
+      const list = Array.isArray(given) ? given : [given];
+      const turn = calls.filter((call) => call.method === "POST" && call.path === path).length - 1; // which try this is (0 for the first)
+      const answer = list[Math.min(turn, list.length - 1)];
+      if (answer === "drop") throw new TypeError("fetch failed"); // the connection drops: the other app may or may not have done it
       if (typeof answer === "number") return reply(answer, { error: { message: "refused" } });
       return reply(200, answer ?? { successful: true, data: {} });
     }

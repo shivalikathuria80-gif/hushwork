@@ -72,7 +72,7 @@ const COPY = {
   },
 };
 
-export default function ApproveSend({ runId, index, message, kind = "request", connected = true }) {
+export default function ApproveSend({ runId, index, message, kind = "request", connected = true, unknown = false }) {
   const copy = COPY[kind];
   const router = useRouter();
   const [error, setError] = useState("");
@@ -83,7 +83,7 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
     startTransition(async () => {
       let result;
       try {
-        result = await copy.action({ runId, index });
+        result = await copy.action({ runId, index, ...(unknown ? { confirmRetry: true } : {}) }); // "it was not done" is the person's word that a step Hushwork lost track of may be sent again
       } catch (problem) {
         unstable_rethrow(problem);
         result = { error: "Could not send. Check your connection and try again." };
@@ -99,8 +99,9 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
       <p className="flex items-center gap-2 font-semibold"><Icon name="ShieldCheck" size={18} className="text-accent-text" />Needs your approval</p>
       <p className="mt-1 text-sm text-mute">{copy.intro}</p>
       <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-line bg-raised p-3 font-sans text-sm">{message}</pre>
+      {unknown && <p className="mt-3 rounded-xl bg-raised px-3 py-2 text-sm"><b className="font-medium">Check first.</b> This step was started, but Hushwork never saw whether it finished. It may already have been done, so it is not sent again by itself. Look in the app. Only if it was NOT done, press the button.</p>}
       {connected ? (
-        <Btn className="mt-3" icon={copy.icon} loading={pending} onClick={send}>{copy.button}</Btn>
+        <Btn className="mt-3" icon={copy.icon} loading={pending} onClick={send}>{unknown ? "It was not done, try again" : copy.button}</Btn>
       ) : (
         <p className="mt-3 text-sm text-mute">{kind === "ai" ? "AI is switched off (no Groq key), so nothing can be asked." : <>{kind === "calendar" || kind === "sheets" || kind === "gmail" || kind === "drive" ? "Google" : "Linear"} is not connected yet, so nothing can be asked. <Link href="/app/connections">See how to connect it</Link>.</>}</p>
       )}

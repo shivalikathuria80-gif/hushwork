@@ -69,13 +69,3 @@ export function fillActionDetails(actionId, text, answer, answers = []) {
   if (!words) return { error: NO_ANSWER };
   return { text: text.split(ANSWER_TAG).join(words).slice(0, 3000) };
 }
-
-// Steps that WRITE somewhere (add a row, create a task) are approved once per step of a practice run, so going back and pressing
-// Approve again cannot add a second copy. True when a real run of this kind from this practice run and step already exists.
-export async function wasApproved(supabase, userId, run, kind) {
-  const { data, error } = await supabase
-    .from("runs").select("id")
-    .eq("user_id", userId).eq("mode", "live")
-    .contains("results", JSON.stringify([{ kind, from: run.id, fromStep: run.stepIndex }])).limit(1); // JSON TEXT on purpose: handed an array, the database client would write it as a Postgres list and match nothing
-  return !error && Array.isArray(data) && data.length > 0;
-}

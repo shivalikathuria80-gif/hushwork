@@ -21,6 +21,7 @@ export async function approveDriveLookup(input) { return core.approveDriveLookup
 export async function approveLinearCreate(input) { return core.approveLinearCreate(input, await asUser()); }
 export async function approveAppLookup(input) { return core.approveAppLookup(input, await asUser()); }
 export async function approveActionStep(input) { return core.approveActionStep(input, await asUser()); }
+export async function resumeRun(input) { return core.resumeRun(input, await asUser()); }
 export async function approveSheetsRow(input) { return core.approveSheetsRow(input, await asUser()); }
 
 // The "Delete this run" button. A run is only a record, so deleting it changes nothing outside Hushwork. Only the person's

@@ -64,6 +64,7 @@ Sign-in, saved workflows and everything else need your Supabase project to have 
 | `connections.sql` (or `connections-any-app.sql` if the table already exists) | each person's encrypted app connections | Connect Linear / Google |
 | `schedules.sql` (and `schedules-index.sql` if you made the table before the index existed) | schedules | scheduled runs |
 | `usage.sql` | counters + the `take_usage` function | limits that hold across servers |
+| `memory.sql` | the `workflow_memories` table (your saved facts) | Settings > Memory (the AI works without it) |
 | `clock.sql` | the once-a-minute clock (`pg_cron` + `pg_net`) | scheduled runs online. Edit your password into it first |
 
 Then, in the Supabase dashboard (links go to the project `mgvaqoishxsqecpjfnuo`; change them for your own):
@@ -315,6 +316,22 @@ A step of the kind **Do something in another app** names one action from `lib/co
 - `{myEmail}` as an email's **Where** means the signed-in person's own address. It is filled in from the session (and from the database for a scheduled run), shown on the approval card, never read from the step.
 - `{answer}` is what the **last** Ask the AI step of the run said (one line, cut to 500 characters; an email keeps its line breaks up to 3,000).
 - `{answers}` (emails only) carries **every** Ask the AI step of the run, in workflow order, joined by blank lines: this is how the **Morning briefing by email** template sends three summaries in one email. With no answer yet the step stops with a clear sentence instead of sending an empty email.
+
+## Safe recovery: continue a run, never send twice
+
+Runs are never edited, so a step's state is told by small records added under it (`lib/run-state.js`); the newest one wins: `pending` (started, end not seen), `failed`, `done`. Every step that **writes** (email, Slack, GitHub, Todoist, Calendar, Notion, Linear task, Sheets row) saves `pending` **before** it calls the other app, then `done` or `failed`.
+
+- A step that is **done** is skipped, always.
+- A step that **failed** (a clear refusal) can be tried again.
+- A step still **pending** (dropped connection, busy server, crash) is **unknown**: it may already have happened, so it is never sent again by itself. The Runs page says "Not sure if this happened"; after you check the app, **It was not done, try again** sends it once.
+- **Continue from where it stopped** (button on a run that stopped, `resumeRun` in `lib/run-core.js`) does the steps that are not done and skips the rest, so pressing it twice is safe.
+- If the "started" record cannot be saved, nothing is sent. If the state cannot be read, writing is blocked.
+
+Tests: `lib/run-recovery.integration.test.js` (real server code, pretend database and Composio) and `lib/run-state.test.js`. Why: `../DECISIONS.md` D-040.
+
+## Memory (Settings > Memory)
+
+Short facts you save (up to 50, 300 characters each), for example "Timezone: India (IST)". The AI plan writer and the **Ask the AI** step receive them as background. They are **data, not instructions** (D-039): only facts you wrote and that are verified are sent, inside `<memory>` tags with look-alike angle brackets, and the prompt says to ignore any instructions in them. Text that looks like a secret is refused. They are not given to the AI beside an MCP server. Saved facts are sent to Groq with your AI requests; they are part of **Download my data** and are deleted with your account. Set up once: paste `../supabase/memory.sql` into the Supabase SQL Editor. Without it the AI simply runs without memory. Code: `lib/ai/memory.js`, `lib/actions/memory.js`, `components/app/MemorySettings.js`.
 
 ## Steps that only describe ("Plan only")
 

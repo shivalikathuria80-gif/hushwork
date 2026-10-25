@@ -118,6 +118,13 @@ Until now every server counted AI use in its own memory, so on Vercel a person c
 1. Paste `supabase/usage.sql` into Supabase (SQL Editor, New query, paste, Run).
 2. Nothing else. Until it is pasted the app still works and falls back to the old in-memory count. The whole-site limit (60 AI plans a day for everybody) is still in memory only.
 
+## 12b. Memory (optional, one paste)
+
+Settings > Memory lets a person save short facts the AI may use as background (their timezone, who gets the reports). It needs one table.
+
+1. Paste `supabase/memory.sql` into Supabase (SQL Editor, New query, paste, Run).
+2. Nothing else. Until it is pasted, Settings > Memory says one setup step is missing and the AI runs without memory; nothing else breaks.
+
 ## 13. Moving to your own web address (when you buy one)
 
 Nothing here can be done for you: buying the address is your job. The order matters.

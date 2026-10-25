@@ -17,6 +17,7 @@
 //   - At most 4 rounds, short answers, one 20-second wait per call, and failures become fixed sentences.
 import { GROQ_MODEL, GROQ_URL } from "./groq.js";
 import { wrapTask } from "./plan.js";
+import { MEMORY_RULE, withMemory } from "./memory.js";
 
 const MAX_ROUNDS = 4;
 const TIMEOUT_MS = 20_000;
@@ -46,15 +47,15 @@ const wrapData = (text) => `<data>\n${neutralise(String(text).slice(0, MAX_TOOL_
 // tools: { name: { description, run: async (input) => string, parameters? } }. Only a tool with `parameters` (an MCP tool) is
 // given the model's input; the others are run with no input at all. keys: { groqKey, fetchImpl }.
 // Returns { ok: true, text, calls } (calls = names of the tools that ran) or { ok: false, error }.
-export async function runAgent({ task, tools = {}, groqKey, fetchImpl = fetch }) {
+export async function runAgent({ task, tools = {}, groqKey, fetchImpl = fetch, memory = "" }) { // memory: a <memory> block of the person's saved facts, or ""
   if (!groqKey) return { ok: false, error: AGENT_FAILED.off };
   const specs = Object.entries(tools).map(([name, tool]) => ({
     type: "function",
     function: { name, description: tool.description, parameters: tool.parameters ?? NO_INPUT },
   }));
   const messages = [
-    { role: "system", content: AGENT_SYSTEM },
-    { role: "user", content: wrapTask(task) },
+    { role: "system", content: memory ? `${AGENT_SYSTEM} ${MEMORY_RULE}` : AGENT_SYSTEM },
+    { role: "user", content: withMemory(wrapTask(task), memory) },
   ];
   const calls = [];
 

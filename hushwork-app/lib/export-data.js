@@ -5,23 +5,24 @@ const MAX_RUNS = 500;
 
 // Returns { data } (a plain object) or { error } (a sentence).
 export async function buildExport(supabase, user) {
-  const [workflows, runs, schedules] = await Promise.all([
+  const [workflows, runs, schedules, memories] = await Promise.all([
     supabase.from("workflows").select("id, name, prompt, plan, created_at, updated_at").order("created_at", { ascending: true }),
     supabase.from("runs").select("id, workflow_id, workflow_name, mode, status, results, created_at").order("created_at", { ascending: false }).limit(MAX_RUNS),
     supabase.from("schedules").select("workflow_id, frequency, hour, minute, weekday, tz_offset, allow_writes, enabled, next_run_at, last_run_at, last_status"),
+    supabase.from("workflow_memories").select("scope, key, value, source, verification_status, created_at").order("created_at", { ascending: true }),
   ]);
   // A missing table (an older database) is simply an empty list; any other problem stops the export rather than hand over half of it.
   const rows = (result) => {
     if (result.error && result.error.code !== "42P01" && result.error.code !== "PGRST205") return null;
     return Array.isArray(result.data) ? result.data : [];
   };
-  const parts = { workflows: rows(workflows), runs: rows(runs), schedules: rows(schedules) };
+  const parts = { workflows: rows(workflows), runs: rows(runs), schedules: rows(schedules), memories: rows(memories) };
   if (Object.values(parts).some((part) => part === null)) return { error: "Could not read your data. Try again in a minute." };
   return {
     data: {
       exportedAt: new Date().toISOString(),
       account: { email: user.email ?? null },
-      note: `Your workflows, your ${MAX_RUNS} newest runs and your schedules. Saved app connections are never included, because they hold sign-in tokens.`,
+      note: `Your workflows, your ${MAX_RUNS} newest runs, your schedules and the facts saved in Memory. Saved app connections are never included, because they hold sign-in tokens.`,
       ...parts,
     },
   };

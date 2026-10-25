@@ -9,12 +9,12 @@ function pretend(tables) {
 }
 
 test("export: the person's workflows, runs and schedules, with their email, and never the saved connections", async () => {
-  const supabase = pretend({ workflows: { data: [{ id: "w1", name: "A" }], error: null }, runs: { data: [{ id: "r1" }], error: null }, schedules: { data: [{ workflow_id: "w1", frequency: "daily" }], error: null } });
+  const supabase = pretend({ workflows: { data: [{ id: "w1", name: "A" }], error: null }, runs: { data: [{ id: "r1" }], error: null }, schedules: { data: [{ workflow_id: "w1", frequency: "daily" }], error: null }, workflow_memories: { data: [{ key: "timezone", value: "IST" }], error: null } });
   const { data } = await buildExport(supabase, { email: "me@example.com" });
-  assert.deepEqual(supabase.read.sort(), ["runs", "schedules", "workflows"]);
+  assert.deepEqual(supabase.read.sort(), ["runs", "schedules", "workflow_memories", "workflows"]);
   assert.ok(!supabase.read.includes("connections"), "connections hold tokens and are never read");
   assert.equal(data.account.email, "me@example.com");
-  assert.deepEqual([data.workflows.length, data.runs.length, data.schedules.length], [1, 1, 1]);
+  assert.deepEqual([data.workflows.length, data.runs.length, data.schedules.length, data.memories.length], [1, 1, 1, 1]);
   assert.match(data.note, /never included/);
   assert.ok(!Number.isNaN(Date.parse(data.exportedAt)));
 });
