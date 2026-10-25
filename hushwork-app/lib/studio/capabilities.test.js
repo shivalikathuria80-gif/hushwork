@@ -163,3 +163,22 @@ test("every bundle workflow shows the Studio cards without trouble: each step ha
     }
   }
 });
+
+test("rowsForEmailList: one email step per typed address, each its own, behind ONE approval row, never to an address that is not typed", async () => {
+  const { rowsForEmailList, MAX_EMAIL_LIST } = await import("../step-rows.js");
+  const empty = toWorking([]);
+  const made = rowsForEmailList("ana@example.com, Bo@Example.com;\nana@example.com  cy@example.org", empty);
+  assert.deepEqual(made.rows.map((r) => r.kind), ["approve", "action", "action", "action"], "a repeated address is one email, the approval row comes once");
+  assert.deepEqual(made.rows.slice(1).map((r) => r.fields.target), ["ana@example.com", "Bo@Example.com", "cy@example.org"]);
+  assert.ok(made.rows.slice(1).every((r) => r.fields.action === "gmail_send" && r.fields.details === "Write your message here."));
+  assert.equal(new Set(made.rows.map((r) => r.key)).size, made.rows.length, "every row has its own key");
+  const afterAi = toWorking(stepsToPlan(checkSteps([{ kind: "trigger", fields: { how: "manual", when: "" } }, { kind: "ai", fields: { task: "x", uses: "nothing", address: "" } }, { kind: "approve", fields: { what: "x" } }]).value));
+  const second = rowsForEmailList("ana@example.com", afterAi);
+  assert.deepEqual(second.rows.map((r) => r.kind), ["action"], "no second approval row");
+  assert.equal(second.rows[0].fields.details, "{answer}", "after an AI step each email carries its answer");
+  for (const bad of ["", "   ", "not an address", "ana@example.com, oops", "{myEmail}", "a@b", "ana@example.com\nbcc:evil@x.co"]) assert.ok(rowsForEmailList(bad, empty).error, JSON.stringify(bad));
+  const nine = Array.from({ length: MAX_EMAIL_LIST + 1 }, (_, n) => `p${n}@example.com`).join(",");
+  assert.match(rowsForEmailList(nine, empty).error, /Up to 8/);
+  assert.equal(rowsForEmailList(nine.split(",").slice(0, MAX_EMAIL_LIST).join(","), empty).rows.length, MAX_EMAIL_LIST + 1);
+  for (const row of made.rows.filter((r) => r.kind === "action")) assert.ok(checkSteps([row]).value, "each step passes the normal checks");
+});

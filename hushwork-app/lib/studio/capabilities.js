@@ -14,16 +14,16 @@
 import { STEP_KINDS } from "../steps.js";
 import { SKILLS, connectionInfo, accessOf } from "../skills/bundles.js";
 import { findAction } from "../connectors/composio-actions.js";
-import { findComposioApp } from "../connectors/composio-apps.js";
+import { findComposioApp, parseAppAddress } from "../connectors/composio-apps.js";
 
 // Which connections a step needs, as ids from the app list or the Composio list. A step that reads or writes nothing in an app needs none.
 export function pluginsOf(step) {
   const f = step?.fields ?? {};
   switch (step?.kind) {
     case "ai":
-      if (["gmail", "drive", "calendar"].includes(f.uses)) return ["google"];
+      if (["gmail", "gmailtext", "drive", "calendar"].includes(f.uses)) return ["google"];
       if (f.uses === "linear") return ["linear"];
-      if (f.uses === "app") return findComposioApp(f.address) ? [findComposioApp(f.address).lookupOf ?? f.address] : []; // a second lookup shares its app's sign-in
+      if (f.uses === "app") return parseAppAddress(f.address) ? [parseAppAddress(f.address).app.lookupOf ?? parseAppAddress(f.address).app.id] : []; // a second lookup shares its app's sign-in
       return []; // nothing, a web address (public pages only) or an MCP server (no sign-in)
     case "app": return findComposioApp(f.app) ? [findComposioApp(f.app).lookupOf ?? f.app] : [];
     case "action": return findAction(f.action) ? [findAction(f.action).app] : [];
@@ -113,7 +113,7 @@ export function requirementOf(step, connections) {
 // A way out that is not "connect it": the fields to change so the step needs no app, or null when there is none.
 // Only an Ask the AI step has one (let it just think). Anything that writes has no stand-in: the person connects the app or removes the step.
 export function alternativeFor(step) {
-  if (step?.kind === "ai" && ["linear", "calendar", "gmail", "drive", "app"].includes(step.fields?.uses)) {
+  if (step?.kind === "ai" && ["linear", "calendar", "gmail", "gmailtext", "drive", "app"].includes(step.fields?.uses)) {
     return { label: "Let the AI just think (it will not look at your apps)", fields: { uses: "nothing", address: "" } };
   }
   return null;

@@ -41,14 +41,14 @@ test("the list: each action belongs to a real app, names one tool written Compos
 });
 
 test("the sign-in at Composio is limited to the app's lookup plus the tools of its actions, and nothing else", () => {
-  assert.deepEqual(allowedTools(findComposioApp("slack")), ["SLACK_LIST_ALL_CHANNELS", "SLACK_SEND_MESSAGE"]);
+  assert.deepEqual(allowedTools(findComposioApp("slack")), ["SLACK_LIST_ALL_CHANNELS", "SLACK_SEND_MESSAGE", "SLACK_FETCH_CONVERSATION_HISTORY"], "Slack: the channel list, the send, and reading one channel");
   assert.deepEqual(allowedTools(findComposioApp("airtable")), ["AIRTABLE_LIST_BASES"]);
   assert.deepEqual(allowedTools(findComposioApp("todoist")), ["TODOIST_GET_ALL_TASKS", "TODOIST_CREATE_TASK"]);
   for (const app of COMPOSIO_APPS) assert.ok(allowedTools(app).length >= 1);
 });
 
 test("a blueprint is reused only when its limit is exactly the allowed tools; otherwise one is made with them", async () => {
-  const wanted = ["SLACK_LIST_ALL_CHANNELS", "SLACK_SEND_MESSAGE"];
+  const wanted = ["SLACK_LIST_ALL_CHANNELS", "SLACK_SEND_MESSAGE", "SLACK_FETCH_CONVERSATION_HISTORY"];
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ method: init.method, body: init.body ? JSON.parse(init.body) : undefined });
@@ -194,3 +194,46 @@ test("when an app refuses an action, the person gets one of our own sentences th
   for (const key of ["notFound", "forbidden", "invalid"]) assert.ok(COMPOSIO_FAILED[key].length > 40, key);
 });
 
+
+// ---- a lookup that needs a typed channel: Slack messages ----
+test("parseAppAddress: 'stripe' and 'slackmessages:general' work, anything half-written or odd is refused (nothing is guessed)", async () => {
+  const { parseAppAddress } = await import("./composio-apps.js");
+  assert.equal(parseAppAddress("stripe").app.id, "stripe");
+  assert.equal(parseAppAddress(" Stripe ").app.id, "stripe");
+  assert.equal(parseAppAddress("stripeinvoices").app.lookupOf, "stripe");
+  assert.deepEqual([parseAppAddress("slackmessages:general").app.id, parseAppAddress("slackmessages:general").input], ["slackmessages", "general"]);
+  assert.equal(parseAppAddress("SlackMessages:#general").input, "general", "a # in front is dropped");
+  assert.equal(parseAppAddress("slackmessages:C0123ABCD").input, "C0123ABCD", "an id keeps its capital letters");
+  for (const bad of ["slackmessages", "slackmessages:", "slackmessages:bad channel", "slackmessages:a/b", "stripe:x", "nope", "", "__proto__", "slackmessages:" + "a".repeat(81), 5, null, undefined]) assert.equal(parseAppAddress(bad), null, String(bad));
+});
+
+test("Slack messages: the channel name is looked up in the person's own channel list, then ONE history read for that channel; answers of different shapes are understood", async () => {
+  const { findComposioApp } = await import("./composio-apps.js");
+  const { runChannelMessages, findChannelId, messageLines } = await import("./composio.js");
+  const app = findComposioApp("slackmessages");
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname.replace("/api/v3.1", "");
+    calls.push({ path, body: init.body ? JSON.parse(init.body) : undefined });
+    const ok = (data) => ({ ok: true, status: 200, json: async () => ({ successful: true, data }), text: async () => "" });
+    if (path === "/tools/execute/SLACK_LIST_ALL_CHANNELS") return ok({ response_data: { channels: [{ id: "C1AAAAAAA", name: "random" }, { id: "C0123ABCD", name: "General" }] } });
+    if (path === "/tools/execute/SLACK_FETCH_CONVERSATION_HISTORY") return ok({ messages: [{ ts: "1792800000.000100", user: "U1", text: "Deploy at 5" }, { ts: "1792800100.0", username: "bot", text: "Done <script>" }, { type: "x" }] });
+    return { ok: false, status: 404, json: async () => ({}), text: async () => "" };
+  };
+  const result = await runChannelMessages({ key: "ak_k", userId: "u1", app, channel: "general", fetchImpl });
+  assert.equal(result.ok, true);
+  assert.match(result.text, /U1: Deploy at 5\n.*bot: Done <script>/);
+  assert.deepEqual(calls.map((c) => c.path), ["/tools/execute/SLACK_LIST_ALL_CHANNELS", "/tools/execute/SLACK_FETCH_CONVERSATION_HISTORY"]);
+  assert.deepEqual(calls[1].body, { user_id: "u1", arguments: { channel: "C0123ABCD", limit: 10 } });
+  calls.length = 0;
+  await runChannelMessages({ key: "ak_k", userId: "u1", app, channel: "C0123ABCD", fetchImpl });
+  assert.deepEqual(calls.map((c) => c.path), ["/tools/execute/SLACK_FETCH_CONVERSATION_HISTORY"], "an id needs no lookup");
+  const missing = await runChannelMessages({ key: "ak_k", userId: "u1", app, channel: "nope", fetchImpl });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /could not find a Slack channel called nope/);
+  assert.equal(findChannelId({ a: [{ id: "lower", name: "general" }] }, "general"), "", "an id must look like a Slack id");
+  assert.deepEqual(messageLines("nothing"), []);
+  const refused = await runChannelMessages({ key: "ak_k", userId: "u1", app, channel: "C0123ABCD", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ successful: false, error: "missing_scope: channels:history" }), text: async () => "" }) });
+  assert.equal(refused.ok, false);
+  assert.ok(refused.error.length > 20);
+});

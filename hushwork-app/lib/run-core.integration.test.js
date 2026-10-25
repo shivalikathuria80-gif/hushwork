@@ -262,3 +262,50 @@ test("a Notion page carries the AI's text (line breaks kept) in the tool's markd
     assert.deepEqual(sent[0].body.arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Week notes", markdown: "Monday: standup\n- Dentist at 5\nTuesday: free" }); // the AI step trims blank lines; line breaks stay
   } finally { composio.restore(); }
 });
+
+// ---- Stripe invoices, Slack messages and the text of emails: the new lookups inside an Ask the AI step ----
+const lookupPlan = (uses, address, task = "Sum up what you see.") => finishSteps({ steps: [trigger, { icon: "Sparkles", title: "Ask the AI", detail: "x", block: "ai", choice: "nothing", a: task, b: "" }].map((s, i) => (i === 1 ? s : s)) }).map((s) => (s.kind === "ai" ? { ...s, fields: { ...s.fields, uses, address } } : s));
+
+test("Slack messages: the channel is looked up by name, ONE history read follows, and the answer reaches the AI; no channel in the step stops with a plain sentence", async () => {
+  const OKAY = (data) => ({ successful: true, data });
+  const good = setup({ plan: lookupPlan("app", "slackmessages:general") });
+  const composio = fakeComposio({
+    SLACK_LIST_ALL_CHANNELS: { answer: OKAY({ channels: [{ id: "C0123ABCD", name: "general" }] }) },
+    SLACK_FETCH_CONVERSATION_HISTORY: { answer: OKAY({ messages: [{ ts: "1792800000.1", user: "U1", text: "Deploy at 5" }] }) },
+  }, { groq: ["TOOL", "One deploy at 5."] });
+  try {
+    const result = await startPracticeRun({ id: good.workflow, auto: true }, good.who);
+    assert.deepEqual(result.auto, { done: 1, stoppedAt: 0 });
+    assert.deepEqual(livePosts(composio).map((call) => call.path), ["/tools/execute/SLACK_LIST_ALL_CHANNELS", "/tools/execute/SLACK_FETCH_CONVERSATION_HISTORY"]);
+    assert.deepEqual(livePosts(composio)[1].body.arguments, { channel: "C0123ABCD", limit: 10 });
+    const groqBodies = composio.calls.filter((call) => call.path === "groq");
+    assert.ok(JSON.stringify(groqBodies[1].body.messages).includes("Deploy at 5"), "the messages were handed to the AI as data");
+  } finally { composio.restore(); }
+  const half = setup({ plan: lookupPlan("app", "slackmessages") });
+  const fake = fakeComposio({}, { groq: ["x"] });
+  try {
+    const result = await startPracticeRun({ id: half.workflow, auto: true }, half.who);
+    assert.match(result.auto.reason, /Write the channel after the name in this step, like slackmessages:general/);
+    assert.equal(fake.calls.length, 0, "nothing was asked of Slack or the AI");
+  } finally { fake.restore(); }
+});
+
+test("Stripe invoices: the invoices tool runs for an Ask the AI step set to stripeinvoices, and only that tool", async () => {
+  const { workflow, who } = setup({ plan: lookupPlan("app", "stripeinvoices") });
+  const composio = fakeComposio({ STRIPE_LIST_INVOICES: { answer: { successful: true, data: { data: [{ id: "in_1", status: "open", amount_due: 500 }] } } } }, { groq: ["TOOL", "One open invoice, 500."] });
+  try {
+    const result = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.deepEqual(result.auto, { done: 1, stoppedAt: 0 });
+    assert.deepEqual(livePosts(composio).map((call) => call.path), ["/tools/execute/STRIPE_LIST_INVOICES"]);
+  } finally { composio.restore(); }
+});
+
+test("the text of emails: a step set to 'with the text of each email' needs Google, and without it nothing is asked of the AI", async () => {
+  const { workflow, who } = setup({ plan: lookupPlan("gmailtext", "") });
+  const composio = fakeComposio({}, { groq: ["x"] });
+  try {
+    const result = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.match(result.auto.reason, /Google is not connected/);
+    assert.equal(composio.calls.length, 0);
+  } finally { composio.restore(); }
+});

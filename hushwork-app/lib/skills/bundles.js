@@ -46,6 +46,12 @@ export const SKILLS = [
   skill("linear-blockers", "Find operational blockers", "ListChecks", "Reads your open Linear tasks and sums up what is in progress and what looks blocked.",
     { reads: "Your open Linear tasks (read only).", needs: ["linear"] },
     step("ai", { task: "Sum up my open tasks: what is in progress and what looks blocked. Up to 5 short lines.", uses: "linear", address: "" })),
+  skill("gmail-reply-drafts", "Draft replies to my emails", "PenLine", "Reads the opening of your 5 newest emails and writes a short reply for each one that needs an answer. It only writes: nothing is sent.",
+    { reads: "The sender, subject and the opening of the text (about 450 characters) of your 5 newest emails. That text goes to the AI (Groq) with your request. It cannot send, change or delete mail.", needs: ["google"] },
+    step("ai", { task: "For each of my newest emails that needs an answer, write a short polite reply. Up to 5.", uses: "gmailtext", address: "" })),
+  skill("slack-channel", "Read a Slack channel", "MessageSquare", "Reads the latest messages of ONE Slack channel and sums up what matters. Put your channel's name in the step after the colon.",
+    { reads: "The latest 10 messages of the one channel named in the step (read only: it cannot post, edit or delete anything).", needs: ["slack"] },
+    step("ai", { task: "Sum up the latest messages: decisions, questions and anything urgent. Up to 5 short lines.", uses: "app", address: "slackmessages:general" })),
   skill("github-notifications", "Read GitHub notifications", "Inbox", "Reads your latest GitHub notifications and lists what needs action first.",
     { reads: "Your latest GitHub notifications (read only).", needs: ["github"] },
     step("ai", { task: "List the notifications that need action first: repo, what and why. Up to 5 short lines.", uses: "app", address: "github" })),
@@ -66,6 +72,9 @@ export const SKILLS = [
   skill("ask-approval", "Ask you to approve", "ShieldCheck", "A stop sign: it marks the point where the workflow starts to write, so you know to read the approval card.",
     { reads: "Nothing." },
     step("approve", { what: "Everything that writes below, before it happens" })),
+  skill("notion-page", "Save to a Notion page", "FileText", "Creates ONE new Notion page with a title and text written on it, under a Notion page you name. First change the page id in the step to your own.",
+    { writes: "Creates one new page in Notion, with the text you read on the approval card. It cannot change or delete existing pages. It waits for your Approve click.", needs: ["notion"], alone: { title: "Notes from Hushwork", details: "Write the page text here." } },
+    step("action", { action: "notion_page", target: "00000000000000000000000000000000", title: "Notes from Hushwork", details: "{answers}" })),
   skill("email-me", "Email me the result", "Mail", "Sends ONE email to your own address with what the AI steps said. You read it and press Approve first.",
     { writes: "Sends one email to your own address through Gmail (send). It waits for your Approve click.", needs: ["gmailsend"], alone: { title: "A note from Hushwork", details: "Write your message here." } },
     step("action", { action: "gmail_send", target: "{myEmail}", title: "Your Hushwork result", details: "{answers}" })),
@@ -107,8 +116,8 @@ export const BUNDLES = [
   {
     id: "marketing-growth", name: "Marketing and growth", icon: "PenLine",
     blurb: "Turn one blog post into social posts and a newsletter, and never run out of ideas.",
-    connections: ["gmailsend"],
-    skills: ["blog-takeaways", "campaign-content", "post-ideas", "ask-approval", "email-me"],
+    connections: ["gmailsend", "notion"],
+    skills: ["blog-takeaways", "campaign-content", "post-ideas", "ask-approval", "email-me", "notion-page"],
     workflows: [
       {
         id: "campaign-repurposer", title: "Campaign Repurposer", body: "Reads one blog post and emails you its takeaways, 5 social posts and a newsletter draft: your review queue is your inbox. Put the post's address in both Ask the AI steps in the Builder first.",
@@ -122,19 +131,37 @@ export const BUNDLES = [
         start: { how: "schedule", when: "Every Monday at 9:00" }, schedule: { frequency: "weekly", weekday: 1, hour: 9, minute: 0 },
         flow: ["post-ideas", "ask-approval", ["email-me", { title: "Five post ideas" }]],
       },
+      {
+        id: "ideas-to-notion", title: "Post Ideas to Notion", body: "When you ask: thinks of five post ideas and writes them on a new Notion page. First change the page id in the last step to the Notion page it should go under.",
+        request: "When I ask, think of five post ideas and write them on a new Notion page. Ask me before it is created.",
+        start: { how: "manual", when: "" },
+        flow: ["post-ideas", "ask-approval", ["notion-page", { title: "Post ideas", details: "{answer}" }]],
+      },
     ],
   },
   {
     id: "dev-admin", name: "Dev and admin", icon: "Workflow",
     blurb: "Triage client requests into Linear tasks and get a weekly digest of GitHub and incidents.",
-    connections: ["google", "linear", "gmailsend", "github", "pagerduty"],
-    skills: ["gmail-urgent", "gmail-top-request", "linear-blockers", "github-notifications", "pagerduty-incidents", "ask-approval", "linear-task", "email-me"],
+    connections: ["google", "linear", "gmailsend", "github", "pagerduty", "slack"],
+    skills: ["gmail-urgent", "gmail-top-request", "gmail-reply-drafts", "slack-channel", "linear-blockers", "github-notifications", "pagerduty-incidents", "ask-approval", "linear-task", "email-me"],
     workflows: [
       {
         id: "client-triage", title: "Client Project Triage", body: "When you ask: spots urgent client emails, sums up what is blocked in Linear, then (after you approve) creates a Linear task for the top request and emails you a daily brief. Slack messages cannot be read, only Gmail.",
         request: "When I ask, find urgent client emails, sum up what is blocked, add a Linear task for the top request and email me a daily brief. Ask me first.",
         start: { how: "manual", when: "" },
         flow: ["gmail-urgent", "linear-blockers", "gmail-top-request", "ask-approval", ["linear-task", { details: "Made by Hushwork from your latest emails." }], ["email-me", { title: "Your daily client brief" }]],
+      },
+      {
+        id: "reply-drafts", title: "Reply Drafts", body: "When you ask: reads the opening of your 5 newest emails, writes a short reply for each one that needs an answer, and emails you the drafts to review. Nothing is sent to anyone else. The text of those emails goes to the AI (Groq).",
+        request: "When I ask, read my newest emails, write a short reply for each that needs one and email the drafts to me. Ask me before it is sent.",
+        start: { how: "manual", when: "" },
+        flow: ["gmail-reply-drafts", "ask-approval", ["email-me", { title: "Reply drafts to review" }]],
+      },
+      {
+        id: "slack-brief", title: "Slack Channel Brief", body: "When you ask: reads the latest messages of one Slack channel and emails you a short brief. First change the channel name after the colon in the Ask the AI step.",
+        request: "When I ask, read the latest messages of my Slack channel and email me a short brief. Ask me before it is sent.",
+        start: { how: "manual", when: "" },
+        flow: ["slack-channel", "ask-approval", ["email-me", { title: "Your Slack channel brief" }]],
       },
       {
         id: "dev-digest", title: "Weekly Dev Digest", body: "Every Monday: reads your GitHub notifications and PagerDuty incidents and emails you one digest.",

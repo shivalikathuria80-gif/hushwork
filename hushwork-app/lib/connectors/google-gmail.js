@@ -1,4 +1,6 @@
-// Asks Gmail for the latest mail in the person's inbox: who sent it, the subject and when. It never reads the body of an email.
+// Asks Gmail for the latest mail in the person's inbox: who sent it, the subject and when. fetchInbox never reads the body of an email.
+// fetchInboxText (below) is the ONE exception, used only by an Ask the AI step the person set to "with the text of each email": it reads the opening
+// of the text of the 5 newest messages.
 // READ-ONLY: this file only ever sends GET requests, and the permission the person gave (gmail.readonly) cannot send, change
 // or delete mail. Gmail answers at https://gmail.googleapis.com/gmail/v1. The Authorization value ("Bearer <token>") is handed
 // in from lib/connections/store.js, and `fetchImpl` can be replaced so tests never call the real Google. Failures come back as
@@ -96,6 +98,75 @@ export async function fetchInbox({ authorization, fetchImpl = fetch }) {
       mails: mails.map(({ body }) => {
         const headers = Array.isArray(body?.payload?.headers) ? body.payload.headers : [];
         return { time: mailTime(headerOf(headers, "date")), from: senderName(headerOf(headers, "from")) || "(unknown sender)", subject: flat(decodeMimeWords(headerOf(headers, "subject")), 100) || "(no subject)" };
+      }),
+    };
+  } catch {
+    return { ok: false, error: GMAIL_FAILED.network };
+  }
+}
+
+// ---- the text of the newest emails (opt-in) ------------------------------------------------------------------------------------------------------------------
+const TEXT_HOW_MANY = 5;
+const TEXT_CHARS = 450; // per email, so five emails and their headers stay inside what the AI is handed (3000 characters)
+
+const decodeBody = (data) => Buffer.from(String(data).replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+const ENTITIES = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" };
+const htmlToText = (html) => html.replace(/<(style|script)[\s\S]*?<\/\1>/gi, " ").replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/gi, "\n").replace(/<[^>]*>/g, " ").replace(/&(?:nbsp|amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity]);
+
+// The first plain-text part of a message (else the first HTML part turned into text), searched through the nested parts. Returns "" when there is none.
+export function bodyOf(payload) {
+  const found = { plain: "", html: "" };
+  const walk = (part, depth) => {
+    if (!part || typeof part !== "object" || depth > 6) return;
+    if (part.mimeType === "text/plain" && !found.plain && typeof part.body?.data === "string") found.plain = decodeBody(part.body.data);
+    if (part.mimeType === "text/html" && !found.html && typeof part.body?.data === "string") found.html = htmlToText(decodeBody(part.body.data));
+    for (const child of Array.isArray(part.parts) ? part.parts : []) walk(child, depth + 1);
+  };
+  walk(payload, 0);
+  return found.plain || found.html;
+}
+
+// Mail text is written by strangers: quoted older messages ("> ..."), signatures ("-- ") and link-only lines are dropped, everything is flattened to plain
+// text and cut short. (The AI later reads it as data and ignores any instructions inside: lib/ai/agent.js.)
+export function tidyBody(text) {
+  const lines = String(text ?? "").replace(/\r/g, "").split("\n");
+  const kept = [];
+  for (const line of lines) {
+    if (/^--\s*$/.test(line) || /^On .{5,120} wrote:\s*$/.test(line)) break; // a signature or the start of the quoted thread: the rest is not new
+    if (line.trimStart().startsWith(">")) continue;
+    kept.push(line);
+  }
+  return kept.join(" ").replace(/https?:\/\/\S+/g, "[link]").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, TEXT_CHARS);
+}
+
+// The latest 5 messages in the inbox WITH the opening of their text, newest first.
+// Returns { ok: true, mails: [{ time, from, subject, text }] } or { ok: false, error }.
+export async function fetchInboxText({ authorization, fetchImpl = fetch }) {
+  try {
+    const list = new URL(BASE);
+    list.searchParams.set("labelIds", "INBOX");
+    list.searchParams.set("maxResults", String(TEXT_HOW_MANY));
+    list.searchParams.set("fields", "messages(id)");
+    const listed = await getJson(list.toString(), authorization, fetchImpl);
+    if (listed.error) return { ok: false, error: listed.error };
+    const messages = listed.body?.messages ?? [];
+    if (!Array.isArray(messages)) return { ok: false, error: GMAIL_FAILED.network };
+    const ids = messages.slice(0, TEXT_HOW_MANY).map((message) => message?.id).filter((id) => typeof id === "string" && /^[A-Za-z0-9]{1,40}$/.test(id));
+
+    const mails = await Promise.all(ids.map(async (id) => {
+      const url = new URL(`${BASE}/${id}`);
+      url.searchParams.set("format", "full");
+      url.searchParams.set("fields", "payload");
+      return getJson(url.toString(), authorization, fetchImpl);
+    }));
+    const failed = mails.find((entry) => entry.error);
+    if (failed) return { ok: false, error: failed.error };
+    return {
+      ok: true,
+      mails: mails.map(({ body }) => {
+        const payload = body?.payload ?? {};
+        const headers = Array.isArray(payload.headers) ? payload.headers : [];
+        return { time: mailTime(headerOf(headers, "date")), from: senderName(headerOf(headers, "from")) || "(unknown sender)", subject: flat(decodeMimeWords(headerOf(headers, "subject")), 100) || "(no subject)", text: tidyBody(bodyOf(payload)) };
       }),
     };
   } catch {

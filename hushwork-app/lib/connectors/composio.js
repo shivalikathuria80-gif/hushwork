@@ -14,6 +14,7 @@
 import { actionsForApp, buildArguments, readToolInputs } from "./composio-actions.js";
 import { COMPOSIO_APPS } from "./composio-apps.js";
 import { looksSensitive } from "../ai/plan.js";
+import { niceTime } from "./time-format.js";
 
 const BASE = "https://backend.composio.dev/api/v3.1";
 const TIMEOUT_MS = 15_000;
@@ -174,6 +175,57 @@ export async function runReadTool({ key, userId, app, fetchImpl }) {
   return { ok: true, text: answer && answer !== "null" ? answer : "(nothing found)" };
 }
 
+// ---- Slack: the latest messages of ONE channel -------------------------------------------------------------------------------------------------------------------
+// Composio answers differently shaped JSON for different tools, so what we need is FOUND by looking through the answer for the right kind of object (a channel
+// has a plain id and a name; a message has text and a time or a user) instead of trusting one exact shape.
+const walkAnswer = (value, visit, depth = 0) => {
+  if (depth > 7 || value === null || typeof value !== "object") return;
+  if (Array.isArray(value)) { for (const one of value.slice(0, 1000)) walkAnswer(one, visit, depth + 1); return; }
+  visit(value);
+  for (const one of Object.values(value)) walkAnswer(one, visit, depth + 1);
+};
+export function findChannelId(data, name) {
+  let found = "";
+  walkAnswer(data, (item) => { if (!found && typeof item.id === "string" && /^[A-Z0-9]{6,20}$/.test(item.id) && typeof item.name === "string" && item.name.toLowerCase() === String(name).toLowerCase()) found = item.id; });
+  return found;
+}
+export function messageLines(data) {
+  const lines = [];
+  walkAnswer(data, (item) => {
+    if (lines.length >= 15 || typeof item.text !== "string" || !item.text.trim() || !("ts" in item || "user" in item || "username" in item)) return;
+    const when = Number.parseFloat(item.ts) > 0 ? niceTime(Number.parseFloat(item.ts) * 1000) : "";
+    const who = typeof item.username === "string" ? item.username : typeof item.user === "string" ? item.user : "someone";
+    lines.push(`${when ? `${when}  ` : ""}${flat(who, 40)}: ${flat(item.text, 200)}`);
+  });
+  return lines;
+}
+
+// Reads the latest messages of one Slack channel (read only). `channel` is a name ("general") or an id ("C0123ABCD"): a name is first looked up in the
+// person's own channel list (the Slack app's one lookup). Returns { ok: true, text } or { ok: false, error, said }.
+export async function runChannelMessages({ key, userId, app, channel, fetchImpl }) {
+  const execute = async (tool, args) => {
+    const ran = await call(key, "POST", `/tools/execute/${tool}`, { body: { user_id: userId, arguments: args }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
+    if (ran.error) return { ok: false, error: ran.error, said: ran.said };
+    if (ran.body?.successful !== true) {
+      const said = cleanSaid(ran.body?.error, key);
+      return { ok: false, error: explainFailure(said || ran.body?.error), said };
+    }
+    return { ok: true, data: ran.body.data ?? null };
+  };
+  let id = /^[A-Z0-9]{6,20}$/.test(channel) && /\d/.test(channel) ? channel : "";
+  if (!id) {
+    const slack = COMPOSIO_APPS.find((one) => one.id === app.lookupOf);
+    const listed = await execute(slack.tool, {});
+    if (!listed.ok) return listed;
+    id = findChannelId(listed.data, channel);
+    if (!id) return { ok: false, error: `Hushwork could not find a Slack channel called ${channel}. Check the name (letters, numbers, dots and dashes), or write the channel's id (it starts with C) instead.` };
+  }
+  const history = await execute(app.tool, { channel: id, limit: 10 });
+  if (!history.ok) return history;
+  const lines = messageLines(history.data);
+  return { ok: true, text: lines.length ? lines.join("\n").slice(0, 1500) : "(no messages found)" };
+}
+
 // Does ONE write in an app (send a message, create an issue, add a task) for this person. `action` is an entry of composio-actions.js
 // and `values` is { target, title, details } (already checked and cut by the caller). First Composio is asked what inputs the action's tool
 // really takes; the request is built only from those (buildArguments), and if the tool needs something we do not fill in, or has no home
@@ -230,7 +282,7 @@ export async function checkComposioConnections({ key, userId, fetchImpl }) {
   const listed = await listConnected({ key, userId, fetchImpl });
   if (listed.error) return { error: listed.error };
   const connected = new Set(listed.accounts.map((account) => account.toolkit));
-  const usable = COMPOSIO_APPS.filter((app) => !app.unavailable && connected.has(app.toolkit));
+  const usable = COMPOSIO_APPS.filter((app) => !app.unavailable && !app.input && connected.has(app.toolkit)); // a lookup that needs a typed channel cannot be tried with nothing to fill in
   const said = (result) => `${result.error}${result.said ? ` The app said: "${result.said}".` : ""}`;
   const rows = await Promise.all(usable.map(async (app) => {
     const read = await runReadTool({ key, userId, app, fetchImpl });

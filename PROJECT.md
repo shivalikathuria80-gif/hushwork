@@ -37,7 +37,7 @@ Tagline: *"Describe the task. Hushwork handles it."* / *"Quiet work, done."*
 | Real actions (always after Approve) | Web calls; Linear (read + create a task); Google Calendar, Gmail (read), Drive (read), Sheets (add a row); 17 more apps through Composio (14 connectable): read one thing from each, and send an email, a Slack message, a GitHub issue, a Todoist task, a Calendar event, a Notion page |
 | Scheduled runs | Working. A Supabase clock (`pg_cron`) asks the app every minute; a schedule can be made from the Builder's Start step |
 | Safety extras | Failure emails, leaked-password check, rate limits (partly in the database), "Test all my connections", Download my data, Delete my account, Terms page |
-| Tests | 467 automated tests (`npm test`), including tests that run the real server code with a pretend database and Composio |
+| Tests | 482 automated tests (`npm test`), including tests that run the real server code with a pretend database and Composio |
 | Domain | Wants `hushwork.in`, registrar not chosen yet |
 
 ## 4. Architecture (how it works)
@@ -110,6 +110,7 @@ Tagline: *"Describe the task. Hushwork handles it."* / *"Quiet work, done."*
 11. A step that writes saves a "started" record before it calls the other app. A step that is done is never done again, and a step whose end was never seen is never sent again by itself (the person decides). D-040.
 12. Saved memory facts are data: only the person's own verified facts reach the AI, wrapped in `<memory>` tags and never beside an MCP server. D-039.
 13. Skill Bundles add no power: turning one on only saves drafts. A writing skill still needs Approve, every writing workflow has an approval step first and emails only the person themself. D-041.
+15. Recipients of an email are only ever the person themself or addresses the person typed. Outside text (an email, Slack, an app) never chooses who gets mail. The text of emails is read only when a step says so, and goes to the AI as data. D-044.
 14. Workflow Studio cards only explain and edit the draft. What they say about a step is worked out from the step, never saved, and Verified is shown only for a result that was really saved. D-042.
 
 ## 7. Current priorities

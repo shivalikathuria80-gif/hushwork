@@ -12,7 +12,7 @@ import { syncScheduleFromStart } from "@/lib/actions/schedules";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
 import { planOnlyWarning } from "@/lib/run-engine";
-import { PALETTE_BLOCKS, DRAG_KIND, newRowForBlock, rowsForSkill } from "@/lib/step-rows";
+import { PALETTE_BLOCKS, DRAG_KIND, MAX_EMAIL_LIST, newRowForBlock, rowsForEmailList, rowsForSkill } from "@/lib/step-rows";
 import { SKILLS, accessOf } from "@/lib/skills/bundles";
 import { requirementOf } from "@/lib/studio/capabilities";
 
@@ -44,6 +44,8 @@ export default function Builder({ initial, connections }) {
   const [status, setStatus] = useState(""); // what the one hidden live region says out loud
   const focusLater = useRef(null); // { key, part }: the control that should take the cursor once the next render is on screen
   const [saving, startSaving] = useTransition();
+  const [emailList, setEmailList] = useState(""); // the addresses typed into "Email several people"
+  const [emailProblem, setEmailProblem] = useState("");
 
   const announce = useCallback((sentence) => {
     // The same sentence twice in a row would not be spoken again, so a non-breaking space makes it new.
@@ -84,6 +86,17 @@ export default function Builder({ initial, connections }) {
     focusLater.current = { key: rows.at(-1).key, part: firstPart(rows.at(-1)) };
     setMessage(null);
     announce(`${skill.name} added${rows.length > 1 ? ", with an Ask me first step before it" : ""}.`);
+  }
+  // "Email several people": one email step for each typed address (see rowsForEmailList), so each person gets their own email and their own Approve click.
+  function addEmailList() {
+    const made = rowsForEmailList(emailList, working);
+    if (made.error) { setEmailProblem(made.error); return; }
+    if (working.length + made.rows.length > LIMITS.planSteps) { setEmailProblem(`A workflow can have up to ${LIMITS.planSteps} steps. Delete some first.`); return; }
+    setWorking((current) => [...current, ...made.rows]);
+    setEmailList("");
+    setEmailProblem("");
+    setMessage(null);
+    announce(`${made.rows.filter((row) => row.kind === "action").length} email steps added.`);
   }
   // The Workflow Studio card's buttons: remove a step whose app is missing, or switch it to its stand-in way.
   const removeRow = (key) => { setWorking((rows) => rows.filter((row) => row.key !== key)); announce("Step removed."); };
@@ -276,6 +289,17 @@ export default function Builder({ initial, connections }) {
               );
             })}
           </ul>
+
+          <h2 id="email-heading" className="mt-6 text-sm font-medium">Email several people</h2>
+          <p className="mt-1 text-sm text-mute">One separate email for each address, and you approve each one. Up to {MAX_EMAIL_LIST}.</p>
+          <label htmlFor="email-list" className="sr-only">Email addresses, separated by commas or new lines</label>
+          <textarea
+            id="email-list" value={emailList} onChange={(event) => setEmailList(event.target.value)} rows={3} readOnly={saving} placeholder={"ana@example.com, bo@example.com"}
+            aria-describedby={emailProblem ? "email-problem" : undefined} aria-invalid={emailProblem ? true : undefined}
+            className="mt-2 w-full rounded-xl border border-field bg-surface px-3 py-2 text-sm placeholder:text-hint"
+          />
+          <Btn type="button" size="sm" variant="secondary" icon="Plus" onClick={addEmailList} disabled={saving || !emailList.trim()} className="mt-2">Add an email step for each</Btn>
+          {emailProblem && <p id="email-problem" role="alert" className="mt-2 text-sm text-error">{emailProblem}</p>}
         </aside>
 
         <section aria-labelledby="builder-steps-heading" className="min-w-0">

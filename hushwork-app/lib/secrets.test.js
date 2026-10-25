@@ -193,7 +193,12 @@ test("Google: exactly four permissions are asked for, each address is in one fil
   assert.ok(drive.includes('"files(name,mimeType,modifiedTime)"'), "only name, kind and time are asked for");
   const gmail = files.find((file) => file.name === "lib/connectors/google-gmail.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(gmail) && !/\/(?:send|modify|trash|delete|drafts|batch)/i.test(gmail), "the gmail connector only sends GET and never names a send, change or delete address");
-  assert.ok(gmail.includes('"metadata"') && !gmail.includes('"full"') && !gmail.includes("format=raw"), "only the headers are asked for, never the body of an email");
+  const [headersOnly, withText] = gmail.split("export async function fetchInboxText");
+  assert.ok(headersOnly.includes('"metadata"') && !headersOnly.includes('"full"') && !gmail.includes("format=raw"), "the usual inbox lookup asks only for the headers, never the body of an email");
+  assert.ok(withText && withText.includes('"full"') && !/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(withText), "the text of an email is read in ONE place, by a read-only call that only a step set to 'with the text of each email' uses");
+  const core = files.find((file) => file.name === "lib/run-core.js").text;
+  assert.equal([...core.matchAll(/fetchInboxText\(/g)].length, 1, "and that one place is called from one tool");
+  assert.ok(core.includes('uses === "gmailtext"') && core.indexOf("fetchInboxText({") > core.indexOf('uses === "gmailtext"'), "only when the step says gmailtext");
   const calendar = files.find((file) => file.name === "lib/connectors/google-calendar.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)/.test(calendar), "the calendar connector only sends GET");
   const sheets = files.find((file) => file.name === "lib/connectors/google-sheets.js").text.replace(/^\s*\/\/.*$/gm, "");
@@ -303,7 +308,8 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/skills/connection-status.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
-  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookup in the apps list and the actions in the actions list");
+  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookups in the apps list and the actions in the actions list");
+  assert.deepEqual([...client.matchAll(/execute\((\w+\.tool), /g)].map((match) => match[1]), ["slack.tool", "app.tool"], "reading a Slack channel runs only the Slack channel list and the messages lookup, both from the apps list");
   assert.ok(client.includes("arguments: {}"), "always called with nothing to fill in");
   assert.ok(client.includes("restrict_to_following_tools: allowed") && client.includes("COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).map((action) => action.tool)])"), "the sign-in is limited to the lookups plus the listed actions at Composio too");
   assert.deepEqual(files.filter((file) => /backend\.composio\.dev/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md"), ["lib/connectors/composio.js"]);

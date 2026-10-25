@@ -287,7 +287,9 @@ test("blocks: an AI step may look at Linear, the calendar, the inbox, Drive or a
   for (const tool of ["linear", "calendar", "gmail", "drive"]) assert.equal(AI_BLOCKS.ai(tool, "Sum up").fields.uses, tool);
   for (const app of ["stripe", "github", "notion", "todoist", "slack", "pagerduty"]) assert.deepEqual(AI_BLOCKS.ai(app, "Sum up").fields, { task: "Sum up", uses: "app", address: app }, app);
   for (const odd of ["", "nothing", "web", "mcp", "Gmail", "__proto__", "everything", "xero", "vercel", "cloudflare", "gmailsend", "gcalwrite"]) assert.deepEqual(AI_BLOCKS.ai(odd, "Sum up").fields, { task: "Sum up", uses: "nothing", address: "" }, odd);
-  assert.match(SYSTEM_PROMPT, /gmail \(their email inbox\)/);
+  assert.match(SYSTEM_PROMPT, /gmail \(their email inbox: who wrote and the subject only\)/);
+  assert.match(SYSTEM_PROMPT, /gmailtext \(their email inbox INCLUDING the words inside their 5 newest emails: use it ONLY when the task needs what the emails say/);
+  assert.equal(AI_BLOCKS.ai("gmailtext", "Answer my emails").fields.uses, "gmailtext");
 });
 
 test("blocks: an issue block becomes a Create a Linear task step with no team (a person adds one later), and passes the normal checks", () => {
@@ -391,7 +393,7 @@ test("notes: the plan that came back as four plain notes (read emails, approve, 
   assert.ok(steps.every((s) => !isPlanOnly(s)), "no step is left that only describes: " + steps.map((s) => s.title).join(" | "));
   const ai = steps.filter((s) => s.kind === "ai");
   assert.equal(ai.length, 1, "reading and drafting are ONE Ask the AI step (steps cannot see each other's answers)");
-  assert.equal(ai[0].fields.uses, "gmail");
+  assert.equal(ai[0].fields.uses, "gmailtext", "answering an email needs what it says, so this one reads the text of the newest emails");
   assert.match(ai[0].fields.task, /Then draft replies/);
   const email = steps.find((s) => s.kind === "action");
   assert.ok(email && isApprovable(email) && email.fields.target === "{myEmail}" && email.fields.details === "{answer}", "the drafts come to the person by email");

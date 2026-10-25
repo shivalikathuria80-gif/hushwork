@@ -353,6 +353,15 @@ The **Skills** page (`/app/skills`, `app/app/skills/page.js` and `components/app
 
 Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules), `lib/skills/enable.test.js`, `lib/skills/bundles.integration.test.js` (the real run code), `lib/sql-rls.test.js` (RLS on every per-person table). Why: `../DECISIONS.md` D-041.
 
+## More abilities (2026-10-25)
+
+- **Run summary line.** At the top of a run on the Runs page: "3 of 4 steps done: looked in Stripe and Google, the AI wrote 1 text and sent 1 email. 1 step could not run: step 3 (...)". Built only from saved results (`lib/studio/run-summary.js`): counts steps, never made-up item counts.
+- **Notion pages with text.** The action's "details" box is the text written on the page (Composio's create-page tool takes it as `markdown`). The approval card shows it as "Text on the page".
+- **Stripe invoices.** `stripeinvoices` (`STRIPE_LIST_INVOICES`) shares the Stripe sign-in. If you connected Stripe earlier, press **Disconnect** then **Connect** once so the sign-in allows the new tool. Invoice Chaser reads invoices.
+- **The text of emails (opt-in).** In an Ask the AI step choose **My Gmail inbox, with the text of each email**. The opening (about 450 characters) of your 5 newest emails goes to the AI (Groq); quoted replies, signatures and links are removed; the email text is not kept, only the AI's answer. The default **My Gmail inbox (senders and subjects)** never reads the text. Skill and workflow: **Draft replies to my emails** / **Reply Drafts** (emails the drafts to YOU).
+- **Slack messages.** In an Ask the AI step set to *Another app*, write `slackmessages:channelname` in the address box: Hushwork finds the channel in your own channel list and reads its latest 10 messages (read only). Skill and workflow: **Read a Slack channel** / **Slack Channel Brief**. Untested against a real Slack.
+- **Email several people.** In the Builder, **Email several people**: type up to 8 addresses; each gets its own email step (its own Approve click, its own done record). Recipients are only ever the addresses you type, never picked from an email or an app.
+
 ## Workflow Studio: one Builder, cards that explain every step
 
 Every way of starting a workflow ends in the same Builder: a **goal** (the workspace box), a **template**, or a **skill** (`/app/builder?skill=<id>`: from "Start a workflow with this skill" on the Skills page, or the **Skills** list on the Builder's left side). Under each step the Builder shows a card (`components/app/StepStudioCard.js`):

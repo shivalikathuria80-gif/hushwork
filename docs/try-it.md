@@ -57,7 +57,15 @@ Open **Skills**. Each bundle (Finance and operations, Marketing and growth, Dev 
 
 In the **Builder** each step has a card: **Why** it is there and **Evidence** (Planned until it has run; on the Runs page it says Verified, Failed or Not sure for real). Press "How it runs and what if it fails" for more. If a step needs an app you have not connected, the card says so right there: press **Connect** (a new tab), then **I connected it: check again**, or let the AI just think, or remove the step. The **Skills** list on the left adds a ready-made step; one that writes brings an "Ask me first" step with it.
 
-## 9. If something goes wrong
+## 9. New in the AI steps
+
+- At the top of a run a **summary line** says what was done and what could not run.
+- A **Notion page** step writes the text onto the page. **Stripe invoices** are readable (disconnect and connect Stripe once if it was connected before).
+- **Ask the AI** can read the text of your 5 newest emails: pick *My Gmail inbox, with the text of each email*. The text goes to the AI (Groq).
+- **Slack:** write `slackmessages:channelname` in an Ask the AI step set to Another app.
+- **Email several people** (Builder, left side): one email step for each address you type.
+
+## 10. If something goes wrong
 
 - A red message under an Approve button says what happened and, when an app refused, what the app said. "Not allowed" for Notion almost always means the page is not shared with the connection.
 - "Google refused" or "Linear refused": press Disconnect, then Connect again.

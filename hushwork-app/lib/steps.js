@@ -103,8 +103,8 @@ export const STEP_KINDS = {
     icon: "Sparkles",
     fields: [
       text("task", "What should the AI do?", 110, { hint: "For example: Tell me which task to do first" }),
-      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", gmail: "My Gmail inbox", drive: "My Google Drive files", app: "Another app (Todoist, Notion...)", web: "A web address", mcp: "An MCP server" }),
-      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server (starts with https://), or Another app (its short name from the Connections page, for example todoist, github or slack)" }),
+      choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", gmail: "My Gmail inbox (senders and subjects)", gmailtext: "My Gmail inbox, with the text of each email", drive: "My Google Drive files", app: "Another app (Todoist, Notion...)", web: "A web address", mcp: "An MCP server" }),
+      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server (starts with https://), or Another app (its short name from the Connections page, for example todoist, github, stripe or stripeinvoices; for the messages of one Slack channel write slackmessages:channelname)" }),
     ],
     describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),
   },
@@ -113,7 +113,7 @@ export const STEP_KINDS = {
     help: "Look at something in an app you connected through Composio (Todoist, Notion...). It only reads. You approve the look on the Runs page.",
     icon: "Plug",
     fields: [
-      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.map((app) => [app.id, app.name]))),
+      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.filter((app) => !app.input).map((app) => [app.id, app.name]))),
       text("what", "Your note", 120, { optional: true, hint: "Optional. What you want to know, for example: which task is due first" }),
     ],
     describe: (fields, label) => ({ title: "Look in another app", detail: join(label("app"), fields.what) }),

@@ -5,6 +5,7 @@ import { ICON_NAMES } from "./ai/icon-names.js";
 import { NOTE, STEP_KINDS, blankFields, isTypedKind } from "./steps.js";
 import { checkSteps } from "./validate.js";
 import { accessOf } from "./skills/bundles.js";
+import { checkTarget, findAction } from "./connectors/composio-actions.js";
 
 let counter = 0;
 const newKey = () => ++counter;
@@ -57,6 +58,30 @@ export function rowsForSkill(skill, existing) {
   }
   rows.push({ ...newRow(skill.step.kind), fields: { ...skill.step.fields, ...(skill.alone && !existing.some((row) => row.kind === "ai") ? skill.alone : {}) } });
   return rows;
+}
+
+// "Email each person on a list": ONE email step per address, so every person gets their own separate email, each with its own Approve click (and its own
+// "done" record, so a stop half way never sends anyone a second copy). The addresses are the ones the person TYPES here: Hushwork never picks recipients
+// from what an email or an app says (that would let a stranger's email choose who gets mail). Every person gets the same words; after an Ask the AI step
+// they carry its answer ({answer}). `text` is the addresses (commas, spaces, semicolons or new lines between them); `existing` the rows already in the list.
+// Returns { rows } or { error }.
+export const MAX_EMAIL_LIST = 8;
+export function rowsForEmailList(text, existing) {
+  const email = findAction("gmail_send");
+  const typed = String(text ?? "").split(/[\s,;]+/).map((one) => one.trim()).filter(Boolean);
+  if (!typed.length) return { error: "Write at least one email address." };
+  const seen = new Set();
+  const addresses = [];
+  for (const address of typed) {
+    if (checkTarget({ ...email, selfAllowed: false }, address).error) return { error: `"${address.slice(0, 40)}" does not look like an email address.` };
+    if (!seen.has(address.toLowerCase())) { seen.add(address.toLowerCase()); addresses.push(address); }
+  }
+  if (addresses.length > MAX_EMAIL_LIST) return { error: `Up to ${MAX_EMAIL_LIST} addresses at a time, so each email can be read and approved.` };
+  const words = existing.some((row) => row.kind === "ai") ? "{answer}" : "Write your message here.";
+  const rows = [];
+  if (!existing.some((row) => row.kind === "approve")) rows.push({ ...newRow("approve"), fields: { what: "Each email below, before it is sent" } });
+  for (const address of addresses) rows.push({ ...newRow("action"), fields: { action: "gmail_send", target: address, title: "A message from Hushwork", details: words } });
+  return { rows };
 }
 
 // ---- drag and drop (the browser's own dragging; the screens call these when something is dropped) ----

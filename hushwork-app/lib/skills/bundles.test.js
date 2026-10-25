@@ -6,8 +6,8 @@ import { ICON_NAMES } from "../ai/icon-names.js";
 import { LIMITS, checkPrompt } from "../validate.js";
 import { parseWhen } from "../schedule-text.js";
 import { checkSchedule } from "../schedule.js";
-import { findAction } from "../connectors/composio-actions.js";
-import { findComposioApp } from "../connectors/composio-apps.js";
+import { findAction, isExampleTarget } from "../connectors/composio-actions.js";
+import { findComposioApp, parseAppAddress } from "../connectors/composio-apps.js";
 
 const WRITING = ["action", "issue", "row"];
 
@@ -55,7 +55,7 @@ test("skills: reading skills that look at an app name a real app that can be con
   for (const one of SKILLS.filter((x) => x.step.kind === "ai")) {
     const { uses, address } = one.step.fields;
     if (uses === "app") {
-      const app = findComposioApp(address);
+      const app = parseAppAddress(address)?.app; // "slackmessages:general" names a channel too
       assert.ok(app && !app.unavailable, `${one.id}: ${address} can be connected`);
       assert.ok(one.needs.includes(app.lookupOf ?? address), `${one.id}: lists ${app.lookupOf ?? address} as a need`);
     }
@@ -110,7 +110,9 @@ test("bundles: a workflow that writes always has an 'Ask you to approve' step be
       const firstWrite = steps.findIndex((s) => WRITING.includes(s.kind));
       assert.ok(firstWrite > 0, `${workflow.id}: it writes something`);
       assert.ok(steps.slice(0, firstWrite).some((s) => s.kind === "approve"), `${workflow.id}: approval before the first write`);
-      for (const s of steps.filter((x) => x.kind === "action")) assert.equal(s.fields.target, "{myEmail}", `${workflow.id}: only to the person`);
+      for (const s of steps.filter((x) => x.kind === "action" && x.fields.action === "gmail_send")) assert.equal(s.fields.target, "{myEmail}", `${workflow.id}: only to the person`);
+      for (const s of steps.filter((x) => x.kind === "action" && x.fields.action === "notion_page")) assert.ok(isExampleTarget(findAction("notion_page"), s.fields.target), `${workflow.id}: a Notion page id is the made-up one until the person writes their own (it is refused until then)`);
+      assert.ok(steps.every((x) => x.kind !== "action" || ["gmail_send", "notion_page"].includes(x.fields.action)), `${workflow.id}: a bundle only writes an email to the person or one Notion page`);
     }
   }
 });
@@ -124,8 +126,10 @@ test("bundles: a workflow's changes only touch fields the skill really has, and 
       }
       const built = buildWorkflow(bundle, workflow);
       const aiBeforeEmail = built.steps.filter((s) => s.kind === "ai").length;
-      const email = built.steps.find((s) => s.kind === "action");
+      const email = built.steps.find((s) => s.kind === "action" && s.fields.action === "gmail_send");
       if (email) assert.ok(aiBeforeEmail >= 1 && email.fields.details === "{answers}", `${workflow.id}: the email carries every AI answer`);
+      const page = built.steps.find((s) => s.kind === "action" && s.fields.action === "notion_page");
+      if (page) assert.ok(aiBeforeEmail >= 1 && page.fields.details === "{answer}", `${workflow.id}: the Notion page carries the AI's text`);
     }
   }
   // a skill can only be used by a bundle that lists it
@@ -174,7 +178,7 @@ test("describeBundle: tells the person what each skill reads and writes, the app
     assert.ok(info.skills.every((s) => ["read", "write", "think", "control"].includes(s.access)));
     for (const workflow of info.workflows) assert.ok(workflow.steps >= 3);
   }
-  assert.deepEqual(describeBundle(findBundle("marketing-growth")).connections.map((c) => c.name), ["Gmail (send)"]);
+  assert.deepEqual(describeBundle(findBundle("marketing-growth")).connections.map((c) => c.name), ["Gmail (send)", "Notion"]);
 });
 
 test("connectionInfo: own sign-ins and Composio apps are named; unavailable apps say so; unknown ids are null", () => {

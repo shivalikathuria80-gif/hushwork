@@ -65,10 +65,10 @@ test("turning it off removes only the row; the saved workflows stay; turning it 
   await enableBundle(supabase, user, "marketing-growth");
   assert.deepEqual(await disableBundle(supabase, user, "marketing-growth"), { ok: true });
   assert.equal((await enabledBundleIds(supabase, user)).ids.size, 0);
-  assert.equal(supabase.tables.workflows.length, 2, "the workflows are the person's now");
+  assert.equal(supabase.tables.workflows.length, 3, "the workflows are the person's now");
   const again = await enableBundle(supabase, user, "marketing-growth");
   assert.deepEqual(again.saved, []);
-  assert.equal(again.skipped.length, 2);
+  assert.equal(again.skipped.length, 3);
 });
 
 test("an unknown bundle id is refused without touching the database; turning off asks the same", async () => {

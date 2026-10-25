@@ -85,6 +85,7 @@ Last updated: 2026-10-24
 | D-041 | Skills and Skill Bundles (plugins) add no new power | ✅ | 2026-10-25 |
 | D-042 | Workflow Studio: one Builder, step cards that explain themselves | ✅ | 2026-10-25 |
 | D-043 | The AI plan writer only uses blocks that really work | ✅ | 2026-10-25 |
+| D-044 | Run summary line, and five things that were not built are now built (carefully) | ✅ | 2026-10-25 |
 
 ---
 
@@ -378,6 +379,19 @@ Last updated: 2026-10-24
 - **Decision:** The AI plan writer is offered only `trigger`, `approve`, `ai`, `row`, `issue` and `action` (and `note` when nothing fits). `find`, `linear`, `write`, `send` and `app` are cut: three of them only described and did nothing, and **Ask the AI** can already look, find, sum up and write in Linear, the calendar, the inbox, Drive and 13 connected apps. A leftover old block in an answer is rewritten into the matching Ask the AI step, and a plain note (a model that ignores the blocks) is turned into the real step that does its job (`realizeNotes`), because a model cannot be relied on to follow instructions: the owner's next plan came back as four plain notes anyway. A typed step that only reads never gets an approval step in front of it. The keyword preview builds the same real steps. The Builder's palette hides the describe-only blocks. Plans saved earlier are untouched and still open.
 - **Reason:** The owner kept getting AI plans full of steps that ran and did nothing, while a working alternative existed.
 - **Where:** `lib/ai/plan.js`, `lib/ai/keyword-plan.js`, `lib/step-rows.js` (`PALETTE_BLOCKS`), `components/app/Composer.js`; tests `lib/ai/plan.test.js`, `lib/ai/keyword-plan.test.js`, `lib/steps.test.js`
+
+### D-044: Run summary line, and five things that were not built are now built (carefully)
+- **Date:** 2026-10-25
+- **Status:** ✅ Approved (the owner asked for all of them)
+- **Decision:**
+  - **Run summary line** on the Runs page (`lib/studio/run-summary.js`): one sentence of what was looked at, written, sent and what could not run, built only from saved results (a step counts as done only if its saved record says so). It counts steps, never invented item counts.
+  - **Notion pages carry text.** Composio's create-page tool takes a `markdown` box in the same call, so the action's "details" are the page text (shown on the approval card as "Text on the page"). A tool that has no such box is never sent the text by guessing.
+  - **Stripe invoices.** A second lookup on the same Stripe sign-in (`stripeinvoices`, `STRIPE_LIST_INVOICES`; `lookupOf: "stripe"` in `lib/connectors/composio-apps.js`). The Stripe sign-in's allowed tools are now the union of all the lookups of that app, so **a Stripe connected before this must be disconnected and connected once more.** Invoice Chaser reads invoices now.
+  - **The text of emails, opt-in.** A new choice in Ask the AI, "My Gmail inbox, with the text of each email" (`gmailtext`): the opening (about 450 characters) of the 5 newest emails, quoted replies and signatures dropped, links hidden, is sent to the AI (Groq). It is a separate choice, never the default, and the planner is told to use it only when the task needs what emails say (for example to answer them). The email text is not kept, only the AI's answer. The privacy page says so. No new Google permission is needed (gmail.readonly already covers it).
+  - **Slack messages.** A lookup that needs ONE typed thing, the channel (`slackmessages:general` in the step; `input` in the apps list): the name is looked up in the person's own channel list, then one history read. Never offered to the AI planner (it cannot know the channel). **Not tested against a real Slack**: the owner has no Slack, and Composio's answer shapes are searched for rather than assumed.
+  - **Emailing several people:** the Builder's "Email several people" adds ONE email step per typed address (up to 8), so each person gets their own email with their own Approve click and their own done record. Recipients are only ever addresses the person types. Hushwork does not pick recipients from an email or an app's data: a stranger's email must not be able to choose who gets mail.
+- **Reason:** The owner asked for these. Each was built so it adds no way for outside text to act: reads only read, every write is a step the person sees and approves, and what is read is handed to the AI as data.
+- **Where:** `lib/studio/run-summary.js`, `lib/connectors/composio-actions.js`, `composio-apps.js`, `composio.js` (`runChannelMessages`), `lib/connectors/google-gmail.js` (`fetchInboxText`), `lib/step-rows.js` (`rowsForEmailList`), `lib/skills/bundles.js` (skills `stripe-unpaid`, `gmail-reply-drafts`, `slack-channel`, `notion-page`), `components/app/Builder.js`, `components/app/RunsViewer.js`; tests next to each
 
 ---
 

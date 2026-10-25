@@ -11,6 +11,7 @@
 //             delete or send), and that needs no input from a person (it is always called with nothing to fill in).
 //   what      what the lookup returns, in plain words ("your open tasks")
 //   about     one plain sentence on the Connections page
+//   input     (optional) { label, pattern }: this lookup needs one thing typed by the person (a channel). Such a lookup is never offered to the AI plan writer and is not tried by Test all my connections.
 //   lookupOf  (optional) the id of the app whose sign-in this lookup shares (a second read-only tool of the same app). It has no Connect button or box of its own.
 //   unavailable  (optional) a plain sentence saying why this app cannot be connected yet. Such an app shows that sentence instead of a Connect
 //             button, and the server refuses to start its sign-in. Checked against Composio's toolkit pages on 2026-10-23.
@@ -29,7 +30,9 @@ export const COMPOSIO_APPS = [
   { id: "cloudflare", name: "Cloudflare", toolkit: "cloudflare", tool: "CLOUDFLARE_LIST_ACCOUNTS", what: "your accounts", about: "Hushwork can list your Cloudflare accounts. It cannot change settings or delete anything.", unavailable: "Cloudflare only works with an API key, and Hushwork never collects keys. Not available yet." },
   { id: "pagerduty", name: "PagerDuty", toolkit: "pagerduty", tool: "PAGERDUTY_FETCH_INCIDENT_LIST", what: "your latest incidents", about: "Hushwork can read your PagerDuty incidents. It cannot acknowledge, resolve or change anything." },
   // Talking and money
-  { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels, and send one message when a step says so and you approve it. It cannot edit or delete messages." },
+  { id: "slack", name: "Slack", toolkit: "slack", tool: "SLACK_LIST_ALL_CHANNELS", what: "your channels", about: "Hushwork can list your Slack channels, read the latest messages of ONE channel when a step names it, and send one message when a step says so and you approve it. It cannot edit or delete messages." },
+  // A lookup that needs ONE thing typed by the person (`input`): Slack messages need the channel. It is written after a colon in the step's address box, for example slackmessages:general.
+  { id: "slackmessages", name: "Slack messages", toolkit: "slack", tool: "SLACK_FETCH_CONVERSATION_HISTORY", lookupOf: "slack", input: { label: "channel", pattern: /^#?[A-Za-z0-9._-]{1,80}$/ }, what: "the latest messages in one channel", about: "Hushwork can read the latest messages of ONE channel you name in the step. It cannot post, edit or delete anything." },
   { id: "stripe", name: "Stripe", toolkit: "stripe", tool: "STRIPE_LIST_CHARGES", what: "your latest payments", about: "Hushwork can read your latest Stripe payments and your latest invoices (paid, open and overdue). It cannot charge, refund, send or change anything." },
   // A second lookup on the SAME sign-in as Stripe (`lookupOf`): it has no Connect button of its own, Connecting Stripe allows both tools. If Stripe was connected before invoices were added, press Disconnect and Connect once more.
   { id: "stripeinvoices", name: "Stripe invoices", toolkit: "stripe", tool: "STRIPE_LIST_INVOICES", lookupOf: "stripe", what: "your latest invoices (paid, open and overdue)", about: "Hushwork can read your latest Stripe invoices. It cannot create, send, pay or change anything." },
@@ -39,6 +42,18 @@ export const COMPOSIO_APPS = [
   { id: "googletasks", name: "Google Tasks", toolkit: "googletasks", tool: "GOOGLETASKS_LIST_ALL_TASKS", what: "your tasks", about: "Hushwork can read your Google Tasks. It cannot add, change or delete anything." },
   { id: "trello", name: "Trello", toolkit: "trello", tool: "TRELLO_GET_MEMBERS_ME_BOARDS", what: "your boards", about: "Hushwork can list your Trello boards. It cannot add, move or delete cards." },
 ];
+
+// The step's address box for an app lookup: "stripe", or "slackmessages:general" for a lookup that needs one typed thing. Returns { app, input } or null
+// ("stripe:x" and "slackmessages" with nothing after it are refused: nothing is guessed). Channel ids keep their capital letters.
+export function parseAppAddress(raw) {
+  const text = typeof raw === "string" ? raw.trim() : "";
+  const colon = text.indexOf(":");
+  const app = findComposioApp((colon === -1 ? text : text.slice(0, colon)).toLowerCase());
+  if (!app) return null;
+  const input = colon === -1 ? "" : text.slice(colon + 1).trim().replace(/^#/, "");
+  if (!app.input) return input ? null : { app, input: "" };
+  return input && app.input.pattern.test(input) ? { app, input } : null;
+}
 
 // Finds one app by its id, or null. Only a real id from the list works ("__proto__" or a made-up name is just "not found").
 export const findComposioApp = (id) => (typeof id === "string" ? COMPOSIO_APPS.find((app) => app.id === id) ?? null : null);

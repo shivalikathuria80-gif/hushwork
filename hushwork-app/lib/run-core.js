@@ -18,15 +18,15 @@ import { getApp, getConnectionsKey } from "@/lib/connectors/oauth-env";
 import { findApp } from "@/lib/connectors/app-list";
 import { loadAccess } from "@/lib/connections/store";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
-import { fetchInbox } from "@/lib/connectors/google-gmail";
+import { fetchInbox, fetchInboxText } from "@/lib/connectors/google-gmail";
 import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { SHEETS_FAILED, appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
 import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers } from "@/lib/run-answer";
 import { PENDING_MESSAGE, UNCHECKED_MESSAGE, loadStepStates, stepStatus } from "@/lib/run-state";
 import { LINEAR_CREATE_FAILED, createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
-import { findComposioApp } from "@/lib/connectors/composio-apps";
-import { COMPOSIO_FAILED, checkComposioConnections, runActionTool, runReadTool } from "@/lib/connectors/composio";
+import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps";
+import { COMPOSIO_FAILED, checkComposioConnections, runActionTool, runChannelMessages, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { makeLimiter } from "@/lib/ai/limits";
@@ -403,6 +403,18 @@ export async function approveAiStep(input, who) {
         return answer.mails.length ? answer.mails.map((mail) => `${mail.time}  ${mail.from}: ${mail.subject}`).join("\n") : "The inbox is empty.";
       },
     };
+  } else if (uses === "gmailtext") {
+    // The person chose "with the text of each email" in this step: the opening of the text of the 5 newest emails goes to the AI (and Groq). Read only.
+    const authorization = await googleAuthorization(supabase, user.id);
+    if (!authorization) return { error: GOOGLE_OFF };
+    tools.gmail_latest_mail_with_text = {
+      description: "Lists the 5 newest messages in the person's Gmail inbox: time, sender, subject and the opening of the text of each email.",
+      run: async () => {
+        const answer = await fetchInboxText({ authorization });
+        if (!answer.ok) return failed(answer.error);
+        return answer.mails.length ? answer.mails.map((mail) => `${mail.time}  ${mail.from}: ${mail.subject}\n${mail.text || "(no text)"}`).join("\n\n") : "The inbox is empty.";
+      },
+    };
   } else if (uses === "drive") {
     const authorization = await googleAuthorization(supabase, user.id);
     if (!authorization) return { error: GOOGLE_OFF };
@@ -416,14 +428,18 @@ export async function approveAiStep(input, who) {
     };
   } else if (uses === "app") {
     // The app is named in the step's address box and must be one from lib/connectors/composio-apps.js; the tool is always that app's one read-only tool.
-    const app = findComposioApp(typeof address === "string" ? address.trim().toLowerCase() : "");
-    if (!app) return { error: "Write the short name of the app in this step first (for example todoist, github or slack: the names are on the Connections page)." };
+    // A lookup that needs one typed thing (Slack messages: the channel) is written like slackmessages:general.
+    const wanted = parseAppAddress(address);
+    const named = typeof address === "string" ? address.split(":")[0].trim().toLowerCase() : "";
+    if (!wanted && findComposioApp(named)?.input) return { error: `Write the ${findComposioApp(named).input.label} after the name in this step, like ${named}:general (letters, numbers, dots and dashes only).` };
+    if (!wanted) return { error: "Write the short name of the app in this step first (for example todoist, github or slack: the names are on the Connections page)." };
+    const { app, input } = wanted;
     const composioKey = getComposioKey();
     if (!composioKey) return { error: COMPOSIO_OFF };
     tools.app_read = {
       description: `Reads ${app.what} from ${app.name} (read-only).`,
       run: async () => {
-        const answer = await runReadTool({ key: composioKey, userId: user.id, app });
+        const answer = app.input ? await runChannelMessages({ key: composioKey, userId: user.id, app, channel: input }) : await runReadTool({ key: composioKey, userId: user.id, app });
         return answer.ok ? answer.text : failed(withSaid(answer));
       },
     };
@@ -451,7 +467,7 @@ export async function approveAiStep(input, who) {
   const answer = await runAgent({ task, tools, groqKey, memory: uses === "mcp" ? "" : await loadMemory(supabase, user.id) }); // never beside an MCP server: the model could copy a fact into its input
   if (!answer.ok) return { error: answer.error };
   if (toolError) return { error: toolError };
-  const lookedAt = !answer.calls.length ? "" : uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address";
+  const lookedAt = !answer.calls.length ? "" : uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "gmailtext" ? "your Gmail inbox, including the text of your newest emails" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${answer.text}${lookedAt ? `\n\nThe AI looked at ${lookedAt}.` : ""}`.slice(0, 4000), answer: answer.text.slice(0, 700) });
 }
 
