@@ -309,3 +309,23 @@ test("the text of emails: a step set to 'with the text of each email' needs Goog
     assert.equal(composio.calls.length, 0);
   } finally { composio.restore(); }
 });
+
+// ---- an Ask the AI step that uses what the steps before it found ({answers}) ----
+test("an Ask the AI step with {answers} gets the answers of the steps BEFORE it as data; with none before it, it stops and says why; it never reads its own old answer", async () => {
+  const plan = finishSteps({ steps: [trigger, aiStep("List the requests.", "Requests"), aiStep("Which have no task? {answers}", "Compare")] });
+  const { workflow, who } = setup({ plan });
+  const composio = fakeComposio({}, { groq: ["1. New logo\n2. Extra page", "The extra page has no task."] });
+  try {
+    const run = await startPracticeRun({ id: workflow, auto: false }, who);
+    const { approveAiStep } = await import("./run-core.js");
+    const early = await approveAiStep({ runId: run.runId, index: 2 }, who);
+    assert.match(early.error, /Approve those first/);
+    assert.equal(composio.calls.filter((call) => call.path === "groq").length, 0, "the AI was not asked");
+    assert.equal((await approveAiStep({ runId: run.runId, index: 1 }, who)).error, undefined);
+    assert.equal((await approveAiStep({ runId: run.runId, index: 2 }, who)).error, undefined);
+    const asked = composio.calls.filter((call) => call.path === "groq").at(-1).body.messages[1].content;
+    assert.match(asked, /Which have no task\? the earlier answers/, "the job reads normally");
+    assert.match(asked, /<data>\n1\. New logo\n2\. Extra page\n<\/data>/, "the earlier answer is handed over as data");
+    assert.ok(!asked.includes("{answers}"));
+  } finally { composio.restore(); }
+});

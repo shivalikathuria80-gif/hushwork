@@ -87,6 +87,7 @@ Last updated: 2026-10-24
 | D-043 | The AI plan writer only uses blocks that really work | ✅ | 2026-10-25 |
 | D-044 | Run summary line, and five things that were not built are now built (carefully) | ✅ | 2026-10-25 |
 | D-045 | Pre-launch hardening from a ChatGPT + Gemini review: pause switch, changed-since-read guard, two-account check | ✅ | 2026-10-25 |
+| D-046 | An Ask the AI step can use what earlier steps found ({answers}); the Freelancer safety net bundle | ✅ | 2026-10-25 |
 
 ---
 
@@ -405,6 +406,14 @@ Last updated: 2026-10-24
   - **Launch checklist** (`docs/launch.md`): the gates, the owner-only tasks (Google verification for the Gmail permission, domain, Vercel plan, backups, monitoring, legal, new clock password) and the pilot scorecard.
 - **Not built, on purpose:** a magic-link "approve from the email" button; error monitoring (needs an account the owner makes); Google verification and legal review (owner tasks).
 - **Where:** `lib/app-controls.js`, `lib/run-core.js`, `lib/schedule-tick.js`, `components/app/ApproveSend.js`, `components/app/RunsViewer.js`, `scripts/two-account-check.mjs`, `docs/launch.md`; tests `lib/app-controls.test.js`, `lib/run-recovery.integration.test.js`, `lib/sql-rls.test.js`
+
+### D-046: An Ask the AI step can use what earlier steps found ({answers}); the Freelancer safety net bundle
+- **Date:** 2026-10-25
+- **Status:** ✅ Approved (second ChatGPT + Gemini round, see `docs/ideas.md`)
+- **Decision:** Writing `{answers}` in an Ask the AI step's job hands that step the answers of the Ask the AI steps BEFORE it (never its own old answer or a later step's). They arrive as `<data>` after the task with angle brackets neutralised, never as part of the person's request, so text that came from an email or a Slack channel cannot act as an instruction. With no earlier answer the step stops and says to approve the earlier steps first. This unlocks "compare" and "combine" jobs, which Hushwork could not do. New bundle **Freelancer safety net**: Scope Creep Alarm, Week Balancer, Meeting-Day Rescue Brief.
+- **Reason:** Both outside AIs proposed jobs that need one step to see what another found. The honest fix was to give Hushwork that ability once, safely, instead of faking it in each workflow.
+- **Limits worth knowing:** one Ask the AI step still looks in ONE place; Linear gives no due dates; Slack needs the channel typed in the step.
+- **Where:** `lib/run-core.js` (`approveAiStep`), `lib/run-answer.js` (`findAnswers`, `before`), `lib/ai/agent.js` (`context`), `lib/skills/bundles.js`; tests in `lib/ai/agent.test.js`, `lib/run-core.integration.test.js`
 
 ---
 

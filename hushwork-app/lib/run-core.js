@@ -362,6 +362,11 @@ export async function approveAiStep(input, who) {
   const { run, step } = loaded;
   const { task, uses, address } = step.fields;
   if (looksSensitive(task)) return { error: "That request looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
+  // {answers} in the job: the answers of the Ask the AI steps BEFORE this one are handed to the AI as data (not as part of the person's request).
+  const wantsEarlier = task.includes(ANSWERS_TAG);
+  const earlier = wantsEarlier ? (await findAnswers(supabase, user.id, { ...run, before: run.stepIndex })).join("\n\n").slice(0, 2800) : "";
+  if (wantsEarlier && !earlier) return { error: "This step uses what the Ask the AI steps before it found. Approve those first, then come back to this one." };
+  const job = wantsEarlier ? task.split(ANSWERS_TAG).join("the earlier answers") : task;
 
   // Counted BEFORE anything goes out (an MCP step connects to an outside server), so a loop of Approves cannot be used as a request relay.
   const now = Date.now();
@@ -473,7 +478,7 @@ export async function approveAiStep(input, who) {
     };
   }
 
-  const answer = await runAgent({ task, tools, groqKey, memory: uses === "mcp" ? "" : await loadMemory(supabase, user.id) }); // never beside an MCP server: the model could copy a fact into its input
+  const answer = await runAgent({ task: job, context: earlier, tools, groqKey, memory: uses === "mcp" ? "" : await loadMemory(supabase, user.id) }); // never beside an MCP server: the model could copy a fact into its input
   if (!answer.ok) return { error: answer.error };
   if (toolError) return { error: toolError };
   const lookedAt = !answer.calls.length ? "" : uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "gmailtext" ? "your Gmail inbox, including the text of your newest emails" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address";

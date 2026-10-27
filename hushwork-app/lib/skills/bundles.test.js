@@ -15,7 +15,7 @@ test("ids: skill and bundle ids are unique plain words, and a made-up id finds n
   assert.equal(new Set(SKILL_IDS).size, SKILLS.length);
   assert.equal(new Set(BUNDLE_IDS).size, BUNDLES.length);
   for (const id of [...SKILL_IDS, ...BUNDLE_IDS]) assert.match(id, /^[a-z][a-z0-9-]{1,39}$/, id);
-  assert.deepEqual(BUNDLE_IDS, ["finance-ops", "marketing-growth", "dev-admin"]);
+  assert.deepEqual(BUNDLE_IDS, ["finance-ops", "marketing-growth", "dev-admin", "freelancer-safety-net"]);
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["dev-admin"]]) {
     assert.equal(findBundle(bad), null, String(bad));
     assert.equal(findSkill(bad), null, String(bad));
@@ -127,7 +127,8 @@ test("bundles: a workflow's changes only touch fields the skill really has, and 
       const built = buildWorkflow(bundle, workflow);
       const aiBeforeEmail = built.steps.filter((s) => s.kind === "ai").length;
       const email = built.steps.find((s) => s.kind === "action" && s.fields.action === "gmail_send");
-      if (email) assert.ok(aiBeforeEmail >= 1 && email.fields.details === "{answers}", `${workflow.id}: the email carries every AI answer`);
+      if (email) assert.ok(aiBeforeEmail >= 1 && ["{answers}", "{answer}"].includes(email.fields.details), `${workflow.id}: the email carries the AI answers ({answers} = all of them, {answer} = the last one, which already used the earlier ones)`);
+      if (email?.fields.details === "{answer}") assert.ok(built.steps.filter((s) => s.kind === "ai").at(-1).fields.task.includes("{answers}"), `${workflow.id}: an email that carries only the last answer follows an AI step that used the earlier answers`);
       const page = built.steps.find((s) => s.kind === "action" && s.fields.action === "notion_page");
       if (page) assert.ok(aiBeforeEmail >= 1 && page.fields.details === "{answer}", `${workflow.id}: the Notion page carries the AI's text`);
     }

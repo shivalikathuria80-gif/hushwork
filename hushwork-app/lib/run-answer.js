@@ -23,7 +23,8 @@ export async function findAnswer(supabase, userId, run) {
 
 // "The answers": ALL the Ask the AI steps of the practice run being approved, in the order they sit in the workflow, so one email can carry
 // a whole briefing (calendar, inbox, tasks). Only real runs that came FROM this practice run count (`from` is its id), and an AI step approved
-// twice counts once (its newest answer). `run` is { id, workflow_id, created_at }. Returns a list of texts, possibly empty.
+// twice counts once (its newest answer). `run` is { id, workflow_id, created_at }, and may carry `before` (a step number): then only the Ask the AI
+// steps that come BEFORE that step count (an Ask the AI step that uses {answers} must not read its own old answer or a later step's). Returns a list of texts, possibly empty.
 export async function findAnswers(supabase, userId, run) {
   if (!run?.id || !run?.workflow_id || !run?.created_at) return [];
   const { data, error } = await supabase
@@ -34,6 +35,7 @@ export async function findAnswers(supabase, userId, run) {
   const byStep = new Map();
   for (const row of data) {
     const first = Array.isArray(row.results) ? row.results[0] : null;
+    if (Number.isInteger(run.before) && first?.fromStep >= run.before) continue;
     if (first?.kind === "ai" && first.from === run.id && Number.isInteger(first.fromStep) && typeof first.answer === "string" && first.answer.trim() && !byStep.has(first.fromStep)) byStep.set(first.fromStep, first.answer);
   }
   return [...byStep.entries()].sort((a, b) => a[0] - b[0]).map(([, answer]) => answer);

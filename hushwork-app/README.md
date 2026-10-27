@@ -353,6 +353,10 @@ The **Skills** page (`/app/skills`, `app/app/skills/page.js` and `components/app
 
 Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules), `lib/skills/enable.test.js`, `lib/skills/bundles.integration.test.js` (the real run code), `lib/sql-rls.test.js` (RLS on every per-person table). Why: `../DECISIONS.md` D-041.
 
+## An Ask the AI step can use what earlier steps found (2026-10-25)
+
+Write `{answers}` in the job of an Ask the AI step, for example "Which of these requests have NO matching open task? {answers}". That step is then handed the answers of the Ask the AI steps before it, as information only (never as part of your request). With none before it, it stops and says to approve those first. One step still looks in ONE place, so a "compare" is two steps: the first finds, the second looks somewhere else and compares. The bundle **Freelancer safety net** (Scope Creep Alarm, Week Balancer, Meeting-Day Rescue Brief) is built on this. The idea log is `../docs/ideas.md`.
+
 ## Safety switches and checks before launch (2026-10-25)
 
 - **Pause switch.** `supabase/app-controls.sql` makes a one-row table. In the Supabase SQL Editor, `update public.app_controls set value = true where name = 'paused';` stops everything at once (no deploy): no writing step starts, no Ask the AI step is asked, no schedule runs, and the Runs page says Hushwork is paused. Set it back to `false` to start again. Nobody can change it from the app.
