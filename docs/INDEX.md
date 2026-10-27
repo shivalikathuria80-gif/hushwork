@@ -6,6 +6,7 @@ Every design, plan and QA note for Hushwork, grouped by the build slice it belon
 
 - [Try everything Hushwork can do](try-it.md): a plain-words walkthrough of every feature, online or on your own computer.
 - [Putting Hushwork online](deploy.md): the deploy checklist (Vercel, Supabase, the schedule clock, limits, custom domain, troubleshooting). Always current.
+- [Launch checklist for hushwork.in](launch.md): the gates before real users, the owner-only tasks, the pilot scorecard.
 - [PROJECT.md](../PROJECT.md) and [DECISIONS.md](../DECISIONS.md): where things stand now, and every decision with its reason. Always current.
 
 ## Slice 1: sign-in, drafts and the sculpture login (2026-10-15)

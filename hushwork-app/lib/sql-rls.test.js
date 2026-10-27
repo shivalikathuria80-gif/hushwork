@@ -48,14 +48,14 @@ for (const [file, table] of Object.entries(PER_PERSON)) {
   });
 }
 
-test("RLS: every table made in supabase/ is either checked above or is one of the two known exceptions", () => {
+test("RLS: every table made in supabase/ is either checked above or is one of the three known exceptions", () => {
   const found = [];
   for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".sql"))) {
     for (const match of noComments(read(file)).matchAll(/create table (?:if not exists )?public\.(\w+)/g)) found.push([file, match[1]]);
   }
   for (const [file, table] of found) {
     if (PER_PERSON[file] === table) continue;
-    assert.ok(["waitlist.sql", "usage.sql"].includes(file), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
+    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
     assert.match(noComments(read(file)), new RegExp(`alter table public\\.${table} enable row level security`), `${table}: row level security is on`);
   }
   assert.ok(found.length >= 8);
@@ -75,4 +75,15 @@ test("the new tables: workflow memories and enabled bundles cap the rows per per
   assert.match(skills, /unique \(user_id, bundle_id\)/);
   assert.match(skills, /bundle_id ~ '\^\[a-z\]\[a-z0-9-\]\{1,39\}\$'/);
   assert.ok(!/grant update/.test(skills), "a row is on or off: nothing to update");
+});
+
+test("the pause switch table: signed-in people can only READ it, nobody can change it from the app, the public gets nothing", () => {
+  const sql = noComments(read("app-controls.sql"));
+  assert.match(sql, /alter table public\.app_controls enable row level security;/);
+  assert.match(sql, /revoke all on public\.app_controls from anon;/);
+  assert.match(sql, /revoke all on public\.app_controls from authenticated;/);
+  const grants = sql.match(/^grant .*;$/gm) ?? [];
+  assert.deepEqual(grants, ["grant select on public.app_controls to authenticated;"], "the only grant is read");
+  assert.ok(!/create policy[^;]*for (insert|update|delete|all)/i.test(sql), "no policy lets anyone write");
+  assert.ok(!/\bto (anon|public)\b/i.test(sql.replace(/revoke all on public\.app_controls from anon;/, "")), "never granted to the public");
 });

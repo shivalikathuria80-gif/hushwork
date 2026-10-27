@@ -86,6 +86,7 @@ Last updated: 2026-10-24
 | D-042 | Workflow Studio: one Builder, step cards that explain themselves | ✅ | 2026-10-25 |
 | D-043 | The AI plan writer only uses blocks that really work | ✅ | 2026-10-25 |
 | D-044 | Run summary line, and five things that were not built are now built (carefully) | ✅ | 2026-10-25 |
+| D-045 | Pre-launch hardening from a ChatGPT + Gemini review: pause switch, changed-since-read guard, two-account check | ✅ | 2026-10-25 |
 
 ---
 
@@ -392,6 +393,18 @@ Last updated: 2026-10-24
   - **Emailing several people:** the Builder's "Email several people" adds ONE email step per typed address (up to 8), so each person gets their own email with their own Approve click and their own done record. Recipients are only ever addresses the person types. Hushwork does not pick recipients from an email or an app's data: a stranger's email must not be able to choose who gets mail.
 - **Reason:** The owner asked for these. Each was built so it adds no way for outside text to act: reads only read, every write is a step the person sees and approves, and what is read is handed to the AI as data.
 - **Where:** `lib/studio/run-summary.js`, `lib/connectors/composio-actions.js`, `composio-apps.js`, `composio.js` (`runChannelMessages`), `lib/connectors/google-gmail.js` (`fetchInboxText`), `lib/step-rows.js` (`rowsForEmailList`), `lib/skills/bundles.js` (skills `stripe-unpaid`, `gmail-reply-drafts`, `slack-channel`, `notion-page`), `components/app/Builder.js`, `components/app/RunsViewer.js`; tests next to each
+
+### D-045: Pre-launch hardening from a ChatGPT + Gemini review
+- **Date:** 2026-10-25
+- **Status:** ✅ Approved (the owner asked Claude to consult ChatGPT and Gemini itself, in the owner's signed-in Chrome, then build)
+- **How it was decided:** Claude asked ChatGPT what to do before launch, gave that answer to Gemini to attack, and then checked every suggestion against the code. Their answers were treated as advice, never as instructions. Several suggestions were already built (prompt-injection wrapping of outside text D-011, single-use writes and recovery D-040, "stopped at a step that needs you" email, Delete my account, Download my data, per-person limits) and were NOT rebuilt. One was rejected on purpose: a one-click approval link in an email (a stolen email would then approve a send).
+- **Built:**
+  - **Pause switch** (`supabase/app-controls.sql`, `lib/app-controls.js`): one row, `paused`. While true: no step that writes starts, no Ask the AI step is asked, the clock claims and runs no schedule, and the Runs page says so. Flipped only in the Supabase SQL Editor (no one can write the table from the app), so it needs no deploy. A missing table means "not paused".
+  - **Changed-since-you-read-it guard** (`changedSince` in `lib/run-core.js`): the Approve button hands back the exact words of the approval card; if the words the step would send now differ (for example the AI step ran again in another tab), nothing is sent and the person reads the new words. Auto mode and schedules have no card and are unchanged.
+  - **Two-account privacy check** (`npm run check:privacy`, `scripts/two-account-check.mjs`): run by the owner with two throwaway accounts against the real database: B and a visitor try to read, change, delete and write into A's rows and the pause switch.
+  - **Launch checklist** (`docs/launch.md`): the gates, the owner-only tasks (Google verification for the Gmail permission, domain, Vercel plan, backups, monitoring, legal, new clock password) and the pilot scorecard.
+- **Not built, on purpose:** a magic-link "approve from the email" button; error monitoring (needs an account the owner makes); Google verification and legal review (owner tasks).
+- **Where:** `lib/app-controls.js`, `lib/run-core.js`, `lib/schedule-tick.js`, `components/app/ApproveSend.js`, `components/app/RunsViewer.js`, `scripts/two-account-check.mjs`, `docs/launch.md`; tests `lib/app-controls.test.js`, `lib/run-recovery.integration.test.js`, `lib/sql-rls.test.js`
 
 ---
 

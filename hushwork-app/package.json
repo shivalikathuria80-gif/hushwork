@@ -10,6 +10,7 @@
     "test": "node --import ./scripts/test-hooks.mjs --test \"lib/**/*.test.js\"",
     "secret": "node scripts/make-secret.mjs",
     "clock": "node --env-file=.env.local scripts/clock.mjs",
+    "check:privacy": "node --env-file=.env.local scripts/two-account-check.mjs",
     "make:sculpture": "node scripts/make-sculpture.mjs"
   },
   "dependencies": {

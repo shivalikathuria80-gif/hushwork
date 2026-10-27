@@ -72,6 +72,9 @@ const COPY = {
   },
 };
 
+// The kinds that write: they send back the words the person read (see CHANGED_MESSAGE in lib/run-core.js).
+const WRITES = new Set(["action", "issue", "sheets"]);
+
 export default function ApproveSend({ runId, index, message, kind = "request", connected = true, unknown = false }) {
   const copy = COPY[kind];
   const router = useRouter();
@@ -83,7 +86,7 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
     startTransition(async () => {
       let result;
       try {
-        result = await copy.action({ runId, index, ...(unknown ? { confirmRetry: true } : {}) }); // "it was not done" is the person's word that a step Hushwork lost track of may be sent again
+        result = await copy.action({ runId, index, ...(unknown ? { confirmRetry: true } : {}), ...(WRITES.has(kind) ? { seen: message } : {}) }); // `seen`: the words of this card, so a step that changed since is not sent // "it was not done" is the person's word that a step Hushwork lost track of may be sent again
       } catch (problem) {
         unstable_rethrow(problem);
         result = { error: "Could not send. Check your connection and try again." };

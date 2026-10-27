@@ -133,6 +133,13 @@ The Skills page lets a person turn on a Skill Bundle (a package of ready-made wo
 2. Nothing else. Until it is pasted, the Skills page still shows the bundles and says one setup step is missing.
 3. If you pasted `skills.sql` or `memory.sql` **before 2026-10-25** and Turn on or Remember fails, paste `supabase/policy-recursion-fix.sql` once (the first versions counted rows inside their own policy, which Postgres refuses with error 42P17). Newer copies of the two files are already fixed.
 
+## 12e. The pause switch (optional, one paste, recommended before launch)
+
+1. Paste `supabase/app-controls.sql` into Supabase (SQL Editor, New query, paste, Run).
+2. To stop everything: `update public.app_controls set value = true, updated_at = now() where name = 'paused';` To start again: the same with `false`. Until the table exists nothing is ever paused.
+
+The whole pre-launch list is in `launch.md`.
+
 ## 12d. After the 2026-10-25 update: reconnect Stripe (and Slack)
 
 Stripe invoices and Slack messages are extra read-only tools on the same sign-in as Stripe and Slack. A sign-in made before only allowed the first tool. On the Connections page press **Disconnect** and then **Connect** for Stripe (and for Slack if you use it). Nothing else is needed.

@@ -353,6 +353,13 @@ The **Skills** page (`/app/skills`, `app/app/skills/page.js` and `components/app
 
 Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules), `lib/skills/enable.test.js`, `lib/skills/bundles.integration.test.js` (the real run code), `lib/sql-rls.test.js` (RLS on every per-person table). Why: `../DECISIONS.md` D-041.
 
+## Safety switches and checks before launch (2026-10-25)
+
+- **Pause switch.** `supabase/app-controls.sql` makes a one-row table. In the Supabase SQL Editor, `update public.app_controls set value = true where name = 'paused';` stops everything at once (no deploy): no writing step starts, no Ask the AI step is asked, no schedule runs, and the Runs page says Hushwork is paused. Set it back to `false` to start again. Nobody can change it from the app.
+- **Changed since you read it.** The Approve button on a writing step hands back the exact words of its card. If the step would now send different words (the AI step ran again somewhere else), nothing is sent and you read the new words first.
+- **Two-account privacy check.** `npm run check:privacy` (see the top of `scripts/two-account-check.mjs`): with two throwaway accounts it proves against the real database that B and a visitor cannot read, change, delete or write into A's data, schedule A's workflow, or flip the pause switch. Run it before launch and after any change to a `supabase/*.sql` file.
+- **Launch checklist:** `../docs/launch.md`.
+
 ## More abilities (2026-10-25)
 
 - **Run summary line.** At the top of a run on the Runs page: "3 of 4 steps done: looked in Stripe and Google, the AI wrote 1 text and sent 1 email. 1 step could not run: step 3 (...)". Built only from saved results (`lib/studio/run-summary.js`): counts steps, never made-up item counts.

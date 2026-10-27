@@ -169,3 +169,51 @@ test("a step whose 'started' record cannot be saved is NOT sent", async () => {
     assert.equal(sends(composio).length, 0);
   } finally { composio.restore(); }
 });
+
+// ---- the pause switch and the "changed since you read it" guard ----
+const pausedDatabase = (supabase) => { supabase.tables.app_controls = [{ name: "paused", value: true }]; return supabase; };
+
+test("while Hushwork is paused nothing that writes starts and the AI is not asked, and the stop is not recorded as a failure; unpausing brings it back", async () => {
+  const plan = briefing();
+  const { workflow, supabase, who } = setup(plan);
+  const composio = fakeComposio({ GMAIL_SEND_EMAIL: mail(OK) }, { groq: ["Line."] });
+  try {
+    pausedDatabase(supabase);
+    const first = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.match(first.auto.reason, /Hushwork is paused right now/);
+    assert.equal(first.auto.done, 0);
+    assert.equal(composio.calls.length, 0, "no AI call and no send");
+    const writes = supabase.tables.runs.filter((row) => row.mode === "live" && row.results[0].status === "pending");
+    assert.equal(writes.length, 0, "no 'started' record either: nothing was tried");
+    supabase.tables.app_controls[0].value = false;
+    const again = await resumeRun({ runId: first.runId }, who);
+    assert.equal(again.auto.stoppedAt, 0);
+    assert.equal(sends(composio).length, 1);
+  } finally { composio.restore(); }
+});
+
+test("a step is NOT sent when its words changed after the person read the card (the AI step ran again), but a matching card, or no card at all (Auto mode), sends", async () => {
+  const { actionSummary } = await import("./run-engine.js");
+  const plan = briefing();
+  const { workflow, supabase, who } = setup(plan);
+  const index = actionIndex(plan);
+  const composio = fakeComposio({ GMAIL_SEND_EMAIL: mail(OK) }, { groq: ["First answer.", "A different answer."] });
+  try {
+    const first = await startPracticeRun({ id: workflow, auto: false }, who);
+    const { approveAiStep } = await import("./run-core.js");
+    assert.equal((await approveAiStep({ runId: first.runId, index: 1 }, who)).error, undefined);
+    const email = plan[index];
+    const card = actionSummary(email, "First answer.", [], "me@example.com");
+    // the AI step is approved again somewhere else: the words now read differently
+    assert.equal((await approveAiStep({ runId: first.runId, index: 1 }, who)).error, undefined);
+    const stale = await approveActionStep({ runId: first.runId, index, seen: card }, who);
+    assert.equal(stale.changed, true);
+    assert.match(stale.error, /changed after you opened this page/);
+    assert.equal(sends(composio).length, 0, "nothing was sent");
+    assert.deepEqual(history(supabase, first.runId, index), [], "and nothing was recorded as started");
+    const fresh = await approveActionStep({ runId: first.runId, index, seen: actionSummary(email, "A different answer.", [], "me@example.com") }, who);
+    assert.equal(fresh.error, undefined);
+    assert.equal(sends(composio).length, 1);
+    assert.equal(sends(composio)[0].body.arguments.body, "A different answer.");
+  } finally { composio.restore(); }
+});

@@ -8,6 +8,7 @@ import DeleteRun from "./DeleteRun";
 import ResumeRun from "./ResumeRun";
 import StepStudioCard from "./StepStudioCard";
 import { summarizeRun } from "@/lib/studio/run-summary";
+import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isPlanOnly, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
@@ -172,6 +173,7 @@ export default async function RunsViewer({ searchParams }) {
   // An email that writes {answers} carries every Ask the AI step of this run, in order.
   const needsAnswers = approvals.some(({ step }) => isActionStep(step) && String(step.fields?.details).includes(ANSWERS_TAG));
   const answers = needsAnswers ? await findAnswers(await createClient(), user.id, { id: selected.id, workflow_id: selected.workflowId, created_at: selected.createdAt }) : [];
+  const paused = await isPaused(await createClient());
   return (
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
@@ -192,6 +194,7 @@ export default async function RunsViewer({ searchParams }) {
       </div>
 
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
+        {paused && <p role="status" className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{PAUSED_MESSAGE}</p>}
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
           <span className={!selected.live && approvals.length > 0 ? chipWaiting : chip}>{!selected.live && approvals.length > 0 ? "Needs approval" : "Completed"}</span>
           <p className="text-sm">

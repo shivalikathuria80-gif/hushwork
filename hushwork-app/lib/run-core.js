@@ -6,7 +6,7 @@
 // stored schedule row) import it.
 import { revalidatePath } from "next/cache";
 import { checkId, checkSteps } from "@/lib/validate";
-import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isActionStep, isSheetsRow, isAiStep, isApprovable, isWriteStep, SETUP_MESSAGE } from "@/lib/run-engine";
+import { practiceRun, readSavedResults, isRequestStep, isLinearLookup, isCalendarLookup, isGmailLookup, isDriveLookup, isLinearCreate, isAppLookup, isActionStep, isSheetsRow, isAiStep, isApprovable, isWriteStep, SETUP_MESSAGE, actionSummary, linearCreateSummary, sheetsSummary } from "@/lib/run-engine";
 import { fetchPublic, checkRequestUrl } from "@/lib/connectors/http";
 import { openMcp } from "@/lib/connectors/mcp";
 import { getGroqKey } from "@/lib/ai/key";
@@ -23,6 +23,7 @@ import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { SHEETS_FAILED, appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
 import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers } from "@/lib/run-answer";
 import { PENDING_MESSAGE, UNCHECKED_MESSAGE, loadStepStates, stepStatus } from "@/lib/run-state";
+import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { LINEAR_CREATE_FAILED, createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps";
@@ -206,7 +207,14 @@ const insertLive = (supabase, run, record) => supabase
 // by itself, only if the person says it was not done. If the "started" record cannot be saved, nothing is sent.
 const RECORD_FIRST = "Hushwork could not record that this step was starting, so it was not done. Try again in a moment.";
 
+// "Changed since you read it": the Approve button hands back the exact words of the approval card the person read (`seen`). If the words this step would
+// send NOW are different (for example the AI step ran again in another tab), nothing is sent and the person reads the new words first. Auto mode and
+// schedules send no `seen`: there is no card to read. Returns the refusal, or null.
+const CHANGED_MESSAGE = "What this step will send changed after you opened this page (for example the AI step ran again). Nothing was sent. Reload the page, read the new words, and press Approve again.";
+const changedSince = (input, nowText) => (typeof input?.seen === "string" && input.seen !== nowText ? { error: CHANGED_MESSAGE, changed: true } : null);
+
 async function writeGate(supabase, userId, run, input) {
+  if (await isPaused(supabase)) return { error: PAUSED_MESSAGE, paused: true }; // the pause switch: nothing that writes starts
   const state = await stepStatus(supabase, userId, run);
   if (state.error) return { error: UNCHECKED_MESSAGE };
   if (state.status === "done") return { error: ALREADY };
@@ -348,6 +356,7 @@ export async function approveAiStep(input, who) {
   const { user, supabase } = who;
   const groqKey = getGroqKey();
   if (!groqKey) return { error: "AI is switched off. Add the Groq key to .env.local first." };
+  if (await isPaused(supabase)) return { error: PAUSED_MESSAGE, paused: true }; // the pause switch: the AI is not asked
   const loaded = await loadPracticeStep(supabase, user, input, isAiStep);
   if (loaded.error) return loaded;
   const { run, step } = loaded;
@@ -561,6 +570,8 @@ export async function approveLinearCreate(input, who) {
   const details = fillAnswerText(step.fields.details, answer, 1500);
   if (title.error || details.error) return { error: title.error ?? details.error };
   if (looksSensitive(title.text) || looksSensitive(details.text)) return { error: "That looks like it holds a card number or a secret key, so it was not sent to Linear. Remove it and try again." };
+  const staleIssue = changedSince(input, linearCreateSummary(step, answer));
+  if (staleIssue) return staleIssue;
 
   const authorization = await linearAuthorization(supabase, user.id);
   if (!authorization) return { error: LINEAR_OFF };
@@ -644,6 +655,8 @@ export async function approveActionStep(input, who) {
   const details = action.noDetails ? { text: "" } : fillActionDetails(action.id, step.fields.details, answer, answers);
   if (title.error || details.error) return { error: title.error ?? details.error };
   if (looksSensitive(title.text) || looksSensitive(details.text)) return { error: "That looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
+  const staleAction = changedSince(input, actionSummary(step, answer, answers, checked.value === MY_EMAIL ? await accountEmail(who) : ""));
+  if (staleAction) return staleAction;
   const composioKey = getComposioKey();
   if (!composioKey) return { error: COMPOSIO_OFF };
 
@@ -676,8 +689,11 @@ export async function approveSheetsRow(input, who) {
   const parsed = parseCells(step.fields.values);
   if (sheet.error || parsed.error) return { error: sheet.error ?? parsed.error };
   // {answer} in a box is replaced by what the Ask the AI step of this workflow said (the same words the Runs page showed before the Approve).
-  const row = fillAnswer(parsed.cells, await findAnswer(supabase, user.id, run));
+  const sheetAnswer = await findAnswer(supabase, user.id, run);
+  const row = fillAnswer(parsed.cells, sheetAnswer);
   if (row.error) return { error: row.error };
+  const staleRow = changedSince(input, sheetsSummary(step, sheetAnswer));
+  if (staleRow) return staleRow;
   const authorization = await googleAuthorization(supabase, user.id);
   if (!authorization) return { error: GOOGLE_OFF };
 
