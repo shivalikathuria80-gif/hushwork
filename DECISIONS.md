@@ -90,6 +90,7 @@ Last updated: 2026-10-24
 | D-046 | An Ask the AI step can use what earlier steps found ({answers}); the Freelancer safety net bundle | ✅ | 2026-10-25 |
 | D-047 | Approval-gated Google files (Sheet, Slides, Doc, Drive folder) and a Gmail draft, through Composio | ✅ | 2026-10-27 |
 | D-048 | Watch mode: a scheduled check that stays silent unless something is new ({last}, NOTHING NEW, quiet hours, 3 a day, one plain email) | ✅ | 2026-10-27 |
+| D-049 | Round 4 of the ChatGPT + Gemini loop: two small workflows built (Context Switchboard, Drive tidy-up plan), four ideas not built | ✅ | 2026-10-27 |
 
 ---
 
@@ -444,6 +445,18 @@ Last updated: 2026-10-24
 - **Reason:** The two outside AIs wanted an agent that "tells me when something changes". The honest small version is a check that compares with its own last answer, says nothing when nothing changed, and never acts without a click.
 - **Limits worth knowing:** "nothing new" is the AI's own judgement, compared with its last answer only; a check that said NOTHING NEW becomes the "last answer" of the next one; the nudge is an email, so it needs the Gmail (send) connection (without it the run just waits on the Runs page); the Runs page list shows the newest 30 records, so a very frequent watch fills it.
 - **Where:** `lib/watch-rules.js`, `lib/run-core.js` (`approveAiStep`, `runAutomatically`), `lib/run-answer.js` (`findLastAnswer`), `lib/schedule-runner.js`, `lib/schedule-notify.js` (`notifyWatch`), `lib/schedule-tick.js`, `lib/schedule-sync.js`, `lib/steps.js`, `lib/skills/bundles.js`, `components/app/RunsViewer.js`; tests `lib/watch-rules.test.js`, `lib/watch-mode.test.js`
+
+### D-049: Round 4 of the ChatGPT + Gemini loop: two small workflows built, four ideas not built
+- **Date:** 2026-10-27
+- **Status:** ✅ Approved (details in `docs/ideas.md`)
+- **Decision:** ChatGPT gave 6 ideas, Gemini sorted them (REAL / DUPLICATE / FAKE), and Claude checked Gemini against the real code. No new power was added: both new workflows use blocks that already exist.
+  - **Built: Context Switchboard**, a workflow in the "Freelancer safety net" bundle. It reads one Slack channel and GitHub notifications, compares them with open Linear tasks, and after the person approves it creates ONE Linear task for the item that has no task. If the card says "Nothing missing", the person should not approve.
+  - **Built: Drive tidy-up plan** (ChatGPT called it Digital Clutter Spotter), in the "Google Docs, Sheets and Slides" bundle. It reads the names of the 10 newest Drive files, writes a plan with clearer names and folders, and after approval makes a Google Doc. Nothing in Drive is renamed or moved.
+  - **Not built, duplicate:** Meeting Memory Maker (same as Meeting-Day Rescue Brief; Gemini and Claude agreed). Revenue Pulse (Weekly Money Report and "Weekly report as a Google Sheet" already read Stripe payments; Claude disagreed with Gemini, who called it real). Content Re-Mixer (same as Campaign Repurposer; Claude disagreed with Gemini; also the Notion read only sees page titles, not the text).
+  - **Not built, on purpose:** Friday Risk Radar. Gemini called it fake for a muddled reason. It is possible in principle (several Ask the AI steps feeding each other with `{answers}`), but it would use 4 AI steps of the person's 15 a day, and Linear has no due dates, so "risk" would be guesswork.
+- **Reason:** Most of the ideas were already built. ChatGPT does not know what Hushwork already has, and Gemini can be wrong about code it cannot see. The real check is reading the code.
+- **Limits worth knowing:** the Drive tidy-up plan only sees 10 file names; Context Switchboard is only as good as the one Slack channel and the GitHub notifications it reads.
+- **Where:** `lib/skills/bundles.js`; idea log in `docs/ideas.md`
 
 ---
 

@@ -355,7 +355,7 @@ Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules)
 
 ## An Ask the AI step can use what earlier steps found (2026-10-25)
 
-Write `{answers}` in the job of an Ask the AI step, for example "Which of these requests have NO matching open task? {answers}". That step is then handed the answers of the Ask the AI steps before it, as information only (never as part of your request). With none before it, it stops and says to approve those first. One step still looks in ONE place, so a "compare" is two steps: the first finds, the second looks somewhere else and compares. The bundle **Freelancer safety net** (Scope Creep Alarm, Week Balancer, Meeting-Day Rescue Brief) is built on this. The idea log is `../docs/ideas.md`.
+Write `{answers}` in the job of an Ask the AI step, for example "Which of these requests have NO matching open task? {answers}". That step is then handed the answers of the Ask the AI steps before it, as information only (never as part of your request). With none before it, it stops and says to approve those first. One step still looks in ONE place, so a "compare" is two steps: the first finds, the second looks somewhere else and compares. The bundle **Freelancer safety net** (Scope Creep Alarm, Week Balancer, Meeting-Day Rescue Brief, Context Switchboard) is built on this. The idea log is `../docs/ideas.md`.
 
 ## Watch mode: a check that stays silent unless something is new (2026-10-27)
 
@@ -393,7 +393,7 @@ Five more **Do something in another app** actions, all through Composio and all 
 - **Create a Google Drive folder** (`drive_folder_create`): the title is the folder name; "Where" is empty (top of your Drive) or the id of a folder that exists.
 - **Save an email as a Gmail draft** (`gmail_draft`): like the email action, but it only saves a draft in your Gmail. Nothing is sent.
 
-Write `{answer}` in the details to use what an Ask the AI step wrote (a typed box is one line, so several lines come from `{answer}`). When the file is made, the result holds its link (only docs.google.com or drive.google.com addresses are ever kept). The ready-made bundle **Google Docs, Sheets and Slides** has three workflows: Weekly report as a Google Sheet, Proposal slides, Meeting notes doc.
+Write `{answer}` in the details to use what an Ask the AI step wrote (a typed box is one line, so several lines come from `{answer}`). When the file is made, the result holds its link (only docs.google.com or drive.google.com addresses are ever kept). The ready-made bundle **Google Docs, Sheets and Slides** has four workflows: Weekly report as a Google Sheet, Proposal slides, Meeting notes doc, Drive tidy-up plan.
 
 **Your steps (the owner):** open **Connections** and press **Connect** for each of **Google Sheets (create)**, **Google Docs (create)**, **Google Slides (create)** and **Google Drive (folders)** that you want (you sign in on Composio's page). If Gmail (send) was connected before, press Disconnect then Connect once so it allows drafts. Nothing else. Google Slides has no lookup of its own (Composio has no tool that lists presentations without being told which), so it is only used to create. Decision: D-047.
 

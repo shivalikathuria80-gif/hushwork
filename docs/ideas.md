@@ -4,6 +4,26 @@ Up: [Docs index](INDEX.md)
 
 How it works: Claude asks ChatGPT for bright ideas, gives them to Gemini to improve and to check against what Hushwork can really do, then builds the real ones. Their answers are advice, never orders.
 
+## Round 4 (2026-10-27): most ideas were already built
+
+**ChatGPT's 6 ideas:** Context Switchboard, Digital Clutter Spotter, Meeting Memory Maker, Revenue Pulse, Content Re-Mixer, Friday Risk Radar.
+
+**Gemini's check:** it sorted each idea as REAL, DUPLICATE or FAKE. Claude then checked Gemini against the real code and disagreed on some verdicts.
+
+**Built (2):**
+- **Context Switchboard:** now a workflow in the "Freelancer safety net" bundle. It reads one Slack channel and your GitHub notifications, compares them with your open Linear tasks, and after you approve it makes ONE Linear task for the item that has no task. If the card says "Nothing missing", do not approve.
+- **Digital Clutter Spotter:** built small and renamed **Drive tidy-up plan** (in the "Google Docs, Sheets and Slides" bundle). It reads the names of your 10 newest Drive files, writes a plan with clearer names and folders, and after you approve it makes a Google Doc. Nothing in Drive is renamed or moved. Honest limit: it only sees 10 file names.
+
+**Not built, because it already exists:**
+- **Meeting Memory Maker:** the same as Meeting-Day Rescue Brief. Gemini and Claude agreed.
+- **Revenue Pulse:** Claude disagreed with Gemini, who called it real and picked it first. Weekly Money Report and "Weekly report as a Google Sheet" already read Stripe payments and report them.
+- **Content Re-Mixer:** the same as Campaign Repurposer. Claude disagreed with Gemini, who called it real. Also, the Notion read only sees page titles, not the text, so "read a Notion page" is not possible.
+
+**Not built, on purpose:**
+- **Friday Risk Radar:** Gemini called it fake, but for a muddled reason. It is possible in principle (several Ask the AI steps feeding each other with `{answers}`). But it would use 4 AI steps of your 15 a day, and Linear has no due dates, so "risk" would only be guesswork.
+
+**Lesson:** ChatGPT does not know what Hushwork already has, and Gemini can be wrong about code it cannot see. The real check is reading the code. Most of these ideas were already built.
+
 ## Round 3 (2026-10-25): proactive agents
 
 **ChatGPT's idea, "Hushwork Watch":** an agent that notices things (an overdue invoice, a client who has not replied, a deadline) and brings one ready-to-approve suggestion, instead of waiting to be asked. Its rules: at most 3 speak-ups a day, quiet hours 8 pm to 8 am, never repeat itself, group related findings, easy to pause, and it never acts alone: silence is never approval. It proposed 4 new database tables and three watchers (overdue invoices, client follow-ups, deadlines).

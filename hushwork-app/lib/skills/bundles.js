@@ -36,6 +36,9 @@ export const SKILLS = [
   skill("drive-expenses", "Sort expenses from Drive", "FolderOpen", "Reads the names of your most recent Google Drive files and sorts the ones that look like receipts or expenses into software, travel and other.",
     { reads: "The names, kinds and times of your 10 most recently changed Drive files. It never opens a file.", needs: ["google"] },
     step("ai", { task: "From my 10 latest file names, which look like receipts or expenses? Group them as software, travel, other.", uses: "drive", address: "" })),
+  skill("drive-tidy-plan", "Plan a tidy-up of my Drive files", "FolderOpen", "Reads the names of your 10 most recently changed Drive files and writes a short tidy-up plan: a clearer name and a folder for each. Nothing is renamed or moved.",
+    { reads: "The names, kinds and times of your 10 most recently changed Drive files. It never opens a file.", needs: ["google"] },
+    step("ai", { task: "Write a tidy-up plan from my 10 file names: one line each, a clearer name and a folder. Skip fine ones.", uses: "drive", address: "" })),
   // work and admin
   skill("gmail-urgent", "Spot urgent client requests", "Inbox", "Reads who wrote and the subjects of your latest emails and says which look like urgent client requests, and why.",
     { reads: "The sender, subject and time of your latest 10 emails. It never reads the text inside an email.", needs: ["google"] },
@@ -91,6 +94,9 @@ export const SKILLS = [
   skill("prep-card", "Write a 3-bullet prep card", "FileText", "Takes what the steps before found and writes a short card: what to know before your meetings today.",
     { reads: "Nothing new from your apps: it only works from what the earlier steps found." },
     step("ai", { task: "Write a 3-bullet prep card for today's meetings from this. {answers}", uses: "nothing", address: "" })),
+  skill("switchboard-gap", "Find the one thing with no task", "ListChecks", "Reads your open Linear tasks and, using what the Slack and GitHub steps before it found, picks the ONE item that has no matching task and writes it as a task title.",
+    { reads: "Your open Linear tasks (read only), plus what the earlier Ask the AI steps found.", needs: ["linear"] },
+    step("ai", { task: "Pick the ONE item below with NO open task. Reply only a task title, or: Nothing missing. {answers}", uses: "linear", address: "" })),
   // watch mode: each check reads ONE place and uses {last} (its own answer from the last check) so it can say NOTHING NEW (see lib/watch-rules.js)
   skill("watch-invoices", "Watch for newly overdue invoices", "CreditCard", "Reads your latest Stripe invoices and lists the ones that are newly overdue since the last check. If nothing is new it says NOTHING NEW and the run ends quietly.",
     { reads: "Your latest Stripe invoices (read only), plus its own answer from the last check.", needs: ["stripe"] },
@@ -225,8 +231,8 @@ export const BUNDLES = [
   {
     id: "freelancer-safety-net", name: "Freelancer safety net", icon: "ShieldCheck",
     blurb: "Catch unpaid extra work, balance a heavy week and walk into every meeting prepared.",
-    connections: ["slack", "linear", "google", "gmailsend"],
-    skills: ["slack-requests", "linear-untracked", "calendar-busy-days", "linear-light-days", "calendar-today", "gmail-urgent-text", "prep-card", "ask-approval", "email-me"],
+    connections: ["slack", "linear", "google", "gmailsend", "github"],
+    skills: ["slack-requests", "linear-untracked", "calendar-busy-days", "linear-light-days", "calendar-today", "gmail-urgent-text", "prep-card", "github-notifications", "switchboard-gap", "ask-approval", "email-me", "linear-task"],
     workflows: [
       {
         id: "scope-creep-alarm", title: "Scope Creep Alarm", body: "When you ask: reads what your client asked for in one Slack channel, compares it with your open Linear tasks and emails you the requests that have NO task, so you can clarify the scope before doing unpaid work. First change the channel name in the first Ask the AI step.",
@@ -245,6 +251,12 @@ export const BUNDLES = [
         request: "Every weekday at 8:00, list today's meetings, find urgent or unhappy emails and email me a 3-bullet prep card. Ask me before it is sent.",
         start: { how: "schedule", when: "Every weekday at 8:00" }, schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 0 },
         flow: ["calendar-today", "gmail-urgent-text", "prep-card", "ask-approval", ["email-me", { title: "Your meeting prep card", details: "{answer}" }]],
+      },
+      {
+        id: "context-switchboard", title: "Context Switchboard", body: "When you ask: reads one Slack channel and your GitHub notifications, compares them with your open Linear tasks and, after you approve, creates ONE Linear task for the item that has no task. First change the channel name in the first Ask the AI step. If the approval card says Nothing missing, do not approve.",
+        request: "When I ask, read my client's Slack channel and my GitHub notifications, find the one item with no Linear task and create a task for it. Ask me before it is created.",
+        start: { how: "manual", when: "" },
+        flow: ["slack-requests", "github-notifications", "switchboard-gap", "ask-approval", ["linear-task", { title: "{answer}" }]],
       },
     ],
   },
@@ -280,7 +292,7 @@ export const BUNDLES = [
     id: "google-creator", name: "Google Docs, Sheets and Slides", icon: "FileText",
     blurb: "Turn what the AI finds or writes into a real Google Sheet, Slides deck or Doc, after you read it and say yes.",
     connections: ["stripe", "google", "gsheets", "gslides", "gdocs"],
-    skills: ["stripe-payment-rows", "slides-outline", "calendar-meeting-notes", "ask-approval", "sheet-create", "slides-create", "doc-create"],
+    skills: ["stripe-payment-rows", "slides-outline", "calendar-meeting-notes", "drive-tidy-plan", "ask-approval", "sheet-create", "slides-create", "doc-create"],
     workflows: [
       {
         id: "weekly-report-sheet", title: "Weekly report as a Google Sheet", body: "Every Friday afternoon: writes your latest Stripe payments as rows and, after you approve, makes a new Google Sheet with them in your Drive.",
@@ -299,6 +311,12 @@ export const BUNDLES = [
         request: "Every weekday at 8:00, read today's meetings and make a new Google Doc with notes for each. Ask me before it is created.",
         start: { how: "schedule", when: "Every weekday at 8:00" }, schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 0 },
         flow: ["calendar-meeting-notes", "ask-approval", ["doc-create", { title: "Meeting notes" }]],
+      },
+      {
+        id: "drive-tidy-plan-doc", title: "Drive tidy-up plan", body: "When you ask: reads the names of your 10 newest Drive files, writes a plan with clearer names and folders and, after you approve, makes a new Google Doc with it. Nothing in Drive is renamed or moved.",
+        request: "When I ask, read my newest Drive file names, write a tidy-up plan and make a new Google Doc from it. Ask me before it is created.",
+        start: { how: "manual", when: "" },
+        flow: ["drive-tidy-plan", "ask-approval", ["doc-create", { title: "Drive tidy-up plan" }]],
       },
     ],
   },

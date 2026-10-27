@@ -174,8 +174,8 @@ test("the three examples from the plan exist as workflows with the steps they pr
 test("the Google creator bundle: each workflow is an AI step, then the approval, then ONE new Google file made from the AI's lines ({answer})", () => {
   const bundle = findBundle("google-creator");
   assert.equal(bundle.name, "Google Docs, Sheets and Slides");
-  assert.deepEqual(bundle.workflows.map((w) => w.title), ["Weekly report as a Google Sheet", "Proposal slides", "Meeting notes doc"]);
-  const expected = { "weekly-report-sheet": ["sheet_create", "stripe"], "proposal-slides": ["slides_create", undefined], "meeting-notes-doc": ["doc_create", undefined] };
+  assert.deepEqual(bundle.workflows.map((w) => w.title), ["Weekly report as a Google Sheet", "Proposal slides", "Meeting notes doc", "Drive tidy-up plan"]);
+  const expected = { "weekly-report-sheet": ["sheet_create", "stripe"], "proposal-slides": ["slides_create", undefined], "meeting-notes-doc": ["doc_create", undefined], "drive-tidy-plan-doc": ["doc_create", undefined] };
   for (const workflow of bundle.workflows) {
     const steps = buildWorkflow(bundle, workflow).steps;
     assert.deepEqual(steps.map((s) => s.kind), ["trigger", "ai", "approve", "action"], workflow.id);
@@ -208,4 +208,13 @@ test("connectionInfo: own sign-ins and Composio apps are named; unavailable apps
   assert.equal(connectionInfo("xero").unavailable.length > 0, true);
   for (const bundle of BUNDLES) for (const id of bundle.connections) assert.equal(connectionInfo(id).unavailable ?? "", "", `${bundle.id}: ${id} can be connected`);
   assert.equal(connectionInfo("nope"), null);
+});
+
+test("the Context Switchboard and the Drive tidy-up plan exist; the switchboard writes only after an approval", () => {
+  const switchboard = findBundle("freelancer-safety-net").workflows.find((w) => w.id === "context-switchboard");
+  const tidy = findBundle("google-creator").workflows.find((w) => w.id === "drive-tidy-plan-doc");
+  assert.ok(switchboard && tidy);
+  const ids = switchboard.flow.map((entry) => (Array.isArray(entry) ? entry[0] : entry));
+  assert.equal(accessOf(findSkill(ids.at(-1))), "write");
+  assert.equal(ids.at(-2), "ask-approval");
 });
