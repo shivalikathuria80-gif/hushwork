@@ -308,7 +308,7 @@ On the workspace page, a plan (written by the AI or the keyword preview) has an 
 
 ## Real actions in other apps (email, Slack, GitHub, Todoist, Calendar, Notion)
 
-A step of the kind **Do something in another app** names one action from `lib/connectors/composio-actions.js` (never a tool name): Send an email (Gmail), Send a Slack message, Create a GitHub issue, Add a Todoist task, Add a Google Calendar event, Create a Notion page. Its boxes are **Where** (an address, channel, `owner/name`, start time or page id; checked by a pattern before anything is asked), **Message or title** and **More details**. On the Runs page the approval card shows the exact words and where they go; **Approve and send it** can be pressed **once per run** for a step. Before sending, Hushwork asks Composio for the tool's real inputs and builds the request only from inputs that exist; if the tool needs something Hushwork cannot fill in, **nothing is sent**.
+A step of the kind **Do something in another app** names one action from `lib/connectors/composio-actions.js` (never a tool name): Send an email (Gmail), Send a Slack message, Create a GitHub issue, Add a Todoist task, Add a Google Calendar event, Create a Notion page (and the Google files and the Gmail draft, see "Google files and a Gmail draft" below). Its boxes are **Where** (an address, channel, `owner/name`, start time or page id; checked by a pattern before anything is asked), **Message or title** and **More details**. On the Runs page the approval card shows the exact words and where they go; **Approve and send it** can be pressed **once per run** for a step. Before sending, Hushwork asks Composio for the tool's real inputs and builds the request only from inputs that exist; if the tool needs something Hushwork cannot fill in, **nothing is sent**.
 
 - **Add an action:** add one entry to `composio-actions.js` (id, app, name, tool, a pattern for "where", the names the tool may call each input, how the words map to inputs, optional `labels`, `noDetails`, `example`, `selfAllowed`). Nothing else changes; the sign-in, the step, the approval card and the checks all read the list.
 - **Safety:** actions take their words from the saved run (never the browser), are checked again on the server, refuse text that looks like a card number or secret key, and are limited (3 a minute, 15 a day per person, counted in the database too).
@@ -372,6 +372,20 @@ Write `{answers}` in the job of an Ask the AI step, for example "Which of these 
 - **The text of emails (opt-in).** In an Ask the AI step choose **My Gmail inbox, with the text of each email**. The opening (about 450 characters) of your 5 newest emails goes to the AI (Groq); quoted replies, signatures and links are removed; the email text is not kept, only the AI's answer. The default **My Gmail inbox (senders and subjects)** never reads the text. Skill and workflow: **Draft replies to my emails** / **Reply Drafts** (emails the drafts to YOU).
 - **Slack messages.** In an Ask the AI step set to *Another app*, write `slackmessages:channelname` in the address box: Hushwork finds the channel in your own channel list and reads its latest 10 messages (read only). Skill and workflow: **Read a Slack channel** / **Slack Channel Brief**. Untested against a real Slack.
 - **Email several people.** In the Builder, **Email several people**: type up to 8 addresses; each gets its own email step (its own Approve click, its own done record). Recipients are only ever the addresses you type, never picked from an email or an app.
+
+## Google files and a Gmail draft (2026-10-27)
+
+Five more **Do something in another app** actions, all through Composio and all behind the normal Approve click (once per run, the card shows the exact words, the pause switch and limits apply):
+
+- **Create a Google Sheet with rows** (`sheet_create`): the title is the spreadsheet name; the details are the rows, one per line, boxes separated by `|` (or commas); up to 50 rows x 10 boxes. It takes two calls (make the sheet, then write the rows as plain text). If the sheet is made but the rows fail, the run says so plainly, keeps the link and does not try again.
+- **Create a Google Slides presentation** (`slides_create`): the details are an outline; a line starting with `# ` begins a slide, the lines after it are its bullets; up to 12 slides.
+- **Create a Google Doc with text** (`doc_create`): the details are the text, line breaks kept.
+- **Create a Google Drive folder** (`drive_folder_create`): the title is the folder name; "Where" is empty (top of your Drive) or the id of a folder that exists.
+- **Save an email as a Gmail draft** (`gmail_draft`): like the email action, but it only saves a draft in your Gmail. Nothing is sent.
+
+Write `{answer}` in the details to use what an Ask the AI step wrote (a typed box is one line, so several lines come from `{answer}`). When the file is made, the result holds its link (only docs.google.com or drive.google.com addresses are ever kept). The ready-made bundle **Google Docs, Sheets and Slides** has three workflows: Weekly report as a Google Sheet, Proposal slides, Meeting notes doc.
+
+**Your steps (the owner):** open **Connections** and press **Connect** for each of **Google Sheets (create)**, **Google Docs (create)**, **Google Slides (create)** and **Google Drive (folders)** that you want (you sign in on Composio's page). If Gmail (send) was connected before, press Disconnect then Connect once so it allows drafts. Nothing else. Google Slides has no lookup of its own (Composio has no tool that lists presentations without being told which), so it is only used to create. Decision: D-047.
 
 ## Workflow Studio: one Builder, cards that explain every step
 

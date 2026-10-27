@@ -50,14 +50,15 @@ export function fillAnswerText(text, answer, max) {
   return { text: text.split(ANSWER_TAG).join(words).slice(0, max) };
 }
 
-// The "more details" of a Do something in another app step. For an email (or the text of a Notion page) the text is a letter, so line breaks are kept (at most one blank
+// The "more details" of a Do something in another app step. For an email (or the text of a Notion page or a Google file) the text is a letter, so line breaks are kept (at most one blank
 // line in a row) and it may be up to 3000 characters; for everything else it is the one-line version above, up to 300. The Runs page and
 // the Approve action both call this, so the email you read before pressing Approve is the email that is sent.
 export const ANSWERS_TAG = "{answers}";
 const tidy = (value) => value.replace(/\r/g, "").replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]+/g, " ").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
-// Actions whose details are a LETTER or a page of text (line breaks kept, up to 3000 characters).
-const LETTER_ACTIONS = new Set(["gmail_send", "notion_page"]);
+// Actions whose details are a LETTER or a page of text (line breaks kept, up to 3000 characters). That includes the rows of a new sheet and the outline of a new
+// presentation (one row or one slide per line), the text of a new document and the text of an email draft.
+const LETTER_ACTIONS = new Set(["gmail_send", "gmail_draft", "notion_page", "sheet_create", "slides_create", "doc_create"]);
 
 export function fillActionDetails(actionId, text, answer, answers = []) {
   if (!LETTER_ACTIONS.has(actionId)) return fillAnswerText(text, answer, 300);

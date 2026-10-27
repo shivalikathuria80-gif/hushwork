@@ -13,6 +13,8 @@ import { connectionInfo } from "../skills/bundles.js";
 const DID = {
   gmail_send: ["sent", "email", "emails"], slack_message: ["sent", "Slack message", "Slack messages"], github_issue: ["created", "GitHub issue", "GitHub issues"],
   calendar_event: ["added", "calendar event", "calendar events"], notion_page: ["created", "Notion page", "Notion pages"], todoist_task: ["added", "Todoist task", "Todoist tasks"],
+  gmail_draft: ["saved", "Gmail draft", "Gmail drafts"], sheet_create: ["created", "Google Sheet", "Google Sheets"], slides_create: ["created", "Google Slides presentation", "Google Slides presentations"],
+  doc_create: ["created", "Google Doc", "Google Docs"], drive_folder_create: ["created", "Google Drive folder", "Google Drive folders"],
 };
 const DID_OTHER = { issue: ["created", "Linear task", "Linear tasks"], row: ["added", "Google Sheet row", "Google Sheet rows"] };
 

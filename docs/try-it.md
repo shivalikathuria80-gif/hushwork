@@ -64,6 +64,7 @@ In the **Builder** each step has a card: **Why** it is there and **Evidence** (P
 - **Ask the AI** can read the text of your 5 newest emails: pick *My Gmail inbox, with the text of each email*. The text goes to the AI (Groq).
 - **Slack:** write `slackmessages:channelname` in an Ask the AI step set to Another app.
 - **Email several people** (Builder, left side): one email step for each address you type.
+- **Google files and a Gmail draft:** on Connections press Connect for Google Sheets (create), Docs (create), Slides (create) and Drive (folders), then turn on the bundle *Google Docs, Sheets and Slides*. After you approve, a new Sheet, Slides deck or Doc appears in your Drive, with its link on the Runs page. *Save an email as a Gmail draft* only saves a draft; nothing is sent.
 
 ## 10. If something goes wrong
 

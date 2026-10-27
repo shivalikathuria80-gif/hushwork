@@ -113,7 +113,7 @@ export const STEP_KINDS = {
     help: "Look at something in an app you connected through Composio (Todoist, Notion...). It only reads. You approve the look on the Runs page.",
     icon: "Plug",
     fields: [
-      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.filter((app) => !app.input).map((app) => [app.id, app.name]))),
+      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.filter((app) => !app.input && !app.noLookup).map((app) => [app.id, app.name]))),
       text("what", "Your note", 120, { optional: true, hint: "Optional. What you want to know, for example: which task is due first" }),
     ],
     describe: (fields, label) => ({ title: "Look in another app", detail: join(label("app"), fields.what) }),
@@ -131,13 +131,13 @@ export const STEP_KINDS = {
   },
   action: {
     label: "Do something in another app",
-    help: "Send an email, send a Slack message, create a GitHub issue, add a Todoist task, add a Google Calendar event or create a Notion page, in an app you connected through Composio. It does exactly that one thing. You read what will be sent and approve it on the Runs page. Write {answer} to use what an Ask the AI step said.",
+    help: "Send an email, send a Slack message, create a GitHub issue, add a Todoist task, add a Google Calendar event, create a Notion page, save a Gmail draft (nothing is sent), or create a Google Sheet, Slides presentation, Doc or Drive folder, in an app you connected through Composio. It does exactly that one thing. You read what will be sent and approve it on the Runs page. Write {answer} to use what an Ask the AI step said.",
     icon: "Send",
     fields: [
       choice("action", "What to do", Object.fromEntries(COMPOSIO_ACTIONS.map((action) => [action.id, action.name]))),
-      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Email: the address it goes to. Calendar: the start, like 2026-11-05 15:00. Notion: the id of the page it goes under. Todoist: leave empty." }),
+      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Email: the address it goes to. Calendar: the start, like 2026-11-05 15:00. Notion: the id of the page it goes under. Todoist, Sheet, Slides, Doc: leave empty. Drive folder: empty, or the id of the folder it goes into." }),
       text("title", "Message or title", 80, { hint: "For example: Deploy finished. Write {answer} to use what an Ask the AI step said." }),
-      text("details", "More details", 120, { optional: true, hint: "Optional. More words for the message or the issue. For an email this is the text of the email." }),
+      text("details", "More details", 120, { optional: true, hint: "Optional. More words for the message or the issue. For an email this is the text of the email; for a Sheet, the rows (one row per line, boxes separated by |); for Slides, the outline (a line starting with # begins a slide); for a Doc, its text. A typed box is one line, so for several lines write {answer} and let an Ask the AI step write them." }),
     ],
     describe: (fields, label) => ({ title: label("action"), detail: join(fields.title, fields.target ? `in ${fields.target}` : "") }),
   },

@@ -13,11 +13,13 @@
 //   about     one plain sentence on the Connections page
 //   input     (optional) { label, pattern }: this lookup needs one thing typed by the person (a channel). Such a lookup is never offered to the AI plan writer and is not tried by Test all my connections.
 //   lookupOf  (optional) the id of the app whose sign-in this lookup shares (a second read-only tool of the same app). It has no Connect button or box of its own.
+//   noLookup  (optional) true when the app has no read-only tool that works with nothing typed (then `tool` is null): the app only holds the sign-in for its actions.
+//             It is never offered as a lookup (not in "Look in another app", not to the AI plan writer, and not tried by Test all my connections).
 //   unavailable  (optional) a plain sentence saying why this app cannot be connected yet. Such an app shows that sentence instead of a Connect
 //             button, and the server refuses to start its sign-in. Checked against Composio's toolkit pages on 2026-10-23.
 export const COMPOSIO_APPS = [
   { id: "todoist", name: "Todoist", toolkit: "todoist", tool: "TODOIST_GET_ALL_TASKS", what: "your open tasks", about: "Hushwork can read your open Todoist tasks, and add a new task when a step says so and you approve it. It cannot change or delete existing tasks." },
-  { id: "gmailsend", name: "Gmail (send)", toolkit: "gmail", tool: "GMAIL_LIST_LABELS", what: "your Gmail label names", about: "Hushwork can read the names of your Gmail labels, and send one email when a step says so and you approve it. It cannot read your emails, delete or change anything." },
+  { id: "gmailsend", name: "Gmail (send)", toolkit: "gmail", tool: "GMAIL_LIST_LABELS", what: "your Gmail label names", about: "Hushwork can read the names of your Gmail labels, and send one email (or save one as a draft, which sends nothing) when a step says so and you approve it. It cannot read your emails, delete or change anything." },
   { id: "gcalwrite", name: "Google Calendar (events)", toolkit: "googlecalendar", tool: "GOOGLECALENDAR_LIST_CALENDARS", what: "the names of your calendars", about: "Hushwork can list the names of your calendars, and add one event when a step says so and you approve it. It cannot read your events, change or delete anything." },
   { id: "notion", name: "Notion", toolkit: "notion", tool: "NOTION_SEARCH_NOTION_PAGE", what: "your recent pages", about: "Hushwork can search your Notion pages and read their titles, and create one new page under a page you name when a step says so and you approve it. It cannot change or delete existing pages." },
   { id: "airtable", name: "Airtable", toolkit: "airtable", tool: "AIRTABLE_LIST_BASES", what: "your bases", about: "Hushwork can list your Airtable bases. It cannot add, change or delete anything." },
@@ -41,6 +43,14 @@ export const COMPOSIO_APPS = [
   // Personal
   { id: "googletasks", name: "Google Tasks", toolkit: "googletasks", tool: "GOOGLETASKS_LIST_ALL_TASKS", what: "your tasks", about: "Hushwork can read your Google Tasks. It cannot add, change or delete anything." },
   { id: "trello", name: "Trello", toolkit: "trello", tool: "TRELLO_GET_MEMBERS_ME_BOARDS", what: "your boards", about: "Hushwork can list your Trello boards. It cannot add, move or delete cards." },
+  // Google files made through Composio (tool names checked against docs.composio.dev/toolkits/<toolkit>.md on 2026-10-27). Each is its own sign-in at Composio,
+  // separate from "Connect Google" (which only reads). The lookup only lists names; the create action is in composio-actions.js and waits for Approve.
+  { id: "gsheets", name: "Google Sheets (create)", toolkit: "googlesheets", tool: "GOOGLESHEETS_SEARCH_SPREADSHEETS", what: "the names of your spreadsheets", about: "Hushwork can list the names of your spreadsheets, and create one new spreadsheet filled with rows when a step says so and you approve it. It cannot change or delete existing sheets." },
+  { id: "gdocs", name: "Google Docs (create)", toolkit: "googledocs", tool: "GOOGLEDOCS_SEARCH_DOCUMENTS", what: "the names of your documents", about: "Hushwork can list the names of your documents, and create one new document with text in it when a step says so and you approve it. It cannot change or delete existing documents." },
+  // Google Slides has NO tool that lists anything without being told which presentation (checked in the toolkit's list), so it has no lookup (`noLookup`):
+  // the entry exists to hold the sign-in for the create action. It cannot be a `lookupOf` another app: Composio keeps one sign-in per toolkit, and a lookupOf has no Connect button.
+  { id: "gslides", name: "Google Slides (create)", toolkit: "googleslides", tool: null, noLookup: true, what: "nothing (it only creates)", about: "Hushwork can create one new presentation with several slides when a step says so and you approve it. It cannot read, change or delete existing presentations." },
+  { id: "gdrivewrite", name: "Google Drive (folders)", toolkit: "googledrive", tool: "GOOGLEDRIVE_GET_ABOUT", what: "your Drive details (your name and how much space is used)", about: "Hushwork can read basic details of your Drive, and create one new folder when a step says so and you approve it. It cannot read your files, change or delete anything." },
 ];
 
 // The step's address box for an app lookup: "stripe", or "slackmessages:general" for a lookup that needs one typed thing. Returns { app, input } or null
@@ -49,7 +59,7 @@ export function parseAppAddress(raw) {
   const text = typeof raw === "string" ? raw.trim() : "";
   const colon = text.indexOf(":");
   const app = findComposioApp((colon === -1 ? text : text.slice(0, colon)).toLowerCase());
-  if (!app) return null;
+  if (!app || app.noLookup) return null;
   const input = colon === -1 ? "" : text.slice(colon + 1).trim().replace(/^#/, "");
   if (!app.input) return input ? null : { app, input: "" };
   return input && app.input.pattern.test(input) ? { app, input } : null;

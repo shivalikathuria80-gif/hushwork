@@ -75,6 +75,26 @@ export const ARTWORK = {
 
 ARTWORK.gcalwrite = ARTWORK.calendar; // the Calendar picture, for the event-adding connection through Composio
 ARTWORK.gmailsend = ARTWORK.gmail; // the same picture, for the send-only Gmail connection through Composio
+ARTWORK.gsheets = ARTWORK.sheets; // the Sheets and Drive pictures, for the Google files made through Composio
+ARTWORK.gdrivewrite = ARTWORK.drive;
+// Google Docs: a blue page with a folded corner and white text lines
+ARTWORK.gdocs = {
+  title: "Google Docs", viewBox: "0 0 24 24",
+  shapes: [
+    { d: "M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", fill: "#4285F4" },
+    { d: "M14 2l5 5h-4a1 1 0 0 1-1-1z", fill: "#A1C2FA" },
+    { d: "M7.5 11.5h9M7.5 14.5h9M7.5 17.5h6", fill: "none", stroke: "#ffffff" },
+  ],
+};
+// Google Slides: a yellow page with a folded corner and a white slide
+ARTWORK.gslides = {
+  title: "Google Slides", viewBox: "0 0 24 24",
+  shapes: [
+    { d: "M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", fill: "#F4B400" },
+    { d: "M14 2l5 5h-4a1 1 0 0 1-1-1z", fill: "#FCE8B2" },
+    { rect: [7.2, 11, 9.6, 6.6, 0.8], fill: "#ffffff" },
+  ],
+};
 
 export const LOGOS = {
   linear: siLinear,

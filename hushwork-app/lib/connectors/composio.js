@@ -106,7 +106,8 @@ async function call(key, method, path, { query, body, fetchImpl = fetch, notFoun
 // The tools an app's sign-in is limited to at Composio: its ONE read-only lookup, plus the tools of the actions Hushwork can do in it
 // (composio-actions.js). Nothing else can be run with that sign-in, whatever anyone asks.
 // (An app's second lookups, `lookupOf`, share its sign-in, so the sign-in allows all of the toolkit's lookups.)
-export const allowedTools = (app) => [...new Set(COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).map((action) => action.tool)]))];
+// (An action that needs two calls also allows its second tool; an app with no lookup, `noLookup`, allows only its actions.)
+export const allowedTools = (app) => [...new Set(COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).flatMap((action) => [action.tool, action.then?.tool])]).filter(Boolean))];
 const sameTools = (list, wanted) => Array.isArray(list) && list.length === wanted.length && wanted.every((tool) => list.includes(tool));
 
 // The sign-in blueprint ("auth config") for an app, limited to its allowed tools. Found if it already exists, made if not.
@@ -229,12 +230,24 @@ export async function runChannelMessages({ key, userId, app, channel, fetchImpl 
 // Does ONE write in an app (send a message, create an issue, add a task) for this person. `action` is an entry of composio-actions.js
 // and `values` is { target, title, details } (already checked and cut by the caller). First Composio is asked what inputs the action's tool
 // really takes; the request is built only from those (buildArguments), and if the tool needs something we do not fill in, or has no home
-// for something we want to say, NOTHING is sent. Returns { ok: true, text } (what the app answered, as short plain text) or { ok: false, error }.
+// for something we want to say, NOTHING is sent. Returns { ok: true, text, link?, note? } (what the app answered as short plain text; `link` = the address of a
+// file it made, only ever a docs.google.com or drive.google.com one; `note` = set when a two-call action made the file but the second call failed) or { ok: false, error }.
 export async function runActionTool({ key, userId, action, values, fetchImpl }) {
   const described = await call(key, "GET", `/tools/${action.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
   if (described.error) return { ok: false, error: described.error, status: described.status, said: described.said };
   const built = buildArguments(action, values, readToolInputs(described.body));
   if (built.error) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
+
+  // A file that needs a second call (make the sheet, then write the rows): the second tool is checked BEFORE anything is made, with a made-up id, so if it
+  // does not fit nothing at all is created.
+  const second = action.then?.when(values) ? action.then : null;
+  let secondInputs = null;
+  if (second) {
+    const looked = await call(key, "GET", `/tools/${second.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
+    if (looked.error) return { ok: false, error: looked.error, status: looked.status, said: looked.said };
+    secondInputs = readToolInputs(looked.body);
+    if (buildArguments(second, values, secondInputs, { id: "check" }).error) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
+  }
 
   const ran = await call(key, "POST", `/tools/execute/${action.tool}`, { body: { user_id: userId, arguments: built.arguments }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
   if (ran.error) return { ok: false, error: ran.error, status: ran.status, said: ran.said };
@@ -248,7 +261,48 @@ export async function runActionTool({ key, userId, action, values, fetchImpl }) 
   } catch {
     // the action worked; there is just nothing to show
   }
-  return { ok: true, text: text && text !== "null" ? text : "" };
+  const made = findCreated(ran.body.data);
+  const result = { ok: true, text: text && text !== "null" ? text : "", ...(made.link ? { link: made.link } : {}) };
+  if (!second) return result;
+
+  // From here the file EXISTS. Whatever goes wrong is told as it is (done, with a note), never retried, and never makes a second file.
+  const partial = (why) => ({ ...result, note: `${second.partial} ${why} Hushwork will not try again by itself: open the file, check it and add the rest by hand.` });
+  if (!made.id) return partial("Hushwork could not find the new file's id in the answer, so it wrote nothing into it.");
+  const built2 = buildArguments(second, values, secondInputs, made);
+  if (built2.error) return partial("The second step did not fit what Hushwork knows how to fill in.");
+  const ran2 = await call(key, "POST", `/tools/execute/${second.tool}`, { body: { user_id: userId, arguments: built2.arguments }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
+  if (ran2.error) return partial(`Reason: ${ran2.error}${ran2.said ? ` The app said: "${ran2.said}".` : ""}`);
+  if (ran2.body?.successful !== true) {
+    const said = cleanSaid(ran2.body?.error, key);
+    return partial(`Reason: ${explainFailure(said || ran2.body?.error)}${said ? ` The app said: "${said}".` : ""}`);
+  }
+  return result;
+}
+
+// What a "make a file" answer holds: the file's id and the address to open it. Composio answers with differently shaped JSON for different tools, so the answer is
+// searched for the right kind of value instead of one exact shape. The address is kept ONLY if it is a docs.google.com or drive.google.com one (cleaned, at
+// most 200 characters); the id must be a plain Google file id. Returns { id, link } with "" for what was not found.
+const LINK_IN_TEXT = /https:\/\/(?:docs|drive)\.google\.com\/[A-Za-z0-9_\-./?=&%#]{1,200}/;
+const ID_KEYS = ["spreadsheetId", "spreadsheet_id", "documentId", "document_id", "presentationId", "presentation_id", "folderId", "folder_id", "fileId", "file_id", "id"];
+const GOOGLE_ID = /^[A-Za-z0-9_-]{15,120}$/;
+export function findCreated(data) {
+  let link = "";
+  const objects = [];
+  walkAnswer(data, (item) => {
+    objects.push(item);
+    if (link) return;
+    for (const value of Object.values(item)) {
+      const found = typeof value === "string" ? value.match(LINK_IN_TEXT) : null;
+      if (found) { link = found[0].replace(/[.,;]+$/, ""); break; }
+    }
+  });
+  let id = "";
+  for (const key of ID_KEYS) {
+    const holder = objects.find((item) => typeof item[key] === "string" && GOOGLE_ID.test(item[key]));
+    if (holder) { id = holder[key]; break; }
+  }
+  if (!id && link) id = link.match(/\/(?:d|folders)\/([A-Za-z0-9_-]{15,120})/)?.[1] ?? "";
+  return { id, link };
 }
 
 // Removes EVERY app this person connected through Composio (used when an account is deleted). Returns { ok: true } or { error }.
@@ -269,11 +323,18 @@ export async function checkActionFits({ key, action, sample, fetchImpl }) {
   const described = await call(key, "GET", `/tools/${action.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
   if (described.error) return { ok: false, error: described.error, said: described.said };
   const built = buildArguments(action, sample, readToolInputs(described.body));
-  return built.error ? { ok: false, error: COMPOSIO_FAILED.cannotFill, said: built.error } : { ok: true };
+  if (built.error) return { ok: false, error: COMPOSIO_FAILED.cannotFill, said: built.error };
+  if (action.then?.when(sample)) { // a two-call action: its second tool has to fit too
+    const looked = await call(key, "GET", `/tools/${action.then.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
+    if (looked.error) return { ok: false, error: looked.error, said: looked.said };
+    const second = buildArguments(action.then, sample, readToolInputs(looked.body), { id: "check" });
+    if (second.error) return { ok: false, error: COMPOSIO_FAILED.cannotFill, said: second.error };
+  }
+  return { ok: true };
 }
 
 // The made-up values used to check that an action's tool has the inputs Hushwork fills in (never sent anywhere).
-const SAMPLE_TARGETS = { slack_message: "general", github_issue: "acme/site", gmail_send: "a@b.co", calendar_event: "2026-11-05 15:00", notion_page: "0123456789abcdef0123456789abcdef", todoist_task: "" };
+const SAMPLE_TARGETS = { slack_message: "general", github_issue: "acme/site", gmail_send: "a@b.co", gmail_draft: "a@b.co", calendar_event: "2026-11-05 15:00", notion_page: "0123456789abcdef0123456789abcdef", todoist_task: "", sheet_create: "", slides_create: "", doc_create: "", drive_folder_create: "" };
 
 // "Test all my connections", the Composio part. For every app this person connected: run its one read-only lookup for real, and check that each
 // action in it can be filled in. Apps that are not connected (or cannot be) are only listed by name. Returns { rows, off } or { error }.
@@ -285,12 +346,12 @@ export async function checkComposioConnections({ key, userId, fetchImpl }) {
   const usable = COMPOSIO_APPS.filter((app) => !app.unavailable && !app.input && connected.has(app.toolkit)); // a lookup that needs a typed channel cannot be tried with nothing to fill in
   const said = (result) => `${result.error}${result.said ? ` The app said: "${result.said}".` : ""}`;
   const rows = await Promise.all(usable.map(async (app) => {
-    const read = await runReadTool({ key, userId, app, fetchImpl });
+    const read = app.noLookup ? { ok: true } : await runReadTool({ key, userId, app, fetchImpl }); // an app with no lookup (Google Slides) is only checked for its actions
     const actions = await Promise.all(actionsForApp(app.id).map(async (action) => {
       const fit = await checkActionFits({ key, action, sample: { target: SAMPLE_TARGETS[action.id] ?? "", title: "Test", details: "Test" }, fetchImpl });
       return { name: action.name, ok: fit.ok, note: fit.ok ? "Ready: its inputs match what Hushwork sends." : said(fit) };
     }));
-    return { name: app.name, ok: read.ok, note: read.ok ? `Works. It answered with ${app.what}.` : said(read), actions };
+    return { name: app.name, ok: read.ok, note: app.noLookup ? "Connected. It has nothing to look up; it only makes a new file when you approve one." : read.ok ? `Works. It answered with ${app.what}.` : said(read), actions };
   }));
   const off = COMPOSIO_APPS.filter((app) => !app.lookupOf && (app.unavailable || !connected.has(app.toolkit))).map((app) => app.name);
   return { rows, off };
