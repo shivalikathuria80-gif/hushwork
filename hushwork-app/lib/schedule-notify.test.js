@@ -11,6 +11,7 @@ test("the failure notice: names only the workflow, says where to look, is sent t
   assert.ok(source.includes('findAction("gmail_send")') && source.includes("found?.user?.email"), "to the person's own address, through Gmail (send)");
   assert.ok(source.includes('.eq("user_id", userId)'), "the workflow name is looked up for that person only");
   assert.ok(source.includes("catch {") && source.includes('return "error"'), "a problem is never thrown at the clock");
-  assert.ok(!/results|answer|outcome/.test(source.replace(/\/\/.*$/gm, "")), "nothing from the run itself goes into the email");
+  const problemNotice = source.slice(0, source.indexOf("// ---- WATCH MODE")); // the watch part below saves its own small "Told you" record, so it is checked in watch-mode.test.js
+  assert.ok(!/results|answer|outcome/.test(problemNotice.replace(/\/\/.*$/gm, "")), "nothing from the run itself goes into the email");
   assert.ok(source.indexOf('if (!key || !WHAT[status]) return "off"') < source.indexOf("getUserById"), "nothing is looked up when notices are off");
 });

@@ -28,7 +28,7 @@ export const STEP_KINDS = {
     help: "What starts this workflow.",
     icon: "Zap",
     fields: [
-      choice("how", "What starts it", { schedule: "On a schedule", email: "When an email arrives", lead: "When a new lead arrives", manual: "When I ask" }),
+      choice("how", "What starts it", { schedule: "On a schedule", watch: "Keep watching: tell me only when something new shows up", email:"When an email arrives", lead: "When a new lead arrives", manual: "When I ask" }),
       text("when", "When", 80, { optional: true, hint: "For example: every weekday at 9am" }),
     ],
     describe: (fields, label) => ({ title: label("how"), detail: fields.when }),

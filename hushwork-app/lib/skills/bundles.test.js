@@ -15,7 +15,7 @@ test("ids: skill and bundle ids are unique plain words, and a made-up id finds n
   assert.equal(new Set(SKILL_IDS).size, SKILLS.length);
   assert.equal(new Set(BUNDLE_IDS).size, BUNDLES.length);
   for (const id of [...SKILL_IDS, ...BUNDLE_IDS]) assert.match(id, /^[a-z][a-z0-9-]{1,39}$/, id);
-  assert.deepEqual(BUNDLE_IDS, ["finance-ops", "marketing-growth", "dev-admin", "freelancer-safety-net"]);
+  assert.deepEqual(BUNDLE_IDS, ["finance-ops", "marketing-growth", "dev-admin", "freelancer-safety-net", "watchers"]);
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["dev-admin"]]) {
     assert.equal(findBundle(bad), null, String(bad));
     assert.equal(findSkill(bad), null, String(bad));
@@ -128,7 +128,7 @@ test("bundles: a workflow's changes only touch fields the skill really has, and 
       const aiBeforeEmail = built.steps.filter((s) => s.kind === "ai").length;
       const email = built.steps.find((s) => s.kind === "action" && s.fields.action === "gmail_send");
       if (email) assert.ok(aiBeforeEmail >= 1 && ["{answers}", "{answer}"].includes(email.fields.details), `${workflow.id}: the email carries the AI answers ({answers} = all of them, {answer} = the last one, which already used the earlier ones)`);
-      if (email?.fields.details === "{answer}") assert.ok(built.steps.filter((s) => s.kind === "ai").at(-1).fields.task.includes("{answers}"), `${workflow.id}: an email that carries only the last answer follows an AI step that used the earlier answers`);
+      if (email?.fields.details === "{answer}") assert.ok(built.steps.filter((s) => s.kind === "ai").at(-1).fields.task.includes("{answers}") || aiBeforeEmail === 1, `${workflow.id}: an email that carries only the last answer follows an AI step that used the earlier answers (or the one and only AI step)`);
       const page = built.steps.find((s) => s.kind === "action" && s.fields.action === "notion_page");
       if (page) assert.ok(aiBeforeEmail >= 1 && page.fields.details === "{answer}", `${workflow.id}: the Notion page carries the AI's text`);
     }
@@ -143,7 +143,7 @@ test("bundles: a suggested schedule is valid and agrees with the Start step's wo
     for (const workflow of bundle.workflows) {
       if (!workflow.schedule) { assert.equal(workflow.start.how, "manual", `${workflow.id}: no schedule means it starts when asked`); continue; }
       assert.ok(checkSchedule({ ...workflow.schedule, tzOffset: 0 }).value, `${workflow.id}: schedule valid`);
-      assert.equal(workflow.start.how, "schedule");
+      assert.ok(["schedule", "watch"].includes(workflow.start.how), `${workflow.id}: a Start step that makes a schedule (a watch Start makes one too)`);
       const read = parseWhen(workflow.start.when);
       assert.ok(read, `${workflow.id}: the Start step's words can be read as a schedule`);
       for (const key of ["frequency", "hour", "minute"]) assert.equal(read[key], workflow.schedule[key], `${workflow.id}: ${key}`);

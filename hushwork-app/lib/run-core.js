@@ -21,7 +21,8 @@ import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox, fetchInboxText } from "@/lib/connectors/google-gmail";
 import { fetchRecentFiles } from "@/lib/connectors/google-drive";
 import { SHEETS_FAILED, appendRow, fillAnswer, parseCells, parseSheetUrl } from "@/lib/connectors/google-sheets";
-import { ANSWERS_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers } from "@/lib/run-answer";
+import { ANSWERS_TAG, LAST_TAG, fillActionDetails, fillAnswerText, findAnswer, findAnswers, findLastAnswer } from "@/lib/run-answer";
+import { isNothingNew, isWatchPlan } from "@/lib/watch-rules";
 import { PENDING_MESSAGE, UNCHECKED_MESSAGE, loadStepStates, stepStatus } from "@/lib/run-state";
 import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { LINEAR_CREATE_FAILED, createIssue } from "@/lib/connectors/linear-create";
@@ -62,11 +63,14 @@ async function saveStopNote(supabase, run, index, step, reason) {
 export async function runAutomatically(runId, results, who, { allowWrites = true, run = null } = {}) {
   let done = 0;
   let skipped = 0;
+  let waiting = 0; // WATCH workflows only: writing steps left for the person's own Approve click
+  const watch = isWatchPlan(results);
   const states = await loadStepStates(who.supabase, who.user.id, runId);
-  const counted = () => (skipped ? { skipped } : {});
+  const counted = () => ({ ...(skipped ? { skipped } : {}), ...(watch ? { watch: true, ...(waiting ? { waiting } : {}) } : {}) });
   for (let index = 0; index < Math.min(results.length, 20); index += 1) {
     const step = results[index];
     if (!isApprovable(step)) continue;
+    if (!allowWrites && isWriteStep(step)) waiting += 1; // counted only so a watch run can tell the person something is waiting for their Approve
     if (!allowWrites && isWriteStep(step)) continue; // a scheduled run only writes when the person ticked "allow writing" for that schedule
     const action = AUTO_ACTIONS.find(([matches]) => matches(step))?.[1];
     if (!action) continue;
@@ -79,6 +83,12 @@ export async function runAutomatically(runId, results, who, { allowWrites = true
       return { done, stoppedAt: index + 1, reason: String(outcome.error).slice(0, 400), ...counted() };
     }
     done += 1;
+    // THE QUIET MARKER. In a watch workflow an Ask the AI step whose answer starts with NOTHING NEW ends the run right here: nothing after it runs,
+    // and a small record says so (the Runs page folds such runs into one quiet line). In any other workflow those words mean nothing special.
+    if (watch && isAiStep(step) && isNothingNew(outcome?.answerText)) {
+      if (run) await saveLiveRun(who.supabase, { ...run, stepIndex: index }, { icon: "Check", title: "Nothing new", detail: "", status: "done", quiet: true, outcome: "Nothing new since the last check." });
+      return { done, stoppedAt: 0, quiet: true, ...counted() };
+    }
   }
   return { done, stoppedAt: 0, ...counted() };
 }
@@ -364,9 +374,15 @@ export async function approveAiStep(input, who) {
   if (looksSensitive(task)) return { error: "That request looks like it holds a card number or a secret key, so it was not sent. Remove it and try again." };
   // {answers} in the job: the answers of the Ask the AI steps BEFORE this one are handed to the AI as data (not as part of the person's request).
   const wantsEarlier = task.includes(ANSWERS_TAG);
-  const earlier = wantsEarlier ? (await findAnswers(supabase, user.id, { ...run, before: run.stepIndex })).join("\n\n").slice(0, 2800) : "";
+  const wantsLast = task.includes(LAST_TAG);
+  const earlier = wantsEarlier ? (await findAnswers(supabase, user.id, { ...run, before: run.stepIndex })).join("\n\n").slice(0, wantsLast ? 1800 : 2800) : "";
   if (wantsEarlier && !earlier) return { error: "This step uses what the Ask the AI steps before it found. Approve those first, then come back to this one." };
-  const job = wantsEarlier ? task.split(ANSWERS_TAG).join("the earlier answers") : task;
+  // {last} in the job: what THIS step answered in the previous practice run of the workflow, also handed over as data. Having no earlier answer is not an
+  // error: it is the first check, and the AI is told so. With both {answers} and {last}, the one data block labels its two parts.
+  const last = wantsLast ? await findLastAnswer(supabase, user.id, run, run.stepIndex) : "";
+  const lastPart = last ? `What this same step answered in the last check:\n${last.slice(0, 900)}` : "This is the first check: there is no answer from an earlier check.";
+  const context = wantsLast ? [wantsEarlier ? `What the earlier steps found:\n${earlier}` : "", lastPart].filter(Boolean).join("\n\n") : earlier;
+  const job = task.split(ANSWERS_TAG).join("the earlier answers").split(LAST_TAG).join("the last check");
 
   // Counted BEFORE anything goes out (an MCP step connects to an outside server), so a loop of Approves cannot be used as a request relay.
   const now = Date.now();
@@ -478,11 +494,12 @@ export async function approveAiStep(input, who) {
     };
   }
 
-  const answer = await runAgent({ task: job, context: earlier, tools, groqKey, memory: uses === "mcp" ? "" : await loadMemory(supabase, user.id) }); // never beside an MCP server: the model could copy a fact into its input
+  const answer = await runAgent({ task: job, context, tools, groqKey, memory: uses === "mcp" ? "" : await loadMemory(supabase, user.id) }); // never beside an MCP server: the model could copy a fact into its input
   if (!answer.ok) return { error: answer.error };
   if (toolError) return { error: toolError };
   const lookedAt = !answer.calls.length ? "" : uses === "linear" ? "your Linear tasks" : uses === "calendar" ? "your calendar" : uses === "gmail" ? "your Gmail inbox" : uses === "gmailtext" ? "your Gmail inbox, including the text of your newest emails" : uses === "drive" ? "your Google Drive" : uses === "app" ? "a connected app" : uses === "mcp" ? `the MCP server, using ${[...new Set(answer.calls)].join(", ")}` : "the web address";
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${answer.text}${lookedAt ? `\n\nThe AI looked at ${lookedAt}.` : ""}`.slice(0, 4000), answer: answer.text.slice(0, 700) });
+  const saved = await saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${answer.text}${lookedAt ? `\n\nThe AI looked at ${lookedAt}.` : ""}`.slice(0, 4000), answer: answer.text.slice(0, 700) });
+  return { ...saved, answerText: answer.text }; // Auto mode reads the words to see whether a watch step found NOTHING NEW (the person's own answer; it was shown on the Runs page anyway)
 }
 
 // The "Approve and look at my calendar" button. READ-ONLY (the permission Google gave is read-only, and

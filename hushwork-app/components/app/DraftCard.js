@@ -11,6 +11,7 @@ import { startPracticeRun } from "@/lib/actions/runs";
 import { useRunMode } from "./RunMode";
 import ScheduleEditor from "./ScheduleEditor";
 import { LIMITS } from "@/lib/validate";
+import { isScheduledStart } from "@/lib/watch-rules";
 
 // One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Run" lists its steps and waits for approval on each one that acts on an app.
 // Opening it puts its request and steps back into the composer; it does not start anything.
@@ -97,7 +98,7 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
   // What the Start step says about WHEN (empty unless it says "On a schedule"): the Schedule panel warns when it differs from the real schedule.
   const startStep = draft.plan[0];
   const startFields = Array.isArray(startStep) ? startStep[4] : startStep?.fields;
-  const startWhen = kindOf(startStep) === "trigger" && startFields?.how === "schedule" ? String(startFields.when ?? "") : "";
+  const startWhen = isScheduledStart({ kind: kindOf(startStep), fields: startFields }) ? String(startFields.when ?? "") : "";
   function practice() {
     setError("");
     startTransition(async () => {

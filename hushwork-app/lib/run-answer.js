@@ -41,6 +41,33 @@ export async function findAnswers(supabase, userId, run) {
   return [...byStep.entries()].sort((a, b) => a[0] - b[0]).map(([, answer]) => answer);
 }
 
+// "The last check": what THIS SAME Ask the AI step answered in the PREVIOUS practice run of the same workflow (a job that writes {last}, which is how a
+// watch workflow notices only what is new). `run` is { id, workflow_id, created_at } of the practice run being approved and `stepIndex` is the step.
+// The previous practice run is the newest one of this workflow created before this run; only its answer for the same step counts (never another step's,
+// never another workflow's). Returns the text, or "" when there is none (the first check: that is not an error).
+export const LAST_TAG = "{last}";
+export async function findLastAnswer(supabase, userId, run, stepIndex) {
+  if (!run?.id || !run?.workflow_id || !run?.created_at || !Number.isInteger(stepIndex)) return "";
+  const { data: before, error } = await supabase
+    .from("runs").select("id, created_at")
+    .eq("user_id", userId).eq("workflow_id", run.workflow_id).eq("mode", "practice")
+    .order("created_at", { ascending: false }).limit(10);
+  if (error || !Array.isArray(before)) return "";
+  const previous = before.find((one) => one.id !== run.id && Date.parse(one.created_at) < Date.parse(run.created_at));
+  if (!previous) return "";
+  const { data, error: liveError } = await supabase
+    .from("runs").select("results")
+    .eq("user_id", userId).eq("workflow_id", run.workflow_id).eq("mode", "live")
+    .contains("results", JSON.stringify([{ from: previous.id, fromStep: stepIndex }])) // JSON TEXT on purpose (see loadStepStates in lib/run-state.js)
+    .order("created_at", { ascending: false }).limit(10);
+  if (liveError || !Array.isArray(data)) return "";
+  for (const row of data) {
+    const first = Array.isArray(row.results) ? row.results[0] : null;
+    if (first?.kind === "ai" && first.from === previous.id && first.fromStep === stepIndex && typeof first.answer === "string" && first.answer.trim()) return first.answer;
+  }
+  return "";
+}
+
 // {answer} inside one piece of text (a task title, say): the answer is flattened to one line, cut to 500 characters, put in, and the
 // whole text is cut to `max`. Returns { text } or { error } (the text uses {answer} but there is no answer yet).
 export function fillAnswerText(text, answer, max) {

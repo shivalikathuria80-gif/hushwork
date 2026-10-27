@@ -12,6 +12,7 @@ import { syncScheduleFromStart } from "@/lib/actions/schedules";
 import { LIMITS, checkSteps, cleanName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
 import { planOnlyWarning } from "@/lib/run-engine";
+import { isScheduledStart } from "@/lib/watch-rules";
 import { PALETTE_BLOCKS, DRAG_KIND, MAX_EMAIL_LIST, newRowForBlock, rowsForEmailList, rowsForSkill } from "@/lib/step-rows";
 import { SKILLS, accessOf } from "@/lib/skills/bundles";
 import { requirementOf } from "@/lib/studio/capabilities";
@@ -123,11 +124,11 @@ export default function Builder({ initial, connections }) {
     return { name: checkedName.value, steps: checked.value };
   }
 
-  // When the Start step says "On a schedule", saving also makes that schedule real (lib/schedule-sync.js). Returns a sentence to add to the
+  // When the Start step says "On a schedule" (or "Keep watching"), saving also makes that schedule real (lib/schedule-sync.js). Returns a sentence to add to the
   // "Saved" message (empty when the Start step has nothing to do with a schedule).
   async function scheduleSentence(id, steps) {
     const start = steps[0];
-    if (!id || start?.kind !== "trigger" || start.fields?.how !== "schedule") return "";
+    if (!id || !isScheduledStart(start)) return "";
     try {
       const result = await syncScheduleFromStart({ id, tzOffset: -new Date().getTimezoneOffset() });
       return result?.text ? ` ${result.text}` : "";

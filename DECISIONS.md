@@ -88,6 +88,7 @@ Last updated: 2026-10-24
 | D-044 | Run summary line, and five things that were not built are now built (carefully) | ✅ | 2026-10-25 |
 | D-045 | Pre-launch hardening from a ChatGPT + Gemini review: pause switch, changed-since-read guard, two-account check | ✅ | 2026-10-25 |
 | D-046 | An Ask the AI step can use what earlier steps found ({answers}); the Freelancer safety net bundle | ✅ | 2026-10-25 |
+| D-048 | Watch mode: a scheduled check that stays silent unless something is new ({last}, NOTHING NEW, quiet hours, 3 a day, one plain email) | ✅ | 2026-10-27 |
 
 ---
 
@@ -414,6 +415,22 @@ Last updated: 2026-10-24
 - **Reason:** Both outside AIs proposed jobs that need one step to see what another found. The honest fix was to give Hushwork that ability once, safely, instead of faking it in each workflow.
 - **Limits worth knowing:** one Ask the AI step still looks in ONE place; Linear gives no due dates; Slack needs the channel typed in the step.
 - **Where:** `lib/run-core.js` (`approveAiStep`), `lib/run-answer.js` (`findAnswers`, `before`), `lib/ai/agent.js` (`context`), `lib/skills/bundles.js`; tests in `lib/ai/agent.test.js`, `lib/run-core.integration.test.js`
+
+### D-048: Watch mode: a scheduled check that stays silent unless something is new
+- **Date:** 2026-10-27
+- **Status:** ✅ Approved (design from a ChatGPT + Gemini review, see `docs/ideas.md`)
+- **Decision:** A first small version of a proactive agent. It is built from parts Hushwork already had, and needs NO new table and NO new column.
+  - **Start choice "Keep watching".** The Start step has a new choice `watch` ("tell me only when something new shows up"), with the time written like a schedule ("Every weekday at 9:00"). It makes the same real schedule as "On a schedule". A watch workflow is recognised when it runs, from its saved Start step.
+  - **`{last}`.** Writing `{last}` in an Ask the AI job hands that step the answer THE SAME STEP gave in the previous practice run of the same workflow, as `<data>` (angle brackets made harmless, never part of the person's request), exactly like `{answers}`. The first check is not an error: the AI is told "This is the first check".
+  - **NOTHING NEW.** In a watch workflow, an Ask the AI answer that starts with NOTHING NEW ends the run quietly right there: a small record says so, no later step runs, nothing is sent, and the schedule is recorded as `ok`. In any other workflow those words mean nothing special.
+  - **Speaking rules** (`lib/watch-rules.js`): never between 20:00 and 08:00 the person's own time, at most 3 speak-ups per person per local day. A watch schedule that comes due at night is claimed (its next time moves on) but not run: no AI cost, no email.
+  - **The nudge.** After a watch run that is not quiet and left a step waiting for the person's Approve, and only if the rules allow: ONE plain email to the person themself, through their own Gmail (send) connection: `Hushwork noticed something in "<name>". Open the Runs page to read it and approve only what you want: <site>/app/runs`. Nothing from the run is in it, and no link approves anything. Each email leaves a small "Told you" record (`spoke: true`) in the person's own runs, and the cap is counted from those records.
+  - **Runs page.** Checks that found nothing new are hidden from the list and folded into one line: "N quiet checks: nothing new".
+  - **Bundle "Watch for me":** Overdue invoice watch (weekdays 9:00), Unhappy email watch (weekdays 8:30), GitHub watch (every day 17:00). The default times are daily on purpose: each check uses one AI step and a person gets 15 AI steps a day. "Every hour" is possible but uses that allowance.
+- **Safety, unchanged and tested:** watch mode never writes by itself (a watch schedule keeps "Let it write by itself" exactly as the person set it, off for a new one); the nudge is the only thing Hushwork does alone and it is an email to the person themself; the pause switch stops everything, nudges included; the AI still only reads, and gets earlier and last answers as data; no new permissions, no webhooks.
+- **Reason:** The two outside AIs wanted an agent that "tells me when something changes". The honest small version is a check that compares with its own last answer, says nothing when nothing changed, and never acts without a click.
+- **Limits worth knowing:** "nothing new" is the AI's own judgement, compared with its last answer only; a check that said NOTHING NEW becomes the "last answer" of the next one; the nudge is an email, so it needs the Gmail (send) connection (without it the run just waits on the Runs page); the Runs page list shows the newest 30 records, so a very frequent watch fills it.
+- **Where:** `lib/watch-rules.js`, `lib/run-core.js` (`approveAiStep`, `runAutomatically`), `lib/run-answer.js` (`findLastAnswer`), `lib/schedule-runner.js`, `lib/schedule-notify.js` (`notifyWatch`), `lib/schedule-tick.js`, `lib/schedule-sync.js`, `lib/steps.js`, `lib/skills/bundles.js`, `components/app/RunsViewer.js`; tests `lib/watch-rules.test.js`, `lib/watch-mode.test.js`
 
 ---
 

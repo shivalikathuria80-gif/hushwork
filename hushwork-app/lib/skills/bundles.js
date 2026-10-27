@@ -91,6 +91,16 @@ export const SKILLS = [
   skill("prep-card", "Write a 3-bullet prep card", "FileText", "Takes what the steps before found and writes a short card: what to know before your meetings today.",
     { reads: "Nothing new from your apps: it only works from what the earlier steps found." },
     step("ai", { task: "Write a 3-bullet prep card for today's meetings from this. {answers}", uses: "nothing", address: "" })),
+  // watch mode: each check reads ONE place and uses {last} (its own answer from the last check) so it can say NOTHING NEW (see lib/watch-rules.js)
+  skill("watch-invoices", "Watch for newly overdue invoices", "CreditCard", "Reads your latest Stripe invoices and lists the ones that are newly overdue since the last check. If nothing is new it says NOTHING NEW and the run ends quietly.",
+    { reads: "Your latest Stripe invoices (read only), plus its own answer from the last check.", needs: ["stripe"] },
+    step("ai", { task: "List newly overdue invoices: client and amount. If nothing is new say exactly NOTHING NEW. {last}", uses: "app", address: "stripeinvoices" })),
+  skill("watch-unhappy-emails", "Watch for unhappy or urgent emails", "Inbox", "Reads the opening of your 5 newest emails and lists any new urgent or unhappy one since the last check. If nothing is new it says NOTHING NEW and the run ends quietly.",
+    { reads: "The sender, subject and opening text (about 450 characters) of your 5 newest emails, plus its own answer from the last check. That text goes to the AI (Groq). It cannot send or change anything.", needs: ["google"] },
+    step("ai", { task: "List new urgent or unhappy emails and who wrote. If nothing is new say exactly NOTHING NEW. {last}", uses: "gmailtext", address: "" })),
+  skill("watch-github", "Watch GitHub notifications", "Inbox", "Reads your latest GitHub notifications and lists the new ones that need action since the last check. If nothing is new it says NOTHING NEW and the run ends quietly.",
+    { reads: "Your latest GitHub notifications (read only), plus its own answer from the last check.", needs: ["github"] },
+    step("ai", { task: "List new GitHub notifications that need action. If nothing is new say exactly NOTHING NEW. {last}", uses: "app", address: "github" })),
   skill("ask-approval", "Ask you to approve", "ShieldCheck", "A stop sign: it marks the point where the workflow starts to write, so you know to read the approval card.",
     { reads: "Nothing." },
     step("approve", { what: "Everything that writes below, before it happens" })),
@@ -216,6 +226,34 @@ export const BUNDLES = [
         request: "Every weekday at 8:00, list today's meetings, find urgent or unhappy emails and email me a 3-bullet prep card. Ask me before it is sent.",
         start: { how: "schedule", when: "Every weekday at 8:00" }, schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 0 },
         flow: ["calendar-today", "gmail-urgent-text", "prep-card", "ask-approval", ["email-me", { title: "Your meeting prep card", details: "{answer}" }]],
+      },
+    ],
+  },
+  // WATCH MODE (lib/watch-rules.js): each workflow checks on a schedule and stays silent unless something is NEW. Times are DAILY on purpose: every
+  // check uses one AI step, and a person gets 15 AI steps a day. Nothing is written by itself: the email waits for the person's Approve click.
+  {
+    id: "watchers", name: "Watch for me", icon: "ShieldCheck",
+    blurb: "Quiet checks that only get in touch when something new shows up: overdue invoices, unhappy emails, GitHub.",
+    connections: ["stripe", "google", "github", "gmailsend"],
+    skills: ["watch-invoices", "watch-unhappy-emails", "watch-github", "ask-approval", "email-me"],
+    workflows: [
+      {
+        id: "overdue-invoice-watch", title: "Overdue invoice watch", body: "Every weekday at 9:00: checks your Stripe invoices and stays quiet unless one has newly gone overdue. Then it emails you once (never at night, at most 3 a day) to open the Runs page, where you read it and press Approve. You can write \"Every hour\" in the Start step, but each check uses one of your 15 AI steps a day.",
+        request: "Every weekday at 9:00, check my Stripe invoices and tell me only when one is newly overdue. Ask me before anything is sent.",
+        start: { how: "watch", when: "Every weekday at 9:00" }, schedule: { frequency: "weekdays", weekday: 1, hour: 9, minute: 0 },
+        flow: ["watch-invoices", "ask-approval", ["email-me", { title: "Newly overdue invoices", details: "{answer}" }]],
+      },
+      {
+        id: "unhappy-email-watch", title: "Unhappy email watch", body: "Every weekday at 8:30: reads the opening of your 5 newest emails and stays quiet unless there is a new urgent or unhappy one. Then it emails you once (never at night, at most 3 a day) to open the Runs page. The text of those emails goes to the AI (Groq). You can write \"Every hour\" in the Start step, but each check uses one of your 15 AI steps a day.",
+        request: "Every weekday at 8:30, check my newest emails and tell me only when there is a new urgent or unhappy one. Ask me before anything is sent.",
+        start: { how: "watch", when: "Every weekday at 8:30" }, schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 30 },
+        flow: ["watch-unhappy-emails", "ask-approval", ["email-me", { title: "Unhappy or urgent emails", details: "{answer}" }]],
+      },
+      {
+        id: "github-watch", title: "GitHub watch", body: "Every day at 17:00: checks your GitHub notifications and stays quiet unless something new needs action. Then it emails you once (never at night, at most 3 a day) to open the Runs page. You can write \"Every hour\" in the Start step, but each check uses one of your 15 AI steps a day.",
+        request: "Every day at 17:00, check my GitHub notifications and tell me only when something new needs action. Ask me before anything is sent.",
+        start: { how: "watch", when: "Every day at 17:00" }, schedule: { frequency: "daily", weekday: 1, hour: 17, minute: 0 },
+        flow: ["watch-github", "ask-approval", ["email-me", { title: "New on GitHub", details: "{answer}" }]],
       },
     ],
   },

@@ -16,6 +16,7 @@ import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 import { ANSWERS_TAG, findAnswer, findAnswers } from "@/lib/run-answer";
 import { ANSWER_TAG } from "@/lib/connectors/google-sheets";
+import { quietLine, quietRunIds } from "@/lib/watch-rules";
 
 // The runs page: a list of real saved runs on the left, the detail of the selected run on the right (stacked on phones).
 // A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A "Real" run is the record of
@@ -130,7 +131,12 @@ export default async function RunsViewer({ searchParams }) {
   }
   const waitingIn = (run) => (run.live ? 0 : run.results.filter((step, index) => isApprovable(step) && !doneByRun.get(run.id)?.has(index)).length);
   const runIds = new Set(runs.filter((run) => !run.live).map((run) => run.id));
-  const shown = runs.filter((run) => !(run.live && run.results[0]?.from && runIds.has(run.results[0].from)));
+  // WATCH MODE: a check that found "nothing new" is not listed (it would bury the runs that matter). All of them are folded into one quiet line.
+  const quiet = quietRunIds(runs);
+  const shown = runs.filter((run) => !(run.live && run.results[0]?.from && runIds.has(run.results[0].from)) && !quiet.has(run.id) && !(run.live && run.results[0]?.quiet));
+  if (shown.length === 0 && !runs.some((run) => run.id === wanted)) {
+    return <Notice icon="History" title="Nothing needs you.">{quiet.size > 0 ? `${quietLine(quiet.size)}. A watch workflow only shows up here when it finds something new.` : "Nothing is waiting."}</Notice>;
+  }
   const selected = runs.find((run) => run.id === wanted) ?? shown[0] ?? runs[0]; // opens on the newest run in the list
   const { linear, google } = await connectorStatus(await createClient(), user.id);
   const linearConnected = linear.usable;
@@ -178,6 +184,7 @@ export default async function RunsViewer({ searchParams }) {
     <div className="mt-8 md:flex">
       <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
         <h2 className={heading}>Your runs</h2>
+        {quiet.size > 0 && <p className="mt-2 text-sm text-mute">{quietLine(quiet.size)}</p>}
         <ul className="mt-3 space-y-1">
           {shown.map((run) => (
             <li key={run.id}>

@@ -4,7 +4,7 @@ import { getCronSecret } from "@/lib/schedule-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runDueSchedules } from "@/lib/schedule-runner";
 import { startPracticeRun } from "@/lib/run-core";
-import { notifyScheduleProblem } from "@/lib/schedule-notify";
+import { notifyScheduleProblem, notifyWatch } from "@/lib/schedule-notify";
 import { isPaused } from "@/lib/app-controls";
 
 // What the clock calls (app/api/cron/tick). It does NOTHING unless the call carries the clock's password in the Authorization header
@@ -24,6 +24,6 @@ export async function handleTick(request) {
   if (!sent || !same(sent, secret)) return reply(401, { ok: false, error: "Wrong or missing password." });
 
   if (await isPaused(admin)) return reply(200, { ok: true, paused: true, due: 0, ran: 0, stopped: 0, failed: 0, skipped: 0 }); // the pause switch: no schedule is claimed or run, they wait
-  const summary = await runDueSchedules({ admin, run: startPracticeRun, notify: (problem) => notifyScheduleProblem({ admin, ...problem }) });
+  const summary = await runDueSchedules({ admin, run: startPracticeRun, notify: (problem) => notifyScheduleProblem({ admin, ...problem }), nudge: (watch) => notifyWatch({ admin, ...watch }) });
   return reply(summary.ok ? 200 : 500, summary);
 }

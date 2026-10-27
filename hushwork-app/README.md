@@ -357,6 +357,16 @@ Tests: `lib/skills/bundles.test.js` (every skill and workflow follows the rules)
 
 Write `{answers}` in the job of an Ask the AI step, for example "Which of these requests have NO matching open task? {answers}". That step is then handed the answers of the Ask the AI steps before it, as information only (never as part of your request). With none before it, it stops and says to approve those first. One step still looks in ONE place, so a "compare" is two steps: the first finds, the second looks somewhere else and compares. The bundle **Freelancer safety net** (Scope Creep Alarm, Week Balancer, Meeting-Day Rescue Brief) is built on this. The idea log is `../docs/ideas.md`.
 
+## Watch mode: a check that stays silent unless something is new (2026-10-27)
+
+In the Builder, set the **Start** step to **Keep watching** and write how often like a schedule ("Every weekday at 9:00"). Saving makes the same real schedule as "On a schedule" (writing stays OFF until you tick it on the Workflows page). Then use the pieces:
+
+- **`{last}`** in an Ask the AI job: the step is handed what it answered the last time the workflow ran (as information only, like `{answers}`), so it can say what is new. The first check is not an error: the AI is told it is the first.
+- **NOTHING NEW:** in a watch workflow, an Ask the AI answer that starts with `NOTHING NEW` ends the run quietly: nothing after it runs, nothing is sent, the schedule counts as fine. The Runs page hides those checks and shows one line, "3 quiet checks: nothing new".
+- **When it speaks** (`lib/watch-rules.js`): never between 20:00 and 08:00 your time, at most 3 times a day. A watch schedule that comes due at night is skipped (it just moves on to its next time, no AI is used). When a check finds something and a step is waiting for your Approve, Hushwork sends you ONE plain email (through your own Gmail (send) connection, to yourself) that only says to open the Runs page. It never contains what was found and never approves anything. Each one leaves a small "Told you" record that the 3-a-day count uses. No Gmail (send) connection: no email, the run just waits on the Runs page.
+- **Never alone:** a watch schedule does not write by itself unless you ticked "Let it write by itself". The pause switch stops it too.
+- **The "Watch for me" bundle** (Skills page) has three ready-made ones. Their times are daily because every check uses one of your 15 AI steps a day; "Every hour" works but uses that allowance up fast.
+
 ## Safety switches and checks before launch (2026-10-25)
 
 - **Pause switch.** `supabase/app-controls.sql` makes a one-row table. In the Supabase SQL Editor, `update public.app_controls set value = true where name = 'paused';` stops everything at once (no deploy): no writing step starts, no Ask the AI step is asked, no schedule runs, and the Runs page says Hushwork is paused. Set it back to `false` to start again. Nobody can change it from the app.

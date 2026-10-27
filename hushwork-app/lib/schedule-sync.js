@@ -1,6 +1,7 @@
 import { parseWhen } from "./schedule-text.js";
 import { checkSchedule, describeSchedule, nextRun } from "./schedule.js";
 import { isApprovable } from "./run-engine.js";
+import { isScheduledStart, isWatchStart } from "./watch-rules.js";
 
 // Makes the Start step's schedule REAL. A workflow whose Start says "On a schedule: Every weekday at 17:30" gets a saved schedule when it is
 // saved in the Builder, so what is written there is what runs. It is careful:
@@ -17,11 +18,12 @@ const quoted = (value) => `"${String(value ?? "").slice(0, 40)}"`;
 
 export async function syncStartSchedule({ supabase, userId, workflowId, plan, tzOffset, now = Date.now() }) {
   const start = Array.isArray(plan) ? plan[0] : null;
-  if (start?.kind !== "trigger" || start.fields?.how !== "schedule") return { text: "" };
+  if (!isScheduledStart(start)) return { text: "" };
+  const label = isWatchStart(start) ? "Keep watching" : "On a schedule"; // a watch Start makes the very same real schedule; only its words and its quiet rules differ
 
   const when = parseWhen(start.fields.when);
-  if (!when) return { text: `The Start step says "On a schedule", but the time ${quoted(start.fields.when)} could not be read, so nothing is scheduled. Write it like "Every Monday at 9:00" or "Every weekday at 17:30".` };
-  if (!plan.some((step) => isApprovable(step))) return { text: "The Start step says \"On a schedule\", but none of this workflow's steps can really run yet (they only describe a plan), so nothing is scheduled." };
+  if (!when) return { text: `The Start step says "${label}", but the time ${quoted(start.fields.when)} could not be read, so nothing is scheduled. Write it like "Every Monday at 9:00" or "Every weekday at 17:30".` };
+  if (!plan.some((step) => isApprovable(step))) return { text: `The Start step says "${label}", but none of this workflow's steps can really run yet (they only describe a plan), so nothing is scheduled.` };
 
   const { data: rows, error: loadError } = await supabase.from("schedules").select("workflow_id, frequency, hour, minute, weekday, tz_offset, allow_writes, enabled").eq("user_id", userId);
   if (loadError) {
@@ -49,5 +51,6 @@ export async function syncStartSchedule({ supabase, userId, workflowId, plan, tz
     return { text: NO_TABLE.has(error.code) ? "Scheduling is not set up on this server yet, so nothing is scheduled." : "The workflow was saved, but its schedule could not be saved. Set it on the Workflows page." };
   }
   const tail = !s.enabled ? " It is paused: press Resume on the Workflows page." : s.allowWrites ? " It may write by itself." : " It only reads by itself: tick \"Let it write by itself\" on the Workflows page if it should send or create things.";
-  return { text: `Scheduled: ${words}.${tail}` };
+  const quiet = isWatchStart(start) ? " It stays quiet unless something is new, and never emails you at night." : "";
+  return { text: `Scheduled: ${words}.${quiet}${tail}` };
 }
