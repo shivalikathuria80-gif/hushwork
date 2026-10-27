@@ -18,13 +18,16 @@ test("the list: every app has an id, a plain name, a toolkit and ONE read-only t
   for (const app of COMPOSIO_APPS) {
     assert.match(app.id, /^[a-z][a-z0-9_]{1,30}$/);
     assert.match(app.toolkit, /^[a-z0-9_]+$/);
+    for (const key of ["name", "what", "about"]) assert.ok(app[key] && typeof app[key] === "string");
+    if (app.noLookup) { assert.equal(app.tool, null, `${app.id}: an app with no lookup has no read tool`); continue; }
     assert.match(app.tool, new RegExp(`^${app.toolkit.toUpperCase()}_[A-Z0-9_]+$`), `${app.id}: the tool belongs to the toolkit`);
     assert.match(app.tool, /_(?:LIST|GET|SEARCH|READ|FETCH)_/, `${app.id}: the tool name says it only reads`);
     assert.doesNotMatch(app.tool, /(?:CREATE|UPDATE|DELETE|ADD|SEND|REMOVE|SET|MERGE|ARCHIVE|UPSERT|WRITE|POST|PUT|PATCH|UPLOAD|MOVE|REPLACE)/, `${app.id}: no writing word`);
-    for (const key of ["name", "what", "about"]) assert.ok(app[key] && typeof app[key] === "string");
   }
   assert.equal(new Set(COMPOSIO_IDS).size, COMPOSIO_IDS.length);
-  assert.equal(new Set(COMPOSIO_APPS.map((app) => app.tool)).size, COMPOSIO_APPS.length);
+  const lookups = COMPOSIO_APPS.filter((app) => !app.noLookup).map((app) => app.tool);
+  assert.equal(new Set(lookups).size, lookups.length);
+  assert.deepEqual(COMPOSIO_APPS.filter((app) => app.noLookup).map((app) => app.id), ["gslides"], "only Google Slides has no lookup: none of its tools lists anything without being told which presentation");
   for (const bad of ["", "nope", "__proto__", "constructor", "TODOIST", 5, null, undefined, {}]) assert.equal(findComposioApp(bad), null, String(bad));
 });
 

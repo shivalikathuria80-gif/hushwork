@@ -1,7 +1,7 @@
 // Rules for skills and bundles. If someone adds a skill or a bundle that breaks a rule here, `npm test` says which one.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SKILLS, BUNDLES, accessOf, buildWorkflow, connectionInfo, describeBundle, findBundle, findSkill, SKILL_IDS, BUNDLE_IDS } from "./bundles.js";
+import { SKILLS, BUNDLES, accessOf, buildWorkflow, connectionInfo, describeBundle, findBundle, findSkill, skillStart, SKILL_IDS, BUNDLE_IDS } from "./bundles.js";
 import { ICON_NAMES } from "../ai/icon-names.js";
 import { LIMITS, checkPrompt } from "../validate.js";
 import { parseWhen } from "../schedule-text.js";
@@ -15,7 +15,7 @@ test("ids: skill and bundle ids are unique plain words, and a made-up id finds n
   assert.equal(new Set(SKILL_IDS).size, SKILLS.length);
   assert.equal(new Set(BUNDLE_IDS).size, BUNDLES.length);
   for (const id of [...SKILL_IDS, ...BUNDLE_IDS]) assert.match(id, /^[a-z][a-z0-9-]{1,39}$/, id);
-  assert.deepEqual(BUNDLE_IDS, ["finance-ops", "marketing-growth", "dev-admin", "freelancer-safety-net", "watchers"]);
+  assert.deepEqual(BUNDLE_IDS, ["finance-ops", "marketing-growth", "dev-admin", "freelancer-safety-net", "watchers", "google-creator"]);
   for (const bad of ["nope", "", "constructor", "__proto__", 5, null, undefined, ["dev-admin"]]) {
     assert.equal(findBundle(bad), null, String(bad));
     assert.equal(findSkill(bad), null, String(bad));
@@ -112,7 +112,8 @@ test("bundles: a workflow that writes always has an 'Ask you to approve' step be
       assert.ok(steps.slice(0, firstWrite).some((s) => s.kind === "approve"), `${workflow.id}: approval before the first write`);
       for (const s of steps.filter((x) => x.kind === "action" && x.fields.action === "gmail_send")) assert.equal(s.fields.target, "{myEmail}", `${workflow.id}: only to the person`);
       for (const s of steps.filter((x) => x.kind === "action" && x.fields.action === "notion_page")) assert.ok(isExampleTarget(findAction("notion_page"), s.fields.target), `${workflow.id}: a Notion page id is the made-up one until the person writes their own (it is refused until then)`);
-      assert.ok(steps.every((x) => x.kind !== "action" || ["gmail_send", "notion_page"].includes(x.fields.action)), `${workflow.id}: a bundle only writes an email to the person or one Notion page`);
+      assert.ok(steps.every((x) => x.kind !== "action" || ["gmail_send", "notion_page", "sheet_create", "slides_create", "doc_create"].includes(x.fields.action)), `${workflow.id}: a bundle only writes an email to the person, one Notion page or one new Google file`);
+      for (const s of steps.filter((x) => x.kind === "action" && ["sheet_create", "slides_create", "doc_create"].includes(x.fields.action))) assert.equal(s.fields.target, "", `${workflow.id}: a new Google file has no place to type`);
     }
   }
 });
@@ -168,6 +169,25 @@ test("the three examples from the plan exist as workflows with the steps they pr
   const made = buildWorkflow(mb, repurposer).steps;
   assert.equal(made.filter((s) => s.fields.uses === "web").length, 2, "reads the post, then writes the content");
   assert.equal(made.at(-1).fields.action, "gmail_send", "the review queue is your inbox");
+});
+
+test("the Google creator bundle: each workflow is an AI step, then the approval, then ONE new Google file made from the AI's lines ({answer})", () => {
+  const bundle = findBundle("google-creator");
+  assert.equal(bundle.name, "Google Docs, Sheets and Slides");
+  assert.deepEqual(bundle.workflows.map((w) => w.title), ["Weekly report as a Google Sheet", "Proposal slides", "Meeting notes doc"]);
+  const expected = { "weekly-report-sheet": ["sheet_create", "stripe"], "proposal-slides": ["slides_create", undefined], "meeting-notes-doc": ["doc_create", undefined] };
+  for (const workflow of bundle.workflows) {
+    const steps = buildWorkflow(bundle, workflow).steps;
+    assert.deepEqual(steps.map((s) => s.kind), ["trigger", "ai", "approve", "action"], workflow.id);
+    const [action, stripe] = expected[workflow.id];
+    assert.equal(steps[3].fields.action, action, workflow.id);
+    assert.equal(steps[3].fields.details, "{answer}", `${workflow.id}: the file carries the AI's lines`);
+    assert.equal(steps[3].fields.target, "");
+    assert.equal(parseAppAddress(steps[1].fields.address)?.app.id, stripe, `${workflow.id}: reads only what it should`);
+  }
+  assert.deepEqual(describeBundle(bundle).connections.map((c) => c.name), ["Stripe", "Google", "Google Sheets (create)", "Google Slides (create)", "Google Docs (create)"]);
+  assert.equal(buildWorkflow(bundle, bundle.workflows[1]).steps[1].fields.uses, "nothing", "the slide outline is written from the brief in the step: no app is read");
+  assert.equal(skillStart("sheet-create").steps.map((s) => s.kind).join(), "trigger,approve,action", "a Google file skill alone gets an approval step first");
 });
 
 test("describeBundle: tells the person what each skill reads and writes, the apps needed, and whether anything writes", () => {

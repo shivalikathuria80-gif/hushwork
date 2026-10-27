@@ -22,6 +22,71 @@
 //   example      (optional) the made-up value a TEMPLATE puts in the "where" box (a page id of zeros, your-name/your-repo). It is refused with a plain
 //                sentence until the person changes it, instead of being sent to the app.
 //   noDetails    (optional) true when the tool has no place for the "details" box: it is then never shown or sent
+//   preview      (optional) turns the checked words into one or two plain lines for the approval card ("12 rows will be written"), so what is
+//                built from the words (rows, slides) is read before it is made
+//   then         (optional) for a file that needs TWO calls (make it, then write into it): { tool, candidates, meaning(values, made), when(values), partial }.
+//                `made` = { id, link } found in the first answer. The second tool is looked at BEFORE the first call, so a mismatch makes nothing.
+//                If the file was made but the second call fails, the step is still recorded as done with `partial` and the reason, and nothing is retried.
+const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}$/;
+
+// ---- reading the plain words of a sheet or a presentation -------------------------------------------------------------------------------------------------
+// The person (or the AI step, through {answer}) writes ordinary lines; these turn them into the shapes the tools want. Both are cut to fixed sizes, and both are
+// used for the approval card too, so what is read there is what is made.
+const MAX_ROWS = 50;
+const MAX_COLUMNS = 10;
+const MAX_SLIDES = 12;
+const MAX_BULLETS = 10;
+
+// Rows of a sheet: one row per line, boxes separated by | (if the line has one) or by commas. Empty lines and Markdown table rulers (|---|---|) are skipped.
+// Returns { rows: [[box, ...], ...], columns, cut } where `columns` is the widest row and `cut` says something was left out.
+export function parseRows(text) {
+  const rows = [];
+  let cut = false;
+  for (const line of String(text ?? "").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || /^[\s|:+-]+$/.test(trimmed)) continue;
+    const boxes = (trimmed.includes("|") ? trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|") : trimmed.split(",")).map((box) => box.trim().slice(0, 200));
+    if (boxes.length > MAX_COLUMNS) cut = true;
+    if (rows.length >= MAX_ROWS) { cut = true; break; }
+    rows.push(boxes.slice(0, MAX_COLUMNS));
+  }
+  return { rows, columns: Math.max(0, ...rows.map((row) => row.length)), cut };
+}
+
+// Slides of a presentation: a line starting with "# " begins a slide, every other line is a bullet of the slide above it. Words before the first "# " (or an
+// outline with no "# " at all) go on a first slide named after the presentation. Returns { slides: [{ heading, bullets }], cut }.
+export function parseOutline(title, text) {
+  const slides = [];
+  let cut = false;
+  const heading = String(title ?? "").trim().slice(0, 100) || "Presentation";
+  for (const line of String(text ?? "").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const starts = trimmed.match(/^#+\s+(.*)$/);
+    if (starts) {
+      if (!starts[1].trim()) continue;
+      if (slides.length >= MAX_SLIDES) { cut = true; break; }
+      slides.push({ heading: starts[1].trim().slice(0, 100), bullets: [] });
+      continue;
+    }
+    if (!slides.length) slides.push({ heading, bullets: [] });
+    const bullet = trimmed.replace(/^[-*•]\s+/, "").slice(0, 200);
+    if (slides.at(-1).bullets.length < MAX_BULLETS) slides.at(-1).bullets.push(bullet);
+  }
+  if (!slides.length) slides.push({ heading, bullets: [] });
+  return { slides, cut };
+}
+
+// The Markdown the Slides tool takes: slides separated by ---, the first one a title slide. The words are made plain first (no pictures, quotes, rulers or
+// column markers), so nothing the AI wrote can pull in a web address or change the layout.
+const plainMarkdown = (text) => text.replace(/!\[/g, "[").replace(/\|\|\|/g, "|").replace(/^[>#]+\s*/, "").replace(/^-{3,}/, "").trim();
+export function outlineToMarkdown(title, text) {
+  return parseOutline(title, text).slides.map((slide, index) => {
+    const lines = slide.bullets.map(plainMarkdown).filter(Boolean).map((bullet) => (index === 0 ? bullet : `- ${bullet}`));
+    return [`# ${plainMarkdown(slide.heading) || "Slide"}`, ...lines].join("\n");
+  }).join("\n\n---\n\n");
+}
+
 export const COMPOSIO_ACTIONS = [
   {
     id: "slack_message", app: "slack", name: "Send a Slack message", tool: "SLACK_SEND_MESSAGE", needsTarget: true,
@@ -40,7 +105,7 @@ export const COMPOSIO_ACTIONS = [
   },
   {
     id: "gmail_send", app: "gmailsend", name: "Send an email (Gmail)", tool: "GMAIL_SEND_EMAIL", needsTarget: true, selfAllowed: true,
-    target: { pattern: /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}$/, hint: "Write the email address it goes to, for example name@example.com, or {myEmail} for your own address." },
+    target: { pattern: EMAIL_PATTERN, hint: "Write the email address it goes to, for example name@example.com, or {myEmail} for your own address." },
     candidates: { recipient_email: ["recipient_email", "to"], subject: ["subject"], body: ["body"] },
     meaning: (v) => ({ recipient_email: v.target, subject: v.title, body: v.details || v.title }),
     done: (v) => `Sent an email to ${v.target}`,
@@ -69,6 +134,60 @@ export const COMPOSIO_ACTIONS = [
     candidates: { content: ["content"], description: ["description"] },
     meaning: (v) => ({ content: v.title, description: v.details }),
     done: () => "Added a Todoist task",
+  },
+  {
+    // A DRAFT only: it lands in the person's Gmail Drafts and nothing is sent. Same boxes and the same {myEmail} rule as the email above.
+    id: "gmail_draft", app: "gmailsend", name: "Save an email as a Gmail draft", tool: "GMAIL_CREATE_EMAIL_DRAFT", needsTarget: true, selfAllowed: true,
+    target: { pattern: EMAIL_PATTERN, hint: "Write the email address the draft is for, for example name@example.com, or {myEmail} for your own address." },
+    candidates: { recipient_email: ["recipient_email", "to"], subject: ["subject"], body: ["body", "message_body"] },
+    meaning: (v) => ({ recipient_email: v.target, subject: v.title, body: v.details || v.title }),
+    done: (v) => `Saved a draft in your Gmail Drafts for ${v.target} (nothing was sent)`,
+    labels: { target: "To", title: "Subject", details: "Email text" },
+    preview: () => "It is only saved as a draft in your Gmail. Nothing is sent: you open the draft and send it yourself.",
+  },
+  {
+    // Two calls: make the spreadsheet, then write the rows into it. Every box is written as plain text ("RAW"), so a line such as =IMPORTXML(...) is never run as a formula.
+    id: "sheet_create", app: "gsheets", name: "Create a Google Sheet with rows", tool: "GOOGLESHEETS_CREATE_GOOGLE_SHEET1", needsTarget: false,
+    target: null,
+    candidates: { title: ["title"] },
+    meaning: (v) => ({ title: v.title }),
+    then: {
+      tool: "GOOGLESHEETS_VALUES_UPDATE",
+      candidates: { spreadsheet_id: ["spreadsheet_id", "spreadsheetId"], range: ["range"], values: ["values"], value_input_option: ["value_input_option", "valueInputOption"] },
+      meaning: (v, made) => ({ spreadsheet_id: made.id, range: "A1", values: parseRows(v.details).rows, value_input_option: "RAW" }),
+      when: (v) => parseRows(v.details).rows.length > 0,
+      partial: "The spreadsheet was created, but its rows may not have been added.",
+    },
+    done: () => "Created a Google Sheet",
+    labels: { title: "Spreadsheet name", details: "Rows (one per line)" },
+    preview: (v) => { const { rows, columns, cut } = parseRows(v.details); return `${rows.length} ${rows.length === 1 ? "row" : "rows"} of up to ${columns} ${columns === 1 ? "box" : "boxes"} will be written into one new spreadsheet, as plain text.${cut ? ` Rows after ${MAX_ROWS} and boxes after ${MAX_COLUMNS} are left out.` : ""}`; },
+  },
+  {
+    id: "slides_create", app: "gslides", name: "Create a Google Slides presentation", tool: "GOOGLESLIDES_CREATE_SLIDES_MARKDOWN", needsTarget: false,
+    target: null,
+    candidates: { title: ["title"], markdown_text: ["markdown_text", "markdown"] },
+    meaning: (v) => ({ title: v.title, markdown_text: outlineToMarkdown(v.title, v.details) }),
+    done: () => "Created a Google Slides presentation",
+    labels: { title: "Presentation title", details: "Outline (# starts a slide)" },
+    preview: (v) => { const { slides, cut } = parseOutline(v.title, v.details); return `${slides.length} ${slides.length === 1 ? "slide" : "slides"} will be made: ${slides.map((slide) => `"${slide.heading.slice(0, 40)}"`).join(", ")}.${cut ? ` Slides after ${MAX_SLIDES} are left out.` : ""}`; },
+  },
+  {
+    // Plain text on purpose (not the Markdown tool): Markdown could pull in pictures from web addresses the AI wrote.
+    id: "doc_create", app: "gdocs", name: "Create a Google Doc with text", tool: "GOOGLEDOCS_CREATE_DOCUMENT", needsTarget: false,
+    target: null,
+    candidates: { title: ["title"], text: ["text"] },
+    meaning: (v) => ({ title: v.title, text: v.details }),
+    done: () => "Created a Google Doc",
+    labels: { title: "Document name", details: "Text of the document" },
+  },
+  {
+    // "Where" is optional here: empty = the top of the person's Drive; otherwise the id of a folder that already exists (the long code at the end of its address).
+    id: "drive_folder_create", app: "gdrivewrite", name: "Create a Google Drive folder", tool: "GOOGLEDRIVE_CREATE_FOLDER", needsTarget: true, noDetails: true,
+    target: { pattern: /^(?:[A-Za-z0-9_-]{10,100})?$/, hint: "Leave empty for the top of your Drive, or write the id of the folder it goes into (the long code at the end of that folder's address).", empty: "the top of your Drive" },
+    candidates: { name: ["name"], parent_id: ["parent_id"] },
+    meaning: (v) => ({ name: v.title, parent_id: v.target }),
+    done: (v) => `Created a Google Drive folder${v.target ? " inside the folder you named" : ""}`,
+    labels: { target: "Inside folder (id)", title: "Folder name" },
   },
 ];
 
@@ -103,14 +222,15 @@ export function readToolInputs(body) {
 
 // The inputs to send: only what the tool really has, from the step's words. `values` = { target, title, details } (already checked and cut).
 // Returns { arguments } or { error } when a needed input has no home in the tool, or the tool needs something we do not fill in.
-export function buildArguments(action, values, { names, required }) {
-  const meant = action.meaning(values);
+// `action` may also be an action's `then` (its second call): it has the same `candidates` and `meaning`, and `made` ({ id, link } of the file the first call made) is handed to `meaning`.
+export function buildArguments(action, values, { names, required }, made = {}) {
+  const meant = action.meaning(values, made);
   const args = {};
   // some tools take the repository as one box "owner/name" instead of two
   const oneBox = action.id === "github_issue" && names.has("repo_name") && !names.has("repo");
   if (oneBox) args.repo_name = values.target;
   for (const [meaning, value] of Object.entries(meant)) {
-    if (typeof value !== "string" || value === "") continue; // an empty optional word is simply not sent
+    if (typeof value === "string" ? value === "" : !Array.isArray(value) || value.length === 0) continue; // an empty optional word is simply not sent (a list, such as the rows of a sheet, is sent as it is)
     if (oneBox && (meaning === "owner" || meaning === "repo")) continue;
     const name = action.candidates[meaning]?.find((candidate) => names.has(candidate));
     if (!name) return { error: "no input for " + meaning };

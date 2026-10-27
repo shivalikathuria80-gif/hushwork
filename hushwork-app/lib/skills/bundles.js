@@ -113,6 +113,25 @@ export const SKILLS = [
   skill("linear-task", "Create a Linear task", "ListTodo", "Adds ONE new task in Linear from what the last AI step said (for example a Reply to: line).",
     { writes: "Creates one new Linear task. It cannot change or delete existing tasks. It waits for your Approve click.", needs: ["linear"], alone: { title: "A task to do", details: "" } },
     step("issue", { title: "{answer}", details: "Made by Hushwork from your latest emails.", team: "" })),
+  // Google files: the AI skill writes the rows, the outline or the notes as plain lines, and the writing skill after it makes ONE new file from them
+  skill("stripe-payment-rows", "Write payments as sheet rows", "FileBarChart", "Reads your latest Stripe payments and writes them as rows for a sheet: date, customer, amount and status, one payment per line.",
+    { reads: "Your latest Stripe payments (read only).", needs: ["stripe"] },
+    step("ai", { task: "First line: Date | Customer | Amount | Status. Then my latest payments, one per line, up to 15.", uses: "app", address: "stripe" })),
+  skill("sheet-create", "Create a Google Sheet", "FileBarChart", "Makes ONE new spreadsheet in your Google Drive and fills it with the rows of the AI step before it (one row per line, boxes separated by |).",
+    { writes: "Creates one new Google Sheet with the rows you read on the approval card, written as plain text. It cannot change or delete existing sheets. It waits for your Approve click.", needs: ["gsheets"], alone: { title: "My spreadsheet", details: "Name | Amount" } },
+    step("action", { action: "sheet_create", target: "", title: "My spreadsheet", details: "{answer}" })),
+  skill("slides-outline", "Write a slide outline", "Sparkles", "Writes a short slide outline from the brief you type in the step: a line starting with # for each slide, then its bullets. Change the brief in the step first.",
+    { reads: "Nothing from your apps: the AI only writes." },
+    step("ai", { task: "Brief: [write your brief here]. Write a 5-slide outline: a # title line, then 2 bullet lines, per slide.", uses: "nothing", address: "" })),
+  skill("slides-create", "Create Google Slides", "FileText", "Makes ONE new presentation in your Google Drive from the outline of the AI step before it: a slide for each line starting with #.",
+    { writes: "Creates one new Google Slides presentation with the slides you read on the approval card. It cannot change or delete existing presentations. It waits for your Approve click.", needs: ["gslides"], alone: { title: "My presentation", details: "# My first slide" } },
+    step("action", { action: "slides_create", target: "", title: "My presentation", details: "{answer}" })),
+  skill("calendar-meeting-notes", "Draft notes for today's meetings", "Calendar", "Reads today's meetings in your calendar and writes a notes page for them: a heading for each meeting with a goal, notes and actions.",
+    { reads: "Your Google Calendar (read only).", needs: ["google"] },
+    step("ai", { task: "For each of today's meetings write: its title and time, then Goal:, Notes: and Actions: lines to fill in.", uses: "calendar", address: "" })),
+  skill("doc-create", "Create a Google Doc", "FileText", "Makes ONE new document in your Google Drive with the text of the AI step before it.",
+    { writes: "Creates one new Google Doc with the text you read on the approval card. It cannot change or delete existing documents. It waits for your Approve click.", needs: ["gdocs"], alone: { title: "My document", details: "Write the text of the document here." } },
+    step("action", { action: "doc_create", target: "", title: "My document", details: "{answer}" })),
 ];
 
 // ---- the bundles -----------------------------------------------------------------------------------------------------------------------------------------
@@ -254,6 +273,32 @@ export const BUNDLES = [
         request: "Every day at 17:00, check my GitHub notifications and tell me only when something new needs action. Ask me before anything is sent.",
         start: { how: "watch", when: "Every day at 17:00" }, schedule: { frequency: "daily", weekday: 1, hour: 17, minute: 0 },
         flow: ["watch-github", "ask-approval", ["email-me", { title: "New on GitHub", details: "{answer}" }]],
+      },
+    ],
+  },
+  {
+    id: "google-creator", name: "Google Docs, Sheets and Slides", icon: "FileText",
+    blurb: "Turn what the AI finds or writes into a real Google Sheet, Slides deck or Doc, after you read it and say yes.",
+    connections: ["stripe", "google", "gsheets", "gslides", "gdocs"],
+    skills: ["stripe-payment-rows", "slides-outline", "calendar-meeting-notes", "ask-approval", "sheet-create", "slides-create", "doc-create"],
+    workflows: [
+      {
+        id: "weekly-report-sheet", title: "Weekly report as a Google Sheet", body: "Every Friday afternoon: writes your latest Stripe payments as rows and, after you approve, makes a new Google Sheet with them in your Drive.",
+        request: "Every Friday at 16:00, write my latest Stripe payments as rows and make a new Google Sheet from them. Ask me before it is created.",
+        start: { how: "schedule", when: "Every Friday at 16:00" }, schedule: { frequency: "weekly", weekday: 5, hour: 16, minute: 0 },
+        flow: ["stripe-payment-rows", "ask-approval", ["sheet-create", { title: "Weekly payments report" }]],
+      },
+      {
+        id: "proposal-slides", title: "Proposal slides", body: "When you ask: writes a 5-slide outline from your short brief and, after you approve, makes a new Google Slides presentation. First write your brief in the Ask the AI step in the Builder.",
+        request: "When I ask, write a slide outline from my short brief and make a new Google Slides presentation from it. Ask me before it is created.",
+        start: { how: "manual", when: "" },
+        flow: ["slides-outline", "ask-approval", ["slides-create", { title: "Proposal" }]],
+      },
+      {
+        id: "meeting-notes-doc", title: "Meeting notes doc", body: "Every weekday morning: reads today's meetings and, after you approve, makes a new Google Doc with a notes section for each one.",
+        request: "Every weekday at 8:00, read today's meetings and make a new Google Doc with notes for each. Ask me before it is created.",
+        start: { how: "schedule", when: "Every weekday at 8:00" }, schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 0 },
+        flow: ["calendar-meeting-notes", "ask-approval", ["doc-create", { title: "Meeting notes" }]],
       },
     ],
   },

@@ -65,6 +65,7 @@ In the **Builder** each step has a card: **Why** it is there and **Evidence** (P
 - **Slack:** write `slackmessages:channelname` in an Ask the AI step set to Another app.
 - **Email several people** (Builder, left side): one email step for each address you type.
 - **Watch mode:** turn on the *Watch for me* bundle on the Skills page, or set a Start step to *Keep watching*. It checks on a schedule, stays quiet unless something is new, never emails you at night, at most 3 times a day, and never does anything without your Approve.
+- **Google files and a Gmail draft:** on Connections press Connect for Google Sheets (create), Docs (create), Slides (create) and Drive (folders), then turn on the bundle *Google Docs, Sheets and Slides*. After you approve, a new Sheet, Slides deck or Doc appears in your Drive, with its link on the Runs page. *Save an email as a Gmail draft* only saves a draft; nothing is sent.
 
 ## 10. If something goes wrong
 

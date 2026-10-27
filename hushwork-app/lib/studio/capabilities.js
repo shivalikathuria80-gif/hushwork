@@ -55,7 +55,7 @@ const OUTPUT = {
   request: "The start of the web page's answer.",
   issue: "One new task in Linear.",
   row: "One new row in your Google Sheet.",
-  action: "One real thing in another app (an email, a message, an issue, an event or a page).",
+  action: "One real thing in another app (an email or draft, a message, an issue, an event, a page, a Google file or a folder).",
 };
 
 const FAIL_READ = "If it fails, the run stops here and the Runs page says why. “Continue from where it stopped” picks up from this step, and steps already done are not repeated.";

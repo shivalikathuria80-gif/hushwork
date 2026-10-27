@@ -43,7 +43,8 @@ test("the instructions: the safety rules stay word for word, and the REAL blocks
   assert.ok(SYSTEM_PROMPT.includes("Never add a separate find, look-up, draft or write step: they do nothing, and ai does the job."), "the AI is told to use Ask the AI to look, find, sum up and write");
   for (const app of ["todoist", "notion", "airtable", "hubspot", "jira", "github", "sentry", "pagerduty", "slack", "stripe", "mailchimp", "googletasks", "trello"]) assert.ok(SYSTEM_PROMPT.includes(app), `ai can look in ${app}`);
   for (const app of ["xero", "vercel", "cloudflare", "gmailsend", "gcalwrite"]) assert.ok(!SYSTEM_PROMPT.includes(app), `${app} is not offered`);
-  for (const id of ["gmail_send", "slack_message", "github_issue", "calendar_event", "notion_page", "todoist_task"]) assert.ok(SYSTEM_PROMPT.includes(id), `action ${id} is taught`);
+  for (const id of ["gmail_send", "slack_message", "github_issue", "calendar_event", "notion_page", "todoist_task", "gmail_draft", "sheet_create", "slides_create", "doc_create", "drive_folder_create"]) assert.ok(SYSTEM_PROMPT.includes(id), `action ${id} is taught`);
+  for (const app of ["gsheets", "gdocs", "gslides", "gdrivewrite"]) assert.ok(!SYSTEM_PROMPT.includes(app), `${app} is not offered as a place to look`);
   assert.ok(SYSTEM_PROMPT.includes("{myEmail}") && /send to me, my account, myself or my email/.test(SYSTEM_PROMPT), "'send to me' becomes an email to the person's own address");
   assert.ok(!SYSTEM_PROMPT.includes("plan-only"), "no block that only describes is taught");
   assert.ok(!/[\u{2013}\u{2014}]/u.test(SYSTEM_PROMPT), "no dashes that read like an AI wrote them");
@@ -314,6 +315,16 @@ test("an AI that picks the real action block gets a REAL email to the person's o
   }
   const run = practiceRun(finishSteps({ steps: [{ icon: "Mail", title: "Email yourself", detail: "Hi", block: "action", choice: "gmail_send", a: "me", b: "Hi" }] }));
   assert.equal(run.status, "done");
+});
+
+test("a Gmail DRAFT chosen by the AI stays a draft (the 'send to me' safety net never turns it into a real send), 'me' means the person's own address, and the AI cannot look in the apps that only create files", () => {
+  const steps = finishSteps({ steps: [{ icon: "Mail", title: "Save a draft", detail: "x", block: "action", choice: "gmail_draft", a: "me", b: "Hello" }] }, undefined, "Save an email draft to me every Monday");
+  const actions = steps.filter((step) => step.kind === "action");
+  assert.deepEqual(actions.map((step) => step.fields.action), ["gmail_draft"], "no gmail_send was added");
+  assert.equal(actions[0].fields.target, "{myEmail}");
+  for (const app of ["gsheets", "gdocs", "gslides", "gdrivewrite"]) assert.deepEqual(AI_BLOCKS.ai(app, "Look").fields, { task: "Look", uses: "nothing", address: "" }, app);
+  const file = finishSteps({ steps: [{ icon: "FileText", title: "Make a sheet", detail: "{answer}", block: "action", choice: "sheet_create", a: "", b: "Weekly report" }] }).find((step) => step.kind === "action");
+  assert.deepEqual(file.fields, { action: "sheet_create", target: "", title: "Weekly report", details: "{answer}" });
 });
 
 test("an AI that picks the plan-only send, or only writes plain notes, is corrected: the task says send to me, so a real email replaces it", async () => {

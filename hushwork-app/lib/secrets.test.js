@@ -308,10 +308,11 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/skills/connection-status.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
-  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${tool}", "/tools/execute/${action.tool}"], "the tools that run are the lookups in the apps list and the actions in the actions list");
+  assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${tool}", "/tools/execute/${action.tool}", "/tools/execute/${second.tool}"], "the tools that run are the lookups in the apps list and the actions in the actions list (and the second call of an action that needs two, written in that same action's entry)");
+  assert.ok(client.includes("const second = action.then?.when(values) ? action.then : null;"), "the second tool can only be the one written in the action's own `then`");
   assert.deepEqual([...client.matchAll(/execute\((\w+\.tool), /g)].map((match) => match[1]), ["slack.tool", "app.tool"], "reading a Slack channel runs only the Slack channel list and the messages lookup, both from the apps list");
   assert.ok(client.includes("arguments: {}"), "always called with nothing to fill in");
-  assert.ok(client.includes("restrict_to_following_tools: allowed") && client.includes("COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).map((action) => action.tool)])"), "the sign-in is limited to the lookups plus the listed actions at Composio too");
+  assert.ok(client.includes("restrict_to_following_tools: allowed") && client.includes("COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).flatMap((action) => [action.tool, action.then?.tool])]).filter(Boolean)"), "the sign-in is limited to the lookups plus the listed actions at Composio too");
   assert.deepEqual(files.filter((file) => /backend\.composio\.dev/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md"), ["lib/connectors/composio.js"]);
   const action = files.find((file) => file.name === "lib/run-core.js").text;
   const body = action.slice(action.indexOf("export async function approveAppLookup"));

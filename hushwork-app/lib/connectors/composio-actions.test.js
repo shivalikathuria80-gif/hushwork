@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { COMPOSIO_ACTIONS, buildArguments, checkTarget, findAction, readToolInputs, actionsForApp } from "./composio-actions.js";
+import { COMPOSIO_ACTIONS, buildArguments, checkTarget, findAction, readToolInputs, actionsForApp, parseRows, parseOutline, outlineToMarkdown } from "./composio-actions.js";
 import { COMPOSIO_APPS, findComposioApp } from "./composio-apps.js";
-import { runActionTool, allowedTools, ensureAuthConfig, COMPOSIO_FAILED } from "./composio.js";
+import { runActionTool, allowedTools, ensureAuthConfig, findCreated, COMPOSIO_FAILED } from "./composio.js";
 
 const sentence = (result) => ({ ok: result.ok, error: result.error });
 const json = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
@@ -100,7 +100,7 @@ test("an email: the address, subject and text go to the tool's own boxes, and th
   const inputs = readToolInputs({ input_parameters: { recipient_email: { required: true }, subject: {}, body: { required: true }, cc: {} } });
   assert.deepEqual(buildArguments(email, { target: "a@b.co", title: "Greetings", details: "Dear Arjun" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Greetings", body: "Dear Arjun" });
   assert.deepEqual(buildArguments(email, { target: "a@b.co", title: "Greetings", details: "" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Greetings", body: "Greetings" });
-  assert.deepEqual(allowedTools(findComposioApp("gmailsend")), ["GMAIL_LIST_LABELS", "GMAIL_SEND_EMAIL"]);
+  assert.deepEqual(allowedTools(findComposioApp("gmailsend")), ["GMAIL_LIST_LABELS", "GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT"]);
 });
 
 test("doing an action: the tool's inputs are asked for first, then ONE request with exactly the built inputs for this person; nothing else is ever sent", async () => {
@@ -236,4 +236,197 @@ test("Slack messages: the channel name is looked up in the person's own channel 
   const refused = await runChannelMessages({ key: "ak_k", userId: "u1", app, channel: "C0123ABCD", fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ successful: false, error: "missing_scope: channels:history" }), text: async () => "" }) });
   assert.equal(refused.ok, false);
   assert.ok(refused.error.length > 20);
+});
+
+
+// ---- Google files and a Gmail draft (sheet, slides, doc, folder), all through the same list ----
+const SHEET_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdef";
+const SHEET_LINK = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+const SHEET_MADE = { successful: true, data: { response_data: { spreadsheetId: SHEET_ID, spreadsheetUrl: SHEET_LINK } } };
+const SHEET_FIRST = { input_parameters: { title: {}, folder_id: {} } };
+const SHEET_SECOND = { input_parameters: { spreadsheet_id: { required: true }, range: { required: true }, values: { required: true }, value_input_option: { required: true }, major_dimension: {} } };
+
+// A pretend Composio that knows several tools: `tools` maps a slug to { described, answer }; every request is remembered.
+function pretendTools(tools) {
+  const sent = [];
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname.replace("/api/v3.1", "");
+    sent.push({ method: init.method, path, body: init.body ? JSON.parse(init.body) : undefined });
+    const described = path.match(/^\/tools\/([A-Z0-9_]+)$/);
+    if (described) return tools[described[1]] ? json(tools[described[1]].described) : json({}, 404);
+    const slug = path.match(/^\/tools\/execute\/([A-Z0-9_]+)$/)?.[1];
+    const answer = tools[slug]?.answer;
+    if (answer === "drop") throw new TypeError("fetch failed");
+    return json(answer ?? { successful: true, data: {} });
+  };
+  return { fetchImpl, sent, runs: () => sent.filter((entry) => entry.method === "POST").map((entry) => entry.path.replace("/tools/execute/", "")) };
+}
+
+test("the rows of a sheet: one row per line, boxes split on | or commas, rulers and empty lines skipped, and cut to 50 rows x 10 boxes x 200 characters", () => {
+  assert.deepEqual(parseRows("Name | Amount\nAna | 10\n\nBen | 20"), { rows: [["Name", "Amount"], ["Ana", "10"], ["Ben", "20"]], columns: 2, cut: false });
+  assert.deepEqual(parseRows("a, b, c\nd,e").rows, [["a", "b", "c"], ["d", "e"]], "commas when a line has no |");
+  assert.deepEqual(parseRows("| Name | Amount |\n|---|:---:|\n| Ana | 10 |").rows, [["Name", "Amount"], ["Ana", "10"]], "a Markdown table works and its ruler is not a row");
+  assert.deepEqual(parseRows("a | b, c").rows, [["a", "b, c"]], "a | on the line wins over commas");
+  for (const none of ["", "  \n \n", null, undefined, "---"]) assert.deepEqual(parseRows(none).rows, [], String(none));
+  const big = parseRows(Array.from({ length: 80 }, (_, row) => Array.from({ length: 14 }, (__, box) => `r${row}b${box}`).join("|")).join("\n"));
+  assert.equal(big.rows.length, 50);
+  assert.equal(big.columns, 10);
+  assert.equal(big.cut, true);
+  assert.equal(parseRows("x".repeat(500)).rows[0][0].length, 200);
+  assert.equal(parseRows(Array.from({ length: 50 }, () => "a|b").join("\n")).cut, false, "exactly 50 rows is not cut");
+  assert.equal(findAction("sheet_create").preview({ details: "a|b\nc|d" }), "2 rows of up to 2 boxes will be written into one new spreadsheet, as plain text.");
+  assert.match(findAction("sheet_create").preview({ details: Array.from({ length: 60 }, () => "a").join("\n") }), /Rows after 50 and boxes after 10 are left out/);
+});
+
+test("the slides of a presentation: a '# ' line starts a slide, other lines are its bullets, up to 12 slides; the Markdown holds no picture, quote or ruler from the words", () => {
+  const parsed = parseOutline("Pitch", "# Why\n- Fast\n* Cheap\n• Safe\n# Price\nFrom 10 dollars");
+  assert.deepEqual(parsed, { slides: [{ heading: "Why", bullets: ["Fast", "Cheap", "Safe"] }, { heading: "Price", bullets: ["From 10 dollars"] }], cut: false });
+  assert.deepEqual(parseOutline("Pitch", "Just words").slides, [{ heading: "Pitch", bullets: ["Just words"] }], "words before any # go on a first slide named after the presentation");
+  assert.deepEqual(parseOutline("Pitch", "").slides, [{ heading: "Pitch", bullets: [] }], "an empty outline is still one title slide");
+  const many = parseOutline("Deck", Array.from({ length: 20 }, (_, n) => `# Slide ${n}\n- a`).join("\n"));
+  assert.equal(many.slides.length, 12);
+  assert.equal(many.cut, true);
+  assert.equal(parseOutline("Deck", "# S\n" + Array.from({ length: 30 }, (_, n) => `- b${n}`).join("\n")).slides[0].bullets.length, 10);
+  assert.equal(outlineToMarkdown("Pitch", "# Why\n- Fast\n- Cheap\n# Price\n- Low"), "# Why\nFast\nCheap\n\n---\n\n# Price\n- Low", "the first slide is the title slide, the others have bullets");
+  const sneaky = outlineToMarkdown("Deck", "# Hello\n# ![x](https://evil.example/a.png)\n- ![pic](https://evil.example/b.png)\n- ---\n- > quote |||");
+  assert.ok(!sneaky.includes("!["), "no picture can be pulled in");
+  assert.equal(sneaky.split("\n\n---\n\n").length, 2, "only our own separators make slides");
+  assert.match(findAction("slides_create").preview({ title: "Pitch", details: "# Why\n- a\n# Price\n- b" }), /^2 slides will be made: "Why", "Price"\.$/);
+});
+
+test("a Gmail draft: the same boxes as an email, {myEmail} allowed, and its own tool (which creates a draft and cannot send)", () => {
+  const draft = findAction("gmail_draft");
+  assert.equal(draft.tool, "GMAIL_CREATE_EMAIL_DRAFT");
+  assert.equal(draft.app, "gmailsend", "it uses the Gmail (send) sign-in");
+  assert.deepEqual(checkTarget(draft, "{myEmail}"), { value: "{myEmail}" });
+  assert.deepEqual(checkTarget(draft, "a@b.co"), { value: "a@b.co" });
+  for (const bad of ["", "arjun", "a@b", "a@c.com\nbcc:x@y.com"]) assert.ok(checkTarget(draft, bad).error, bad);
+  const inputs = readToolInputs({ input_parameters: { recipient_email: {}, subject: {}, body: {}, is_html: {}, cc: {} } });
+  assert.deepEqual(buildArguments(draft, { target: "a@b.co", title: "Hello", details: "Dear Ana" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Hello", body: "Dear Ana" });
+  assert.deepEqual(buildArguments(draft, { target: "a@b.co", title: "Hello", details: "" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Hello", body: "Hello" });
+  assert.match(draft.done({ target: "a@b.co" }), /nothing was sent/);
+  assert.ok(!allowedTools(findComposioApp("gmailsend")).some((tool) => /SEND_DRAFT|REPLY/.test(tool)), "nothing that sends a draft is allowed");
+});
+
+test("a Google Doc and a Drive folder: one call each, the words go to the tool's own boxes, the folder's parent is optional and plain", () => {
+  const doc = findAction("doc_create");
+  assert.deepEqual(buildArguments(doc, { target: "", title: "Notes", details: "Line one\nLine two" }, readToolInputs({ input_parameters: { title: { required: true }, text: {} } })).arguments, { title: "Notes", text: "Line one\nLine two" });
+  assert.deepEqual(buildArguments(doc, { target: "", title: "Notes", details: "" }, readToolInputs({ input_parameters: { title: { required: true }, text: {} } })).arguments, { title: "Notes" }, "no text: an empty document with the name");
+  assert.ok(buildArguments(doc, { target: "", title: "Notes", details: "x" }, readToolInputs({ input_parameters: { title: { required: true } } })).error, "no place for the text: nothing is sent");
+  assert.equal(doc.then, undefined);
+  assert.equal(checkTarget(doc, "").value, "");
+  assert.ok(checkTarget(doc, "somewhere").error, "a doc has no place to type");
+
+  const folder = findAction("drive_folder_create");
+  assert.deepEqual(checkTarget(folder, ""), { value: "" }, "empty = the top of the Drive");
+  assert.deepEqual(checkTarget(folder, "1AbCdEfGhIjKlMnOp"), { value: "1AbCdEfGhIjKlMnOp" });
+  for (const bad of ["short", "has space in it 12345", "../../etc/passwd", "https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOp", "1AbCdEfGhIjKlMnOp\nx"]) assert.ok(checkTarget(folder, bad).error, bad);
+  const inputs = readToolInputs({ input_parameters: { name: { required: true }, parent_id: {} } });
+  assert.deepEqual(buildArguments(folder, { target: "", title: "Invoices 2026", details: "" }, inputs).arguments, { name: "Invoices 2026" });
+  assert.deepEqual(buildArguments(folder, { target: "1AbCdEfGhIjKlMnOp", title: "Invoices 2026", details: "" }, inputs).arguments, { name: "Invoices 2026", parent_id: "1AbCdEfGhIjKlMnOp" });
+  assert.equal(folder.noDetails, true);
+});
+
+test("a Google Sheet and a presentation: the arguments of the first call, and of the sheet's second call (rows as plain text from A1)", () => {
+  const sheet = findAction("sheet_create");
+  const values = { target: "", title: "Weekly report", details: "Name | Amount\nAna | 10" };
+  assert.deepEqual(buildArguments(sheet, values, readToolInputs(SHEET_FIRST)).arguments, { title: "Weekly report" });
+  const second = buildArguments(sheet.then, values, readToolInputs(SHEET_SECOND), { id: SHEET_ID });
+  assert.deepEqual(second.arguments, { spreadsheet_id: SHEET_ID, range: "A1", values: [["Name", "Amount"], ["Ana", "10"]], value_input_option: "RAW" });
+  assert.equal(sheet.then.when(values), true);
+  assert.equal(sheet.then.when({ ...values, details: "" }), false, "no rows: only the empty spreadsheet is made");
+  assert.ok(buildArguments(sheet.then, values, readToolInputs({ input_parameters: { ...SHEET_SECOND.input_parameters, owner_token: { required: true } } }), { id: SHEET_ID }).error, "an input we do not fill in is required: nothing is sent");
+  assert.ok(buildArguments(sheet.then, values, readToolInputs(SHEET_SECOND), {}).error, "without the new file's id the second call cannot be built");
+  assert.deepEqual(allowedTools(findComposioApp("gsheets")), ["GOOGLESHEETS_SEARCH_SPREADSHEETS", "GOOGLESHEETS_CREATE_GOOGLE_SHEET1", "GOOGLESHEETS_VALUES_UPDATE"], "the second tool is allowed at Composio too");
+
+  const slides = findAction("slides_create");
+  assert.deepEqual(buildArguments(slides, { target: "", title: "Pitch", details: "# Why\n- Fast" }, readToolInputs({ input_parameters: { title: { required: true }, markdown_text: { required: true } } })).arguments, { title: "Pitch", markdown_text: "# Why\nFast" });
+  assert.deepEqual(buildArguments(slides, { target: "", title: "Pitch", details: "" }, readToolInputs({ input_parameters: { title: { required: true }, markdown_text: { required: true } } })).arguments, { title: "Pitch", markdown_text: "# Pitch" }, "even an empty outline gives a title slide");
+  assert.deepEqual(allowedTools(findComposioApp("gslides")), ["GOOGLESLIDES_CREATE_SLIDES_MARKDOWN"], "Google Slides has no lookup: only its create tool is allowed");
+  assert.deepEqual(allowedTools(findComposioApp("gdocs")), ["GOOGLEDOCS_SEARCH_DOCUMENTS", "GOOGLEDOCS_CREATE_DOCUMENT"]);
+  assert.deepEqual(allowedTools(findComposioApp("gdrivewrite")), ["GOOGLEDRIVE_GET_ABOUT", "GOOGLEDRIVE_CREATE_FOLDER"]);
+});
+
+test("the made file's id and address are found in differently shaped answers, and only a docs.google.com or drive.google.com address is ever kept", () => {
+  assert.deepEqual(findCreated(SHEET_MADE.data), { id: SHEET_ID, link: SHEET_LINK });
+  assert.deepEqual(findCreated({ spreadsheet_id: SHEET_ID }), { id: SHEET_ID, link: "" });
+  assert.deepEqual(findCreated({ webViewLink: "https://drive.google.com/drive/folders/" + SHEET_ID + "." }), { id: SHEET_ID, link: "https://drive.google.com/drive/folders/" + SHEET_ID }, "the id comes from the address when nothing else has it; a trailing dot is dropped");
+  assert.deepEqual(findCreated({ documentId: SHEET_ID, note: `Open it at ${"https://docs.google.com/document/d/" + SHEET_ID + "/edit"} now` }).link, "https://docs.google.com/document/d/" + SHEET_ID + "/edit", "an address inside a sentence");
+  for (const evil of ["https://evil.example/https", "https://docs.google.com.evil.example/x", "https://docs.google.com@evil.example/x", "http://docs.google.com/x", "javascript:alert(1)", "https://drive.google.com.evil.example/", "ftp://docs.google.com/x"]) assert.equal(findCreated({ url: evil }).link, "", evil);
+  for (const nothing of [null, undefined, "text", 5, [], {}]) assert.deepEqual(findCreated(nothing), { id: "", link: "" }, String(nothing));
+  assert.equal(findCreated({ id: "short" }).id, "", "an id must look like a Google file id");
+});
+
+test("a sheet takes TWO calls: the tools are looked at first, the sheet is made, then the rows are written into it, and the answer carries the link", async () => {
+  const pretend = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: SHEET_MADE }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND } });
+  const result = await runActionTool({ key: "k", userId: "u-1", action: findAction("sheet_create"), values: { target: "", title: "Weekly report", details: "Name | Amount\nAna | 10" }, fetchImpl: pretend.fetchImpl });
+  assert.equal(result.ok, true);
+  assert.equal(result.link, SHEET_LINK);
+  assert.equal(result.note, undefined);
+  assert.deepEqual(pretend.sent.map((entry) => `${entry.method} ${entry.path}`), [
+    "GET /tools/GOOGLESHEETS_CREATE_GOOGLE_SHEET1", "GET /tools/GOOGLESHEETS_VALUES_UPDATE", "POST /tools/execute/GOOGLESHEETS_CREATE_GOOGLE_SHEET1", "POST /tools/execute/GOOGLESHEETS_VALUES_UPDATE",
+  ]);
+  assert.deepEqual(pretend.sent[2].body, { user_id: "u-1", arguments: { title: "Weekly report" } });
+  assert.deepEqual(pretend.sent[3].body, { user_id: "u-1", arguments: { spreadsheet_id: SHEET_ID, range: "A1", values: [["Name", "Amount"], ["Ana", "10"]], value_input_option: "RAW" } });
+});
+
+test("a sheet with no rows is only the empty spreadsheet (one call); a sheet whose second tool does not fit makes NOTHING", async () => {
+  const empty = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: SHEET_MADE } });
+  assert.equal((await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "Empty", details: "" }, fetchImpl: empty.fetchImpl })).ok, true);
+  assert.deepEqual(empty.runs(), ["GOOGLESHEETS_CREATE_GOOGLE_SHEET1"]);
+
+  const odd = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: SHEET_MADE }, GOOGLESHEETS_VALUES_UPDATE: { described: { input_parameters: { spreadsheet_id: { required: true }, cells: { required: true } } } } });
+  assert.deepEqual(await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: odd.fetchImpl }), { ok: false, error: COMPOSIO_FAILED.cannotFill });
+  assert.deepEqual(odd.runs(), [], "the second tool does not fit, so the spreadsheet was not even created");
+
+  const missing = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: SHEET_MADE } });
+  const gone = await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: missing.fetchImpl });
+  assert.equal(gone.ok, false);
+  assert.deepEqual(missing.runs(), [], "an unknown second tool also creates nothing");
+});
+
+test("a sheet that was made but could not be filled is told honestly: ok with a note and the link, never retried, never a second sheet", async () => {
+  const wrong = { successful: false, error: "Forbidden: insufficient permissions" };
+  for (const [answer, why] of [[wrong, /not allowed to do that/], ["drop", /Could not reach Composio/], [{ successful: true, data: {} }, null]]) {
+    const pretend = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: SHEET_MADE }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND, answer } });
+    const result = await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: pretend.fetchImpl });
+    assert.equal(result.ok, true, "the file exists, so this is not a failure");
+    assert.equal(result.link, SHEET_LINK);
+    assert.deepEqual(pretend.runs(), ["GOOGLESHEETS_CREATE_GOOGLE_SHEET1", "GOOGLESHEETS_VALUES_UPDATE"], "one sheet, one try at the rows");
+    if (why) {
+      assert.match(result.note, /^The spreadsheet was created, but its rows may not have been added\./);
+      assert.match(result.note, why);
+      assert.match(result.note, /will not try again by itself/);
+    } else assert.equal(result.note, undefined);
+  }
+  // the first answer holds no id: the sheet exists but nothing can be written into it
+  const noId = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: { successful: true, data: { ok: true } } }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND } });
+  const lost = await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: noId.fetchImpl });
+  assert.equal(lost.ok, true);
+  assert.match(lost.note, /could not find the new file's id/);
+  assert.deepEqual(noId.runs(), ["GOOGLESHEETS_CREATE_GOOGLE_SHEET1"]);
+  // the FIRST call failing is an ordinary failure (nothing was made)
+  const refused = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: wrong }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND } });
+  assert.equal((await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: refused.fetchImpl })).ok, false);
+  assert.deepEqual(refused.runs(), ["GOOGLESHEETS_CREATE_GOOGLE_SHEET1"], "the rows are not written when the sheet was not made");
+});
+
+test("test all my connections checks BOTH tools of a two-call action, and an app with no lookup is not asked to look anything up", async () => {
+  const { checkActionFits, checkComposioConnections } = await import("./composio.js");
+  const good = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND } });
+  assert.deepEqual(await checkActionFits({ key: "k", action: findAction("sheet_create"), sample: { target: "", title: "Test", details: "Test" }, fetchImpl: good.fetchImpl }), { ok: true });
+  const bad = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST }, GOOGLESHEETS_VALUES_UPDATE: { described: { input_parameters: { spreadsheet_id: { required: true } } } } });
+  assert.equal((await checkActionFits({ key: "k", action: findAction("sheet_create"), sample: { target: "", title: "Test", details: "Test" }, fetchImpl: bad.fetchImpl })).ok, false);
+  assert.equal(good.sent.filter((entry) => entry.method === "POST").length, 0, "nothing is ever run by the check");
+
+  const slidesOnly = pretendTools({ GOOGLESLIDES_CREATE_SLIDES_MARKDOWN: { described: { input_parameters: { title: { required: true }, markdown_text: { required: true } } } } });
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path.endsWith("/connected_accounts")) return json({ items: [{ id: "ca_1", toolkit: { slug: "googleslides" } }] });
+    return slidesOnly.fetchImpl(url, init);
+  };
+  const rows = await checkComposioConnections({ key: "k", userId: "u", fetchImpl });
+  assert.deepEqual(rows.rows.map((row) => [row.name, row.ok]), [["Google Slides (create)", true]]);
+  assert.deepEqual(rows.rows[0].actions.map((action) => action.ok), [true]);
+  assert.deepEqual(slidesOnly.runs(), [], "no tool was run: Google Slides has no lookup and the action is only checked");
 });

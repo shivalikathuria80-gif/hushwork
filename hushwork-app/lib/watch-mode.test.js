@@ -506,7 +506,7 @@ test("the Start step offers 'Keep watching', and it passes the normal checks lik
 test("bundle 'Watch for me': three ready-made watch workflows, each Start watch + one quiet-able check + the stop sign + an email that carries {answer}", () => {
   const bundle = findBundle("watchers");
   assert.equal(bundle.name, "Watch for me");
-  assert.equal(BUNDLES.at(-1).id, "watchers", "added at the end of the list");
+  assert.ok(BUNDLES.some((b) => b.id === "watchers"), "the Watch for me bundle is in the list");
   assert.deepEqual(bundle.workflows.map((w) => w.title), ["Overdue invoice watch", "Unhappy email watch", "GitHub watch"]);
   const expected = { "overdue-invoice-watch": ["app", "stripeinvoices", "Every weekday at 9:00"], "unhappy-email-watch": ["gmailtext", "", "Every weekday at 8:30"], "github-watch": ["app", "github", "Every day at 17:00"] };
   for (const workflow of bundle.workflows) {

@@ -66,7 +66,7 @@ export const linearCreateSummary = (step, answer = "") => {
 
 // A "Look in another app" step can be approved on the Runs page: Hushwork then asks Composio to read one fixed thing from the app
 // (its list entry in lib/connectors/composio-apps.js). Read-only.
-export const isAppLookup = (step) => step?.kind === "app" && Boolean(findComposioApp(step?.fields?.app)) && !findComposioApp(step.fields.app).input; // a lookup that needs a typed channel is only used inside an Ask the AI step
+export const isAppLookup = (step) => step?.kind === "app" && Boolean(findComposioApp(step?.fields?.app)) && !findComposioApp(step.fields.app).input && !findComposioApp(step.fields.app).noLookup; // a lookup that needs a typed channel is only used inside an Ask the AI step
 
 export const appSummary = (step) => {
   const app = findComposioApp(step?.fields?.app);
@@ -96,11 +96,14 @@ export const actionSummary = (step, answer = "", answers = [], myEmail = "") => 
   const f = step?.fields ?? {};
   const title = fillAnswerText(String(f.title ?? ""), answer, 150);
   const details = fillActionDetails(action?.id, String(f.details ?? ""), answer, answers);
+  const where = resolveTarget(action, f.target, myEmail).value;
   return [
     `Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`,
-    action?.needsTarget ? `${labelFor(action, "target")}: ${resolveTarget(action, f.target, myEmail).value ?? "your own email address"}` : "",
+    action?.needsTarget ? `${labelFor(action, "target")}: ${where === "" && action.target?.empty ? action.target.empty : where ?? "your own email address"}` : "",
     `${labelFor(action, "title")}: ${title.text ?? f.title}`,
     f.details && !action?.noDetails ? `${labelFor(action, "details")}: ${details.text ?? f.details}` : "",
+    // what is BUILT from the words (the rows, the slides), so it is read before it is made
+    action?.preview && title.text !== undefined && !details.error ? action.preview({ target: where ?? "", title: title.text, details: details.text ?? "" }) : "",
     isExampleTarget(action, f.target) ? `Warning: ${EXAMPLE_NOTICE}` : "",
     "It is sent through Composio, the company that keeps the connection to the app.",
     title.error ?? (action?.noDetails ? "" : details.error) ?? "",

@@ -37,7 +37,7 @@ Tagline: *"Describe the task. Hushwork handles it."* / *"Quiet work, done."*
 | Real actions (always after Approve) | Web calls; Linear (read + create a task); Google Calendar, Gmail (read), Drive (read), Sheets (add a row); 17 more apps through Composio (14 connectable): read one thing from each, and send an email, a Slack message, a GitHub issue, a Todoist task, a Calendar event, a Notion page |
 | Scheduled runs | Working. A Supabase clock (`pg_cron`) asks the app every minute; a schedule can be made from the Builder's Start step |
 | Safety extras | Failure emails, leaked-password check, rate limits (partly in the database), "Test all my connections", Download my data, Delete my account, Terms page |
-| Tests | 488 automated tests (`npm test`), including tests that run the real server code with a pretend database and Composio |
+| Tests | 554 automated tests (`npm test`), including tests that run the real server code with a pretend database and Composio |
 | Domain | Wants `hushwork.in`, registrar not chosen yet |
 
 ## 4. Architecture (how it works)

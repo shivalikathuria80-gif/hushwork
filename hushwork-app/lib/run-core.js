@@ -694,7 +694,13 @@ export async function approveActionStep(input, who) {
   if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
   const done = await runActionTool({ key: composioKey, userId: user.id, action, values });
   if (!done.ok) return afterFailedWrite(supabase, run, step, withSaid(done), done);
-  return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `${action.done(values)}: ${title.text}${details.text ? `\n${details.text}` : ""}`.slice(0, 700) });
+  // A file that was made (a sheet, a document...) says where to open it. If it was made but its content could not be added, that is said plainly and the step
+  // still counts as DONE: the file exists, so Approve is refused from now on and nothing makes a second one.
+  const link = done.link ? `\n${done.link}` : "";
+  const outcome = done.note
+    ? `${action.done(values)}: ${title.text}${link}\nHeads up: ${done.note}`.slice(0, 900)
+    : `${action.done(values)}: ${title.text}${link}${details.text ? `\n${details.text}` : ""}`.slice(0, 700);
+  return saveLiveRun(supabase, run, { ...step, status: "done", outcome });
 }
 
 // The "Approve and add the row" button. The ONE action that writes into somebody's Google account, so: the sheet address and the
