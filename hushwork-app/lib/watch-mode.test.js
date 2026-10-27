@@ -568,3 +568,17 @@ test("the approval card says what {last} does", async () => {
   assert.match(aiSummary(step), /also gets what it answered the last time this workflow ran \(as information only\)/);
   assert.ok(!/last time/.test(aiSummary({ kind: "ai", fields: { task: "Plain job", uses: "nothing", address: "" } })));
 });
+
+test("{last} skips checks that said NOTHING NEW and uses the newest real finding before them", async () => {
+  const { findLastAnswer } = await import("./run-answer.js");
+  const rows = [];
+  const live = (from, answer, minute) => rows.push({ id: `l-${from}`, user_id: "u", workflow_id: "w", mode: "live", created_at: `2026-10-26T10:0${minute}:00Z`, results: [{ kind: "ai", from, fromStep: 1, answer }] });
+  const practice = (id, minute) => rows.push({ id, user_id: "u", workflow_id: "w", mode: "practice", created_at: `2026-10-26T09:0${minute}:00Z`, results: [] });
+  practice("p1", 1); live("p1", "Invoice 104 is overdue.", 1);
+  practice("p2", 2); live("p2", "NOTHING NEW", 2);
+  practice("p3", 3); live("p3", "nothing new, all quiet", 3);
+  practice("p4", 4);
+  const supabase = { from: (table) => { let list = rows.slice(); const q = { select: () => q, eq: (c, v) => { list = list.filter((r) => r[c] === v); return q; }, contains: (c, json) => { const need = JSON.parse(json); list = list.filter((r) => need.every((n) => r.results.some((h) => Object.entries(n).every(([k, v]) => h[k] === v)))); return q; }, order: (c, { ascending = true } = {}) => { list.sort((a, b) => (a[c] < b[c] ? -1 : 1) * (ascending ? 1 : -1)); return q; }, limit: async () => ({ data: list, error: null }) }; return q; } };
+  assert.equal(await findLastAnswer(supabase, "u", { id: "p4", workflow_id: "w", created_at: "2026-10-26T09:04:00Z" }, 1), "Invoice 104 is overdue.");
+  assert.equal(await findLastAnswer(supabase, "u", { id: "p1", workflow_id: "w", created_at: "2026-10-26T09:01:00Z" }, 1), "", "the very first check has no last time");
+});

@@ -1,4 +1,5 @@
 import { ANSWER_TAG, MAX_ANSWER_LENGTH, NO_ANSWER } from "./connectors/google-sheets.js";
+import { isNothingNew } from "./watch-rules.js";
 
 // "The answer": what an Ask the AI step of the same workflow said after the person approved it. An Add a row step may use it
 // by writing {answer} in a box (see fillAnswer in lib/connectors/google-sheets.js). The Runs page and the Approve action both call
@@ -53,17 +54,19 @@ export async function findLastAnswer(supabase, userId, run, stepIndex) {
     .eq("user_id", userId).eq("workflow_id", run.workflow_id).eq("mode", "practice")
     .order("created_at", { ascending: false }).limit(10);
   if (error || !Array.isArray(before)) return "";
-  const previous = before.find((one) => one.id !== run.id && Date.parse(one.created_at) < Date.parse(run.created_at));
-  if (!previous) return "";
-  const { data, error: liveError } = await supabase
-    .from("runs").select("results")
-    .eq("user_id", userId).eq("workflow_id", run.workflow_id).eq("mode", "live")
-    .contains("results", JSON.stringify([{ from: previous.id, fromStep: stepIndex }])) // JSON TEXT on purpose (see loadStepStates in lib/run-state.js)
-    .order("created_at", { ascending: false }).limit(10);
-  if (liveError || !Array.isArray(data)) return "";
-  for (const row of data) {
-    const first = Array.isArray(row.results) ? row.results[0] : null;
-    if (first?.kind === "ai" && first.from === previous.id && first.fromStep === stepIndex && typeof first.answer === "string" && first.answer.trim()) return first.answer;
+  // Older checks first matter too: a check that said NOTHING NEW teaches nothing, so it is skipped and the one before it is used (otherwise the AI would
+  // be told "last time: nothing new" and could report something it already flagged two checks ago).
+  for (const previous of before.filter((one) => one.id !== run.id && Date.parse(one.created_at) < Date.parse(run.created_at))) {
+    const { data, error: liveError } = await supabase
+      .from("runs").select("results")
+      .eq("user_id", userId).eq("workflow_id", run.workflow_id).eq("mode", "live")
+      .contains("results", JSON.stringify([{ from: previous.id, fromStep: stepIndex }])) // JSON TEXT on purpose (see loadStepStates in lib/run-state.js)
+      .order("created_at", { ascending: false }).limit(10);
+    if (liveError || !Array.isArray(data)) return "";
+    for (const row of data) {
+      const first = Array.isArray(row.results) ? row.results[0] : null;
+      if (first?.kind === "ai" && first.from === previous.id && first.fromStep === stepIndex && typeof first.answer === "string" && first.answer.trim() && !isNothingNew(first.answer)) return first.answer;
+    }
   }
   return "";
 }
