@@ -251,7 +251,7 @@ A **Create a Linear task** step (block **Create Linear task** in the Builder) ha
 
 **Owner set-up:** nothing new in Linear's developer settings. Anyone who connected Linear earlier must press **Disconnect** and **Connect Linear** again so Linear asks for the new permission (until then the Runs page says Linear refused). The personal key in `.env.local` (this computer only) can create tasks too. Not yet tested against the real Linear.
 
-## More apps through Composio (17 apps, 14 connectable)
+## More apps through Composio (22 apps, 19 connectable)
 
 Composio (composio.dev) already holds the sign-in for hundreds of apps, so Hushwork reaches more apps without making an app on each website. The apps are one list, `lib/connectors/composio-apps.js`: Todoist, Notion, Airtable, HubSpot, Jira, GitHub, Vercel, Sentry, Cloudflare, PagerDuty, Slack, Stripe, Xero, Mailchimp, Google Tasks, Trello, plus **Gmail (send)** and **Google Calendar (events)** (separate connections, used for the actions). Each entry names ONE read-only Composio tool (for example `TODOIST_GET_ALL_TASKS`) and the sign-in Hushwork asks Composio to make is limited to that tool plus the tools of the actions listed for that app (`restrict_to_following_tools`).
 

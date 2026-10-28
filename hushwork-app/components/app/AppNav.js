@@ -84,6 +84,7 @@ export default function AppNav({ userBadge }) {
           <NavLink href="/app/connections" icon="Plug" onNavigate={close}>Connections</NavLink>
         </nav>
         <div className="flex flex-col gap-1">
+          <NavLink href="/docs" icon="FileText" onNavigate={close}>Docs</NavLink>
           <NavLink href="/app/settings" icon="Settings" onNavigate={close}>Settings</NavLink>
           <div className="min-w-0 px-3 pb-2">
             <p className="sr-only">Signed in as</p>

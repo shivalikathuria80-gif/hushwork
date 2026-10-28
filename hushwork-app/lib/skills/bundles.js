@@ -203,7 +203,7 @@ export const BUNDLES = [
     skills: ["gmail-urgent", "gmail-top-request", "gmail-reply-drafts", "slack-channel", "linear-blockers", "github-notifications", "pagerduty-incidents", "ask-approval", "linear-task", "email-me"],
     workflows: [
       {
-        id: "client-triage", title: "Client Project Triage", body: "When you ask: spots urgent client emails, sums up what is blocked in Linear, then (after you approve) creates a Linear task for the top request and emails you a daily brief. Slack messages cannot be read, only Gmail.",
+        id: "client-triage", title: "Client Project Triage", body: "When you ask: spots urgent client emails, sums up what is blocked in Linear, then (after you approve) creates a Linear task for the top request and emails you a daily brief.",
         request: "When I ask, find urgent client emails, sum up what is blocked, add a Linear task for the top request and email me a daily brief. Ask me first.",
         start: { how: "manual", when: "" },
         flow: ["gmail-urgent", "linear-blockers", "gmail-top-request", "ask-approval", ["linear-task", { details: "Made by Hushwork from your latest emails." }], ["email-me", { title: "Your daily client brief" }]],

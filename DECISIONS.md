@@ -92,6 +92,7 @@ Last updated: 2026-10-24
 | D-048 | Watch mode: a scheduled check that stays silent unless something is new ({last}, NOTHING NEW, quiet hours, 3 a day, one plain email) | ✅ | 2026-10-27 |
 | D-049 | Round 4 of the ChatGPT + Gemini loop: two small workflows built (Context Switchboard, Drive tidy-up plan), four ideas not built | ✅ | 2026-10-27 |
 | D-050 | Round 5 (first-time experience): example sentences under the empty box and a 3-step Getting started card; no demo mode | ✅ | 2026-10-28 |
+| D-051 | Docs site on docs.hushwork.in: same app, a host rewrite, 22 markdown pages; technical reference in `docs/reference/` | ✅ | 2026-10-28 |
 
 ---
 
@@ -470,6 +471,20 @@ Last updated: 2026-10-24
 - **Reason:** The biggest first-time problem is the blank box and not knowing what to do first; both are cheap to fix without new power or new tables.
 - **Limits worth knowing:** the card cannot tell whether an app is connected through Composio (that needs a slow lookup), so it has no "connect an app" step. Not yet looked at on the live site with a real sign-in.
 - **Where:** `components/app/Workspace.js`, `components/app/GettingStarted.js`, `app/app/page.js`; idea log in `docs/ideas.md`
+
+### D-051: A docs site on docs.hushwork.in, and a technical reference
+- **Date:** 2026-10-28
+- **Status:** ✅ Approved (the domain itself still has to be added in Vercel and DNS by the owner)
+- **Decision:** The docs live in the SAME app, not a second project. `next.config.mjs` rewrites any request whose host starts with `docs.` to the `/docs` pages; the pages also work at `/docs` on any host.
+  - **Content:** 22 plain markdown files in `hushwork-app/content/docs/`, listed in `lib/docs/pages.js` (getting started, using Hushwork, connections, safety and privacy, reference). Each was written from the real code, not from memory.
+  - **Reader:** a tiny hand-written markdown reader (`lib/docs/markdown.js`) that never makes HTML (no new libraries). Raw HTML and images are not allowed; links must be `https://`, `/` or `#`.
+  - **Tests:** the page list must match the files, every link and anchor must exist, nothing may look like a secret, and the host rewrite is checked.
+  - **Reference:** 12 developer notes in `docs/reference/` (also in the Obsidian vault), plus the user-guide files mirrored there.
+  - **Links:** "Docs" in the landing footer and in the app menu (both go to `/docs`).
+- **Reason:** One app means one deploy and no extra cost; markdown files mean the same text is the website and the Obsidian notes.
+- **Limits worth knowing:** no search box yet. On the docs host `/privacy` shows the docs Privacy page, not the legal one.
+- **Found while writing:** the READMEs said "17 apps, 14 connectable"; the code has 22 apps, 19 connectable (fixed). A scheduled run does NOT stop at an "Ask me first" step: it skips writing steps unless "Let it write by itself" is on (documented). Some code comments are stale (`lib/ai/limits.js` header, a Notion comment in `lib/ai/plan.js`, headers in the SQL files); not changed yet.
+- **Where:** `next.config.mjs`, `app/docs/`, `components/docs/`, `lib/docs/`, `content/docs/`, `docs/reference/docs-site.md`
 
 ---
 

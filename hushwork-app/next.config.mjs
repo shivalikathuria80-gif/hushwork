@@ -20,8 +20,20 @@ const SAFETY_HEADERS = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
 ];
 
+// docs.hushwork.in is this same app: a request whose host starts with "docs." is rewritten to the /docs pages (the address in the browser stays the same).
+// Files the pages need (/_next/..., the icon, the link-preview images, /api) and /docs itself are left alone. The pages also work at /docs on any host.
+const DOCS_HOST = [{ type: "host", value: "docs\\..*" }];
+
 const nextConfig = {
   cacheComponents: true,
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: "/", has: DOCS_HOST, destination: "/docs" },
+        { source: "/:path((?!_next|docs|api|icon\\.svg|opengraph-image|twitter-image).+)", has: DOCS_HOST, destination: "/docs/:path" },
+      ],
+    };
+  },
   async headers() {
     return [{ source: "/:path*", headers: SAFETY_HEADERS }];
   },
