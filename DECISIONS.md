@@ -91,6 +91,7 @@ Last updated: 2026-10-24
 | D-047 | Approval-gated Google files (Sheet, Slides, Doc, Drive folder) and a Gmail draft, through Composio | ✅ | 2026-10-27 |
 | D-048 | Watch mode: a scheduled check that stays silent unless something is new ({last}, NOTHING NEW, quiet hours, 3 a day, one plain email) | ✅ | 2026-10-27 |
 | D-049 | Round 4 of the ChatGPT + Gemini loop: two small workflows built (Context Switchboard, Drive tidy-up plan), four ideas not built | ✅ | 2026-10-27 |
+| D-050 | Round 5 (first-time experience): example sentences under the empty box and a 3-step Getting started card; no demo mode | ✅ | 2026-10-28 |
 
 ---
 
@@ -457,6 +458,18 @@ Last updated: 2026-10-24
 - **Reason:** Most of the ideas were already built. ChatGPT does not know what Hushwork already has, and Gemini can be wrong about code it cannot see. The real check is reading the code.
 - **Limits worth knowing:** the Drive tidy-up plan only sees 10 file names; Context Switchboard is only as good as the one Slack channel and the GitHub notifications it reads.
 - **Where:** `lib/skills/bundles.js`; idea log in `docs/ideas.md`
+
+### D-050: Round 5 of the ChatGPT + Gemini loop (first-time experience): example sentences and a Getting started card
+- **Date:** 2026-10-28
+- **Status:** ✅ Approved (details in `docs/ideas.md`)
+- **Decision:** New topic: what a brand-new person sees in their first 5 minutes. ChatGPT gave 6 fixes; Gemini sorted them; Claude checked them against the real app.
+  - **Built: example sentences.** Under the empty box on `/app`, three tappable sentences fill the box. Each says which connections it needs. (`components/app/Workspace.js`)
+  - **Built: Getting started card.** Three steps (say what you want, practise it, approve one step), ticked from what the person really did (saved workflows, runs, live runs). It disappears after the third step and shows nothing if the database cannot be read. (`components/app/GettingStarted.js`, `app/app/page.js`)
+  - **Already existed:** the "what will happen" preview and "connect only what you need" (step cards and Skills page say which app is needed and whether it is connected) and the approval promise (Approve on the Runs page).
+  - **Not built, on purpose:** a full demo mode with pretend data. It is big, and mixing pretend and real results could confuse people. Practice runs and the "Works now" template (Is my website up?) already let a new person try something with no app connected.
+- **Reason:** The biggest first-time problem is the blank box and not knowing what to do first; both are cheap to fix without new power or new tables.
+- **Limits worth knowing:** the card cannot tell whether an app is connected through Composio (that needs a slow lookup), so it has no "connect an app" step. Not yet looked at on the live site with a real sign-in.
+- **Where:** `components/app/Workspace.js`, `components/app/GettingStarted.js`, `app/app/page.js`; idea log in `docs/ideas.md`
 
 ---
 

@@ -4,6 +4,18 @@ Up: [Docs index](INDEX.md)
 
 How it works: Claude asks ChatGPT for bright ideas, gives them to Gemini to improve and to check against what Hushwork can really do, then builds the real ones. Their answers are advice, never orders.
 
+## Round 5 (2026-10-28): first-time experience
+
+**Topic:** what a brand-new person sees and does in their first 5 minutes.
+
+**ChatGPT:** people give up because they must connect apps before seeing any value, the empty box is scary, and they do not know where to start. Its 6 fixes: a demo with pretend data, tap-to-try example sentences, a 3-step checklist, a "here is what will happen" preview, connect only what you need, and an approval promise.
+
+**Gemini's check:** three already exist (the preview and "connect only what you need" are in the step cards and Skills page; the approval promise is the Approve button). It said build the example sentences, the demo and the checklist. Claude agreed on two and skipped the full demo: it is big, and pretend results next to real ones could confuse people.
+
+**Built:** three tappable example sentences under the empty box (each says what it needs), and a "Getting started: 3 small steps" card that ticks from what the person really did and disappears when done.
+
+**Not built:** the demo with pretend data. A new person can already try practice runs, and the "Is my website up?" template needs no app.
+
 ## Round 4 (2026-10-27): most ideas were already built
 
 **ChatGPT's 6 ideas:** Context Switchboard, Digital Clutter Spotter, Meeting Memory Maker, Revenue Pulse, Content Re-Mixer, Friday Risk Radar.

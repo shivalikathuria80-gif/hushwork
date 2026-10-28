@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Icon } from "@/components/icons";
 import Workspace from "@/components/app/Workspace";
 import AiWorkspace from "@/components/app/AiWorkspace";
+import GettingStarted from "@/components/app/GettingStarted";
 import Drafts, { DraftsFallback } from "@/components/app/Drafts";
 
 export const metadata = { title: "Workspace - Hushwork", robots: { index: false, follow: false } };
@@ -20,6 +21,7 @@ export default function AppPage() {
         <p className="mx-auto mt-3 max-w-[48ch] text-[15px] text-mute">Describe something you do every week. You get a plan made of blocks. Open it in the Builder and run it. Steps that act on your apps wait for your approval.</p>
       </header>
       <div className="mt-8">
+        <Suspense fallback={null}><GettingStarted /></Suspense>
         <Suspense
           fallback={
             <Workspace ai={{ enabled: false, limit: 0, pending: true }}>
