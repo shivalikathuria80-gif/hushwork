@@ -1,7 +1,8 @@
 -- The "app_controls" table: global on/off switches for the whole app. Right now one switch: "paused".
 --
--- STATUS: written, NOT applied yet. The owner pastes it into Supabase (Dashboard > SQL Editor > New query > paste > Run).
--- Until then nothing is paused and nothing breaks (the app treats a missing table as "not paused").
+-- STATUS: APPLIED on the hosted Supabase project (checked 2026-10-28; "paused" is false). Do not run this file again: it will say
+-- "relation app_controls already exists", which only means it is already done. To pause or restart, use the two update lines below.
+-- (A missing table is treated by the app as "not paused", so nothing breaks without it.)
 --
 -- While "paused" is true Hushwork does nothing on anyone's behalf: no step that writes (send, create, add), no Ask the AI step, no scheduled run.
 -- Pages, runs and Disconnect / Delete my account still work.
