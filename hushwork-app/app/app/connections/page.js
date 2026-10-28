@@ -16,6 +16,9 @@ export const metadata = { title: "Connections - Hushwork", robots: { index: fals
 // Which logos stand for each connection: Google is four products behind one sign-in. Anything else uses its own id (lib/app-logos.js).
 const LOGO_IDS = { google: ["calendar", "sheets", "gmail", "drive"] };
 
+// The Composio apps that belong to Google (Gmail and every "google..." toolkit): they get their own Google Workspace box instead of sitting in More apps.
+const isGoogle = (app) => app.toolkit === "gmail" || app.toolkit.startsWith("google");
+
 // What the short message in the address means (the Connect button sends the person back with ?linear=... or ?google=...).
 const RESULTS = {
   connected: ["ok", "Connected."],
@@ -50,13 +53,23 @@ export default function ConnectionsPage({ searchParams }) {
         </section>
       ))}
 
+      <section aria-labelledby="workspace-heading" className="mt-8">
+        <div className="flex items-center gap-3">
+          <AppLogos ids={COMPOSIO_APPS.filter(isGoogle).slice(0, 4).map((app) => app.id)} size={32} />
+          <h2 id="workspace-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Google Workspace (through Composio)</h2>
+        </div>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <Suspense fallback={fallback}><MoreApps searchParams={searchParams} group="google" /></Suspense>
+        </div>
+      </section>
+
       <section aria-labelledby="more-heading" className="mt-8">
         <div className="flex items-center gap-3">
           <AppLogos ids={COMPOSIO_APPS.slice(0, 6).map((app) => app.id)} size={32} />
           <h2 id="more-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">More apps (through Composio)</h2>
         </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <Suspense fallback={fallback}><MoreApps searchParams={searchParams} /></Suspense>
+          <Suspense fallback={fallback}><MoreApps searchParams={searchParams} group="other" /></Suspense>
         </div>
       </section>
 
@@ -111,7 +124,7 @@ const COMPOSIO_RESULTS = {
 
 // "More apps": apps reached through Composio (composio.dev), which keeps each person's sign-in. It reads the session and asks
 // Composio which apps this person connected, so it sits inside <Suspense>.
-async function MoreApps({ searchParams }) {
+async function MoreApps({ searchParams, group }) {
   const user = await requireUser();
   const params = await searchParams;
   const result = params.composio;
@@ -119,6 +132,10 @@ async function MoreApps({ searchParams }) {
   const key = getComposioKey();
   const listed = key ? await listConnected({ key, userId: user.id }) : null;
   const connected = new Set((listed?.accounts ?? []).map((account) => account.toolkit));
+  const apps = COMPOSIO_APPS.filter((app) => !app.lookupOf && isGoogle(app) === (group === "google"));
+  if (group === "google" && (!key || listed?.error)) {
+    return <p role={key ? "alert" : undefined} className="text-sm text-mute">{key ? listed.error : "These need the one-time Composio setup. The steps are under More apps below."}</p>;
+  }
 
   return (
     <div>
@@ -127,7 +144,8 @@ async function MoreApps({ searchParams }) {
           <Icon name={note[0] === "ok" ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${note[0] === "ok" ? "text-success" : "text-error"}`} />{note[1]}
         </p>
       )}
-      <p className="text-sm text-mute">Composio is a company that already holds the sign-in for many apps, so you do not have to make an app for each one. When you press Connect, you sign in on Composio{"’"}s page and Composio keeps the permission. Hushwork can only <b className="font-medium text-ink">read</b> one fixed thing from each app, plus one fixed action in Gmail (send an email or save a draft, through the Gmail (send) connection), Google Calendar (add an event, through the Google Calendar (events) connection), Notion (create a page), Slack (send a message), GitHub (create an issue), Todoist (add a task), and Google Sheets, Docs, Slides and Drive (create one new spreadsheet, document, presentation or folder, each through its own Connect button below, separate from Connect Google), and the action happens only when a step says so and you approve it. It also asks Composio to refuse everything else, and what it reads or sends passes through Composio. You can press Disconnect any time.</p>
+      {group === "google" && <p className="text-sm text-mute">These are your Google apps connected through Composio. Each has its own Connect button and its own sign-in, separate from the Google box above (which only reads). Hushwork can read one fixed thing from each, plus one fixed action when a step says so and you approve it: send an email or save a draft (Gmail), add an event (Calendar), create one new spreadsheet, document, presentation or folder (Sheets, Docs, Slides, Drive). It cannot change or delete anything. You can press Disconnect any time.</p>}
+      {group !== "google" && <p className="text-sm text-mute">Composio is a company that already holds the sign-in for many apps, so you do not have to make an app for each one. When you press Connect, you sign in on Composio{"’"}s page and Composio keeps the permission. Hushwork can only <b className="font-medium text-ink">read</b> one fixed thing from each app, plus one fixed action in Notion (create a page), Slack (send a message), GitHub (create an issue) and Todoist (add a task), and the action happens only when a step says so and you approve it. It also asks Composio to refuse everything else, and what it reads or sends passes through Composio. You can press Disconnect any time.</p>}
 
       {!key ? (
         <div className="mt-4 rounded-xl border border-line bg-raised p-3">
@@ -142,7 +160,7 @@ async function MoreApps({ searchParams }) {
         <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{listed.error}</p>
       ) : (
         <ul className="mt-4 space-y-3">
-          {COMPOSIO_APPS.filter((app) => !app.lookupOf).map((app) => (
+          {apps.map((app) => (
             <li key={app.id} className="rounded-xl border border-line p-3">
               <div className="flex flex-wrap items-center gap-3">
                 <AppLogo id={app.id} label={app.name} />
