@@ -29,7 +29,12 @@ const livePosts = (composio) => composio.calls.filter((call) => call.method === 
 
 test("'Send a message to my account', from the words to the inbox: the plan made from them really sends an email to the signed-in person", async () => {
   // what the AI wrote: the plan-only Send block (the exact mistake that made nothing arrive)
-  const plan = finishSteps({ steps: [trigger, { icon: "Send", title: "Send a message", detail: "To your account", block: "send", choice: "other", a: "my account", b: "good morning" }] }, undefined, SAY);
+  const made = finishSteps({ steps: [trigger, { icon: "Send", title: "Send a message", detail: "To your account", block: "send", choice: "other", a: "my account", b: "good morning" }] }, undefined, SAY);
+  const email = made.find((step) => step.kind === "action");
+  assert.ok(made.indexOf(email) > made.findIndex((step) => step.kind === "ai") && made.some((step) => step.kind === "ai"), "an Ask the AI step writes the text before the email");
+  assert.equal(email.fields.details, "{answer}", "the email carries that answer, never the person's own request");
+  // this test has no AI, so it runs the plan as if the AI step had already written "good morning"
+  const plan = made.filter((step) => step.kind !== "ai").map((step) => (step.kind === "action" ? { ...step, fields: { ...step.fields, details: "good morning" } } : step));
   const { workflow, supabase, who, user } = setup({ plan });
   const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
   try {

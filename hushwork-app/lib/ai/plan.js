@@ -200,13 +200,25 @@ export function ensureRealSend(steps, task = "") {
   const address = !toMe && SENDS_TO_ADDRESS.test(String(task)) ? String(task).match(ADDRESS)?.[0] : "";
   if ((!toMe && !address) || steps.some(REALLY_SENDS)) return steps;
   const after = steps.findIndex(PLAN_ONLY_SEND);
-  const hasAnswer = steps.slice(0, after === -1 ? steps.length : after).some((step) => step.kind === "ai");
-  const words = tidy(String(task)).slice(0, 100);
-  const made = checkSteps([AI_BLOCKS.action("gmail_send", address || "{myEmail}", hasAnswer ? "From Hushwork" : "A message from Hushwork", hasAnswer ? "{answer}" : words)]).value?.[0];
+  const head = steps.slice(0, after === -1 ? steps.length : after);
+  // An email must carry real words. With no Ask the AI step before it, the person's own request ("send list to my email") used to become the
+  // email text. Now an Ask the AI step does the job first and the email carries its answer.
+  const hasAnswer = head.some((step) => step.kind === "ai");
+  const ask = hasAnswer ? null : answerStep(task);
+  const carriesAnswer = hasAnswer || ask !== null;
+  const made = checkSteps([AI_BLOCKS.action("gmail_send", address || "{myEmail}", carriesAnswer ? "From Hushwork" : "A message from Hushwork", carriesAnswer ? "{answer}" : tidy(String(task)).slice(0, 100))]).value?.[0];
   if (!made) return steps;
-  if (after !== -1) return steps.map((step, index) => (index === after ? made : step));
-  return steps.length >= LIMITS.planSteps ? [...steps.slice(0, -1), made] : [...steps, made];
+  const added = ask ? [ask, made] : [made];
+  const tail = after === -1 ? [] : steps.slice(after + 1);
+  return [...head.slice(0, LIMITS.planSteps - added.length), ...added, ...tail].slice(0, LIMITS.planSteps);
 }
+
+// The Ask the AI step that writes an email's text when the plan has none: it does the person's job (looking where their words point, with the
+// "send it to my email" part taken out so the word "email" does not send it to the inbox) and writes the result as the email text.
+const answerStep = (task) => {
+  const words = tidy(String(task)).replace(SEND_TO_ME, " ").replace(ADDRESS, " ").replace(/\s+/g, " ").trim();
+  return askAi(lookingAt(words), `${(words || tidy(String(task))).slice(0, 75)}. Write the result as the email text.`);
+};
 
 // THE SAFETY NET FOR PLAIN NOTES. A model sometimes ignores the blocks and answers with plain notes ("Read important emails", "Draft replies", "Store
 // drafts in Notion"). A note only describes: run it and nothing happens. So a note is turned into the real step that does the same job, decided by the
@@ -254,6 +266,9 @@ export function realizeNotes(steps, task = "") {
       }
       out.push(askAi("nothing", job) ?? step);
     } else if (OUT_VERBS.has(word) && !out.some(REALLY_SENDS) && !steps.some(REALLY_SENDS)) {
+      // (With no Ask the AI step before it, one is added: the person's own request must never become the email text.)
+      const ask = out.some((one) => one.kind === "ai") ? null : answerStep(task);
+      if (ask) out.push(ask);
       const answers = out.filter((one) => one.kind === "ai").length;
       const address = SENDS_TO_ADDRESS.test(String(task)) ? String(task).match(ADDRESS)?.[0] : ""; // "email friend@example.com ..." goes to that address
       const email = checkSteps([AI_BLOCKS.action("gmail_send", address || "{myEmail}", "Your result from Hushwork", answers > 1 ? "{answers}" : answers === 1 ? "{answer}" : tidy(String(task)).slice(0, 100) || "A message from Hushwork")]).value?.[0];

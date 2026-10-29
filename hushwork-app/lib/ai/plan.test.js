@@ -152,7 +152,7 @@ test("finishSteps: the strict gate refuses what a faulty first pass lets through
 
 test("finishSteps: the whole chain, ending in the strict gate", () => {
   const out = finishSteps({ steps: [{ icon: "Clock", title: "Run every morning", detail: "8:00 am" }, { icon: "Mail", title: "Email each client", detail: "PDF attached" }] });
-  assert.deepEqual(out.map((step) => step.icon), ["Clock", "ShieldCheck", "Send"], "a note that sends becomes a real email step (to the person), behind an approval step");
+  assert.deepEqual(out.map((step) => step.icon), ["Clock", "Sparkles", "ShieldCheck", "Send"], "a note that sends becomes a real email step (to the person), behind an approval step, after an Ask the AI step that writes its text");
   assert.equal(finishSteps({ steps: [] }), null);
   assert.equal(finishSteps("nope"), null);
 });
@@ -386,6 +386,22 @@ test("an address written in the task counts too: 'email friend@example.com about
   // an address with no sending word, and a task about sending to someone else's role, are left alone
   assert.equal(finishSteps(notes, undefined, "Keep a list of contacts like friend@example.com").some((step) => step.kind === "action"), false);
   assert.equal(finishSteps(notes, undefined, "Chase overdue invoices").some((step) => step.kind === "action"), false);
+});
+
+test("an email with no Ask the AI step before it never carries the person's own request as its text", () => {
+  const task = "send list to my email";
+  // the AI picked the plan-only Send block, or only plain notes: both must end as an Ask the AI step, then an email carrying its answer
+  const fromSendBlock = finishSteps({ steps: [{ icon: "Send", title: "Send a message", detail: "x", block: "send", choice: "email", a: "me", b: task }] }, undefined, task);
+  const fromNote = finishSteps({ steps: [{ icon: "Send", title: "Send list", detail: "to my email", block: "note", choice: "", a: "", b: "" }] }, undefined, task);
+  for (const steps of [fromSendBlock, fromNote]) {
+    const emailAt = steps.findIndex((step) => step.kind === "action");
+    assert.ok(emailAt > 0 && steps.slice(0, emailAt).some((step) => step.kind === "ai"), "an Ask the AI step comes before the email");
+    assert.equal(steps[emailAt].fields.details, "{answer}", "the email carries the AI's answer");
+    assert.equal(steps[emailAt].fields.target, "{myEmail}");
+  }
+  // "send it to my email" must not make the helper look in the inbox when the job is about Linear tasks
+  const linear = finishSteps({ steps: [{ icon: "Send", title: "Send a message", detail: "x", block: "send", choice: "email", a: "me", b: "" }] }, undefined, "Make a list of my Linear tasks and send it to my email");
+  assert.equal(linear.find((step) => step.kind === "ai").fields.uses, "linear");
 });
 
 
