@@ -2,7 +2,7 @@
 
 Hushwork is a small workspace where you describe a job in plain words ("every Friday, email me what I worked on"), turn it into steps, and let it run **only after you approve each step that does something**.
 
-- **Live:** https://hushwork-six.vercel.app
+- **Live:** https://hushwork.in (docs at https://docs.hushwork.in; the old https://hushwork-six.vercel.app still works)
 - **Open source:** MIT license (see `LICENSE`).
 
 ## What it can do

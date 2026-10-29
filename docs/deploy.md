@@ -94,10 +94,10 @@ The clock only works while the app and the clock terminal are both running. For 
 ## 10. What is live right now (2026-10-24)
 
 - Code: https://github.com/shivalikathuria80-gif/hushwork (public, MIT license). Vercel project `hushwork`, root folder `hushwork-app`, production branch `main`: every push to `main` deploys by itself, and GitHub Actions runs the tests and lint on every push.
-- Address: https://hushwork-six.vercel.app
+- Address: https://hushwork.in and https://docs.hushwork.in (since 2026-10-29; the old https://hushwork-six.vercel.app still answers). The name servers at Hostinger point to Vercel (`ns1.vercel-dns.com`, `ns2.vercel-dns.com`), so Vercel manages the records.
 - Settings on Vercel: the public Supabase values and `NEXT_PUBLIC_SITE_URL`, and the secrets (`GROQ_API_KEY`, `CONNECTIONS_KEY`, `COMPOSIO_API_KEY`, the Linear and Google client ids and secrets, `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`). Vercel never shows a secret again after it is saved, so keep your own copy; to change one, edit it on Vercel and press **Redeploy**.
 - Supabase: the SQL files for waitlist, workflows, runs, connections, schedules, usage and the clock have been run. The Site URL and redirect list include the live address.
-- Google and Linear callbacks: `https://hushwork-six.vercel.app/api/connect/google/callback` and `.../linear/callback` are registered with each service.
+- Google and Linear callbacks: `https://hushwork.in/...` and `https://hushwork-six.vercel.app/...` (`/api/connect/google/callback` and `/api/connect/linear/callback`) are registered with each service. Supabase Site URL is `https://hushwork.in`; its redirect list has `hushwork.in/**`, `docs.hushwork.in/**` and localhost.
 - Proven live: sign-in, the AI, Connect Google and Linear, apps through Composio, real emails, calendar events and Notion pages, scheduled runs by the Supabase clock.
 - Not yet tried for real: Slack and GitHub actions, Linear task creation, the failure email.
 
@@ -145,6 +145,8 @@ The whole pre-launch list is in `launch.md`.
 Stripe invoices and Slack messages are extra read-only tools on the same sign-in as Stripe and Slack. A sign-in made before only allowed the first tool. On the Connections page press **Disconnect** and then **Connect** for Stripe (and for Slack if you use it). Nothing else is needed.
 
 ## 13. Moving to your own web address (when you buy one)
+
+> **Done 2026-10-29** for `hushwork.in` and `docs.hushwork.in`: steps 1 to 3 finished (Vercel, `NEXT_PUBLIC_SITE_URL`, Supabase, Google, Linear). Steps 4 and 5 (the GitHub variable and the clock address) are not needed yet because the old address keeps answering; do them together with the new clock password.
 
 Nothing here can be done for you: buying the address is your job. The order matters.
 

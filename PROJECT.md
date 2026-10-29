@@ -29,7 +29,7 @@ Tagline: *"Describe the task. Hushwork handles it."* / *"Quiet work, done."*
 
 | Thing | Status |
 |---|---|
-| Live site | https://hushwork-six.vercel.app (Vercel auto-deploys every push to `main`) |
+| Live site | https://hushwork.in (docs: https://docs.hushwork.in; the old https://hushwork-six.vercel.app still answers). Vercel auto-deploys every push to `main` |
 | Code | https://github.com/shivalikathuria80-gif/hushwork, MIT license, checked by GitHub Actions on every push (tests + lint) |
 | Users | The owner only. Early access, no customers yet. Waitlist is open |
 | Sign-in, drafts, runs, Builder | Built and working online |

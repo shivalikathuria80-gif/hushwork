@@ -93,6 +93,7 @@ Last updated: 2026-10-24
 | D-049 | Round 4 of the ChatGPT + Gemini loop: two small workflows built (Context Switchboard, Drive tidy-up plan), four ideas not built | ✅ | 2026-10-27 |
 | D-050 | Round 5 (first-time experience): example sentences under the empty box and a 3-step Getting started card; no demo mode | ✅ | 2026-10-28 |
 | D-051 | Docs site on docs.hushwork.in: same app, a host rewrite, 22 markdown pages; technical reference in `docs/reference/` | ✅ | 2026-10-28 |
+| D-052 | hushwork.in and docs.hushwork.in live: Vercel name servers, site address setting, Supabase, Google and Linear callbacks | ✅ | 2026-10-29 |
 
 ---
 
@@ -533,3 +534,9 @@ Last updated: 2026-10-24
 - **Reason:** ChatGPT, Gemini and Claude don't share memory. A common file stops the copy-pasting and re-explaining.
 - **Options considered:** Automating handoffs between models with an orchestration script. Postponed until the manual version proves useful.
 - **Next action:** Try it on one real task: ChatGPT plans, Gemini researches, Claude Code builds. Then check whether it saved explaining.
+
+### D-052: hushwork.in and docs.hushwork.in go live (2026-10-29)
+- **Decision:** The domain `hushwork.in` (registered at Hostinger) uses Vercel's name servers, so Vercel manages its records. `hushwork.in` and `docs.hushwork.in` are attached to the Vercel project. `NEXT_PUBLIC_SITE_URL` is `https://hushwork.in`.
+- **Why:** Google's review needs a real domain; the docs site needs its own host. Name servers instead of single records because Hostinger would not let the owner edit records while DNS was parked.
+- **Other services:** Supabase Site URL `https://hushwork.in` plus redirect list for `hushwork.in/**` and `docs.hushwork.in/**` (the old list had only localhost). Google "Web client 1" and the Linear app now list the `hushwork.in` and `hushwork-six.vercel.app` callbacks. Callbacks are built from the request host, so each host must be registered.
+- **Left alone on purpose:** the clock address in `supabase/clock.sql` and `HUSHWORK_URL` (the old address keeps answering; change them together with the new clock password). Google "Web client 2" lists only `https://hushwork-six.vercel.app` with no path and was not touched; it looks unused.
