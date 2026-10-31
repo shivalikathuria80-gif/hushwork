@@ -30,7 +30,7 @@ const nextConfig = {
     return {
       beforeFiles: [
         { source: "/", has: DOCS_HOST, destination: "/docs" },
-        { source: "/:path((?!_next|docs|api|icon\\.svg|opengraph-image|twitter-image).+)", has: DOCS_HOST, destination: "/docs/:path" },
+        { source: "/:path((?!_next|docs|api|icon\\.svg|opengraph-image|twitter-image|robots\\.txt|sitemap\\.xml).+)", has: DOCS_HOST, destination: "/docs/:path" },
       ],
     };
   },
