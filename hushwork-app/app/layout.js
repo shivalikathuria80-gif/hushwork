@@ -25,6 +25,8 @@ export const metadata = {
     description: "Describe a weekly task in plain English. Hushwork builds the workflow, asks before it sends anything, and keeps a log of every run.",
   },
   twitter: { card: "summary_large_image", title, description: "Describe a weekly task in plain English. Hushwork builds the workflow and runs it for you." },
+  // Proves to Google Search Console that this site is ours (not a secret: every visitor's browser sees it). Keep it, or the site is un-verified.
+  verification: { google: "DSdoalTC01nieFqJ1mFP5-o0PqMiYob6u5xuDp5-TJ8" },
 };
 
 export const viewport = { themeColor: "#121018", colorScheme: "dark light" };
