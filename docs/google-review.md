@@ -29,7 +29,7 @@ Sensitive permissions need a normal review. Restricted ones need that plus, usua
 
 ## What Google asks for
 
-- [ ] A real domain you own (`hushwork.in`) added to Google Search Console and verified, and set as an authorised domain on the consent screen.
+- [x] A real domain you own (`hushwork.in`) added to Google Search Console and verified (done 2026-10-31: property `https://hushwork.in/`, HTML tag in `hushwork-app/app/layout.js`, sitemap sent, home page indexing requested; the DNS "Domain" property was left unverified). Still to do: set it as an authorised domain on the consent screen.
 - [ ] A public home page on that domain that says what the app does and links to the privacy page.
 - [ ] A public **privacy policy** page (`/privacy` exists) that says exactly what Google data is read, why, where it is stored, and that it is not sold or used to train AI. Needs a real contact address (see launch.md, "Law").
 - [ ] The **terms** page (`/terms` exists).
