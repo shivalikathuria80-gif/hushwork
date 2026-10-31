@@ -61,6 +61,7 @@ Needs Stripe, Google, GitHub and Gmail (send). See [Watch mode](/docs/watch-mode
 
 - **Overdue invoice watch:** weekdays at 9:00, quiet unless an invoice is newly overdue.
 - **Unhappy email watch:** weekdays at 8:30, quiet unless a new urgent or unhappy email arrives.
+- **Client request watch:** weekdays at 12:00, quiet unless one of your 5 newest emails newly asks you to do something. Then it suggests ONE Linear task for you to approve.
 - **GitHub watch:** every day at 17:00, quiet unless something new needs action.
 
 ### Google Docs, Sheets and Slides

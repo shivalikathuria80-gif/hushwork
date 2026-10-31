@@ -12,7 +12,7 @@ Watch mode never acts alone. It does not send anything for you. Anything that wr
 
 There are two ways:
 
-1. Turn on the **Watch for me** bundle on the **Skills** page. It saves three ready-made workflows: Overdue invoice watch, Unhappy email watch and GitHub watch. See [Skills and bundles](/docs/skills-and-bundles).
+1. Turn on the **Watch for me** bundle on the **Skills** page. It saves four ready-made workflows: Overdue invoice watch, Unhappy email watch, Client request watch and GitHub watch. See [Skills and bundles](/docs/skills-and-bundles).
 2. Or, in the Builder, set a Start step to **Keep watching: tell me only when something new shows up** and write the time in **When**, like `Every weekday at 9:00`. Press **Save**. It makes the same kind of real schedule as **On a schedule**. See [Schedules](/docs/schedules).
 
 ## How a check works
@@ -22,7 +22,7 @@ Each check is one run. Its **Ask the AI** step looks at one place, such as your 
 Two small words make the "quiet" part work:
 
 - `{last}`: write it in the AI step's job. It hands the AI what **the same step** answered in the previous check, as plain data. The first check has no earlier answer, and the AI is told "This is the first check". This is not an error.
-- **NOTHING NEW**: if the AI's answer starts with `NOTHING NEW` (in any capital letters), the run ends quietly right there. Nothing after that step runs and nothing is sent. In a normal workflow these words mean nothing special.
+- **NOTHING NEW**: if the AI's answer starts with `NOTHING NEW` (in any capital letters), the run ends quietly right there. Nothing after that step runs and nothing is sent. A short one-line answer that says the same in other words ("No new overdue invoices.", "There is nothing new.", "No changes since the last check.") counts too; a longer answer still speaks up, in case it holds real news. In a normal workflow these words mean nothing special.
 
 For example, an AI step might say: "List new urgent emails and who wrote. If nothing is new say exactly NOTHING NEW. `{last}`"
 

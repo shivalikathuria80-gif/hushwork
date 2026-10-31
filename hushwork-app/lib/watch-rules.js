@@ -33,8 +33,15 @@ export const isWatchStart = (step) => step?.kind === "trigger" && step.fields?.h
 // A workflow is a watch workflow when its saved first step says so (no extra column: the plan is the one source).
 export const isWatchPlan = (plan) => Array.isArray(plan) && isWatchStart(plan[0]);
 
-// The quiet marker: an answer that starts with NOTHING NEW (any capitals, spaces in front are ignored).
-export const isNothingNew = (answer) => typeof answer === "string" && /^nothing new\b/i.test(answer.trim());
+// The quiet marker: an answer that starts with NOTHING NEW (any capitals, spaces in front are ignored). A cheap model often says it its own way
+// ("No new overdue invoices.", "There is nothing new.", "No changes since the last check."), which used to send a nudge about nothing. Those
+// count too, but only as a SHORT one-line answer: a longer answer may hold real news after its first words, so it still speaks up.
+const SAYS_NOTHING_NEW = /^(?:there\s+(?:is|are|was|were)\s+)?(?:nothing\s+(?:is\s+)?new\b|no\s+new\b|no\s+(?:changes?|updates?)\b|nothing\s+(?:has\s+)?changed\b)/i;
+export const isNothingNew = (answer) => {
+  if (typeof answer !== "string") return false;
+  const text = answer.trim();
+  return /^nothing new\b/i.test(text) || (text.length <= 80 && !text.includes("\n") && SAYS_NOTHING_NEW.test(text));
+};
 
 // Runs page: the practice runs that ended quietly. `runs` = [{ id, live, results }] with results read by readSavedResults; a quiet run has a saved
 // "live" record with `quiet: true` that points back to it (`from`). Returns a Set of those practice run ids.

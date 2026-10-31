@@ -503,16 +503,17 @@ test("the Start step offers 'Keep watching', and it passes the normal checks lik
 });
 
 // ---- the "Watch for me" bundle ----------------------------------------------------------------------------------------------------------------------
-test("bundle 'Watch for me': three ready-made watch workflows, each Start watch + one quiet-able check + the stop sign + an email that carries {answer}", () => {
+test("bundle 'Watch for me': four ready-made watch workflows, each Start watch + one quiet-able check + the stop sign + an email or a Linear task that carries {answer}", () => {
   const bundle = findBundle("watchers");
   assert.equal(bundle.name, "Watch for me");
   assert.ok(BUNDLES.some((b) => b.id === "watchers"), "the Watch for me bundle is in the list");
-  assert.deepEqual(bundle.workflows.map((w) => w.title), ["Overdue invoice watch", "Unhappy email watch", "GitHub watch"]);
-  const expected = { "overdue-invoice-watch": ["app", "stripeinvoices", "Every weekday at 9:00"], "unhappy-email-watch": ["gmailtext", "", "Every weekday at 8:30"], "github-watch": ["app", "github", "Every day at 17:00"] };
+  assert.deepEqual(bundle.workflows.map((w) => w.title), ["Overdue invoice watch", "Unhappy email watch", "Client request watch", "GitHub watch"]);
+  const expected = { "overdue-invoice-watch": ["app", "stripeinvoices", "Every weekday at 9:00"], "unhappy-email-watch": ["gmailtext", "", "Every weekday at 8:30"], "client-request-watch": ["gmailtext", "", "Every weekday at 12:00"], "github-watch": ["app", "github", "Every day at 17:00"] };
   for (const workflow of bundle.workflows) {
     const [uses, address, when] = expected[workflow.id];
     const built = buildWorkflow(bundle, workflow);
-    assert.deepEqual(built.steps.map((s) => s.kind), ["trigger", "ai", "approve", "action"], workflow.id);
+    const task = workflow.id === "client-request-watch"; // the one that adds a Linear task instead of emailing the person
+    assert.deepEqual(built.steps.map((s) => s.kind), ["trigger", "ai", "approve", task ? "issue" : "action"], workflow.id);
     assert.equal(built.steps[0].fields.how, "watch", workflow.id);
     assert.equal(built.steps[0].fields.when, when, workflow.id);
     const check = built.steps[1].fields;
@@ -520,9 +521,12 @@ test("bundle 'Watch for me': three ready-made watch workflows, each Start watch 
     assert.equal(check.address, address, workflow.id);
     assert.ok(check.task.endsWith("If nothing is new say exactly NOTHING NEW. {last}"), `${workflow.id}: the job ends with the quiet words and {last}`);
     assert.ok(check.task.length < 110, `${workflow.id}: the job stays under 110 characters (${check.task.length})`);
-    assert.equal(built.steps[3].fields.action, "gmail_send");
-    assert.equal(built.steps[3].fields.target, "{myEmail}", "only to the person");
-    assert.equal(built.steps[3].fields.details, "{answer}", workflow.id);
+    if (task) assert.equal(built.steps[3].fields.title, "{answer}", workflow.id);
+    else {
+      assert.equal(built.steps[3].fields.action, "gmail_send");
+      assert.equal(built.steps[3].fields.target, "{myEmail}", "only to the person");
+      assert.equal(built.steps[3].fields.details, "{answer}", workflow.id);
+    }
     assert.ok(built.steps.every((s) => s.kind === "trigger" || s.kind === "approve" || isApprovable(s)), `${workflow.id}: every step can really run`);
     assert.ok(/Every hour/.test(workflow.body) && /15 AI steps a day/.test(workflow.body), `${workflow.id}: says "Every hour" is possible but uses the AI allowance`);
     assert.match(workflow.body, /never at night, at most 3 a day/);
@@ -543,8 +547,8 @@ test("bundle 'Watch for me': the Start step's words agree with the suggested sch
     assert.equal(db.log.inserts[0].allow_writes, false, `${workflow.id}: writing is off until the person ticks it`);
     assert.match(result.text, /stays quiet/);
   }
-  assert.deepEqual(describeBundle(bundle).workflows.map((w) => w.schedule), ["Every weekday at 09:00", "Every weekday at 08:30", "Every day at 17:00"]);
-  assert.deepEqual([...describeBundle(bundle).connections.map((c) => c.id)].sort(), ["github", "gmailsend", "google", "stripe"]);
+  assert.deepEqual(describeBundle(bundle).workflows.map((w) => w.schedule), ["Every weekday at 09:00", "Every weekday at 08:30", "Every weekday at 12:00", "Every day at 17:00"]);
+  assert.deepEqual([...describeBundle(bundle).connections.map((c) => c.id)].sort(), ["github", "gmailsend", "google", "linear", "stripe"]);
 });
 
 test("the Studio card knows the new Start: it says it checks quietly and never acts alone; the other Starts keep their plain words", () => {

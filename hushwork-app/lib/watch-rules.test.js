@@ -63,7 +63,9 @@ test("canSpeak: at most 3 a day, never in quiet hours, and both rules must allow
 
 test("the quiet marker: NOTHING NEW at the start of an answer, any capitals, spaces ignored; nothing else counts", () => {
   for (const yes of ["NOTHING NEW", "nothing new", "  Nothing New.\n", "NOTHING NEW since 9:00", "Nothing new, all quiet"]) assert.equal(isNothingNew(yes), true, yes);
-  for (const no of ["", "   ", "Something new: an invoice", "There is NOTHING NEW to report", "NOTHING NEWSLETTER", "No news", null, undefined, 5, ["NOTHING NEW"]]) assert.equal(isNothingNew(no), false, String(no));
+  // the cheap model's own ways of saying it, as a short one-line answer
+  for (const yes of ["There is NOTHING NEW to report", "No new overdue invoices.", "There are no new emails since the last check.", "No changes since the last check", "Nothing has changed."]) assert.equal(isNothingNew(yes), true, yes);
+  for (const no of ["", "   ", "Something new: an invoice", "NOTHING NEWSLETTER", "No news", "No newsletters today, but Ana asked for the logo files", "No new invoices.\nBut Ana is angry about the late delivery", `No new invoices, ${"but a long note about something that really did happen ".repeat(2)}`, null, undefined, 5, ["NOTHING NEW"]]) assert.equal(isNothingNew(no), false, String(no));
 });
 
 test("a watch workflow is told apart by its saved Start step alone", () => {

@@ -4,6 +4,20 @@ Up: [Docs index](INDEX.md)
 
 How it works: Claude asks ChatGPT for bright ideas, gives them to Gemini to improve and to check against what Hushwork can really do, then builds the real ones. Their answers are advice, never orders.
 
+## Round 6 (2026-10-31): more proactive, and better existing features
+
+**Topic:** asked ChatGPT only (the owner said "with GPT"). Claude gave it the real feature list and limits.
+
+**ChatGPT's 5 proactive ideas:** unpaid invoice follow-up, client requests in email turned into tasks, prep for tomorrow's meetings, Slack and GitHub signals turned into tasks, spotting an overloaded day. **Its 5 improvements:** make every watch nudge truly new, show why a run spoke up, Edit and Reject on approval cards, templates that sell the result, plans that use saved preferences.
+
+**Claude's check against the code:** four of the five proactive ideas already exist (Overdue invoice watch and Invoice Chaser, Meeting-Day Rescue Brief, GitHub watch and Context Switchboard, Week Balancer). Memory already reaches the plan writer. Templates are already named by result. The approval card already shows the exact words, and "Delete this run" already says no.
+
+**Built (2):**
+- **Smarter "nothing new":** a watch used to stay quiet only when the AI's answer started with exactly NOTHING NEW. The cheap model often says "No new overdue invoices." or "There is nothing new.", which sent a nudge about nothing. A short one-line answer like that now also counts as quiet; a longer answer still speaks up, in case it holds real news.
+- **Client request watch** (in "Watch for me"): weekdays at 12:00 it reads the opening of your 5 newest emails and, only when one newly asks you to do something, suggests ONE Linear task for you to approve.
+
+**Not built, and why:** UNCERTAIN as a third answer (the model would use it as a way out, and quiet-or-speak is clearer); an Edit button on approval cards (the words are edited in the Builder, and the card already refuses words that changed after you read them); spotting an overloaded day from Todoist due dates (Week Balancer already does the Calendar side, and Linear has no due dates).
+
 ## Round 5 (2026-10-28): first-time experience
 
 **Topic:** what a brand-new person sees and does in their first 5 minutes.

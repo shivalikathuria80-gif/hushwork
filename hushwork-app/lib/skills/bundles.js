@@ -107,6 +107,9 @@ export const SKILLS = [
   skill("watch-github", "Watch GitHub notifications", "Inbox", "Reads your latest GitHub notifications and lists the new ones that need action since the last check. If nothing is new it says NOTHING NEW and the run ends quietly.",
     { reads: "Your latest GitHub notifications (read only), plus its own answer from the last check.", needs: ["github"] },
     step("ai", { task: "List new GitHub notifications that need action. If nothing is new say exactly NOTHING NEW. {last}", uses: "app", address: "github" })),
+  skill("watch-client-requests", "Watch for new client requests", "Inbox", "Reads the opening of your 5 newest emails and, when one newly asks you to do something, writes it as one short task title. If nothing is new it says NOTHING NEW and the run ends quietly.",
+    { reads: "The sender, subject and opening text (about 450 characters) of your 5 newest emails, plus its own answer from the last check. That text goes to the AI (Groq). It cannot send or change anything.", needs: ["google"] },
+    step("ai", { task: "New email asking me to do something? One short task title. If nothing is new say exactly NOTHING NEW. {last}", uses: "gmailtext", address: "" })),
   skill("ask-approval", "Ask you to approve", "ShieldCheck", "A stop sign: it marks the point where the workflow starts to write, so you know to read the approval card.",
     { reads: "Nothing." },
     step("approve", { what: "Everything that writes below, before it happens" })),
@@ -264,9 +267,9 @@ export const BUNDLES = [
   // check uses one AI step, and a person gets 15 AI steps a day. Nothing is written by itself: the email waits for the person's Approve click.
   {
     id: "watchers", name: "Watch for me", icon: "ShieldCheck",
-    blurb: "Quiet checks that only get in touch when something new shows up: overdue invoices, unhappy emails, GitHub.",
-    connections: ["stripe", "google", "github", "gmailsend"],
-    skills: ["watch-invoices", "watch-unhappy-emails", "watch-github", "ask-approval", "email-me"],
+    blurb: "Quiet checks that only get in touch when something new shows up: overdue invoices, unhappy emails, client requests, GitHub.",
+    connections: ["stripe", "google", "github", "gmailsend", "linear"],
+    skills: ["watch-invoices", "watch-unhappy-emails", "watch-client-requests", "watch-github", "ask-approval", "email-me", "linear-task"],
     workflows: [
       {
         id: "overdue-invoice-watch", title: "Overdue invoice watch", body: "Every weekday at 9:00: checks your Stripe invoices and stays quiet unless one has newly gone overdue. Then it emails you once (never at night, at most 3 a day) to open the Runs page, where you read it and press Approve. You can write \"Every hour\" in the Start step, but each check uses one of your 15 AI steps a day.",
@@ -279,6 +282,12 @@ export const BUNDLES = [
         request: "Every weekday at 8:30, check my newest emails and tell me only when there is a new urgent or unhappy one. Ask me before anything is sent.",
         start: { how: "watch", when: "Every weekday at 8:30" }, schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 30 },
         flow: ["watch-unhappy-emails", "ask-approval", ["email-me", { title: "Unhappy or urgent emails", details: "{answer}" }]],
+      },
+      {
+        id: "client-request-watch", title: "Client request watch", body: "Every weekday at 12:00: reads the opening of your 5 newest emails and stays quiet unless one newly asks you to do something. Then it emails you once (never at night, at most 3 a day) to open the Runs page, where you read the task and press Approve to add it to Linear. The text of those emails goes to the AI (Groq). It only sees the 5 newest emails, so a request buried deeper is missed. You can write \"Every hour\" in the Start step, but each check uses one of your 15 AI steps a day.",
+        request: "Every weekday at 12:00, check my newest emails and, when one asks me to do something, turn it into a Linear task. Ask me first.",
+        start: { how: "watch", when: "Every weekday at 12:00" }, schedule: { frequency: "weekdays", weekday: 1, hour: 12, minute: 0 },
+        flow: ["watch-client-requests", "ask-approval", "linear-task"],
       },
       {
         id: "github-watch", title: "GitHub watch", body: "Every day at 17:00: checks your GitHub notifications and stays quiet unless something new needs action. Then it emails you once (never at night, at most 3 a day) to open the Runs page. You can write \"Every hour\" in the Start step, but each check uses one of your 15 AI steps a day.",
