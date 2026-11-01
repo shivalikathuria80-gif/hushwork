@@ -4,6 +4,7 @@ import Workspace from "@/components/app/Workspace";
 import AiWorkspace from "@/components/app/AiWorkspace";
 import GettingStarted from "@/components/app/GettingStarted";
 import Drafts, { DraftsFallback } from "@/components/app/Drafts";
+import AgentPanel from "@/components/app/AgentPanel";
 
 export const metadata = { title: "Workspace - Hushwork", robots: { index: false, follow: false } };
 
@@ -29,7 +30,7 @@ export default function AppPage() {
             </Workspace>
           }
         >
-          <AiWorkspace>
+          <AiWorkspace top={<Suspense fallback={null}><AgentPanel /></Suspense>}>
             <section id="drafts" className="mt-10">
               <Suspense fallback={<DraftsFallback />}>
                 <Drafts />

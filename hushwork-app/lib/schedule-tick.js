@@ -4,8 +4,10 @@ import { getCronSecret } from "@/lib/schedule-env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runDueSchedules } from "@/lib/schedule-runner";
 import { startPracticeRun } from "@/lib/run-core";
-import { notifyScheduleProblem, notifyWatch } from "@/lib/schedule-notify";
+import { notifyAgent, notifyScheduleProblem, notifyWatch } from "@/lib/schedule-notify";
 import { isPaused } from "@/lib/app-controls";
+import { runDueAgents } from "@/lib/agent/runner";
+import { checkAgent } from "@/lib/agent/check";
 
 // What the clock calls (app/api/cron/tick). It does NOTHING unless the call carries the clock's password in the Authorization header
 // ("Bearer <CRON_SECRET>"; Vercel Cron sends exactly that when CRON_SECRET is set). Answers are small and never hold anyone's data:
@@ -25,5 +27,7 @@ export async function handleTick(request) {
 
   if (await isPaused(admin)) return reply(200, { ok: true, paused: true, due: 0, ran: 0, stopped: 0, failed: 0, skipped: 0 }); // the pause switch: no schedule is claimed or run, they wait
   const summary = await runDueSchedules({ admin, run: startPracticeRun, notify: (problem) => notifyScheduleProblem({ admin, ...problem }), nudge: (watch) => notifyWatch({ admin, ...watch }) });
-  return reply(summary.ok ? 200 : 500, summary);
+  // The Hushwork Agent's looks (lib/agent/). A problem there never fails the schedules above.
+  const agents = await runDueAgents({ admin, check: checkAgent, nudge: (found) => notifyAgent({ admin, ...found }) }).catch(() => ({ ok: false }));
+  return reply(summary.ok ? 200 : 500, { ...summary, agents: { looked: agents.looked ?? 0, told: agents.told ?? 0 } });
 }

@@ -12,6 +12,7 @@ export const DOC_GROUPS = [
   {
     title: "Using Hushwork",
     pages: [
+      { slug: "agent", title: "Your Hushwork Agent" },
       { slug: "workspace", title: "The workspace: describe a chore" },
       { slug: "builder", title: "The Builder and its blocks" },
       { slug: "templates", title: "Templates" },

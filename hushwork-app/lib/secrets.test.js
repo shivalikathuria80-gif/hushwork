@@ -40,7 +40,7 @@ test("lib/ai/key.js is marked server-only and is imported only by server code", 
   const key = files.find((file) => file.name === "lib/ai/key.js").text;
   assert.match(key, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/ai\/key|(?:\.\.?\/)+(?:lib\/)?(?:ai\/)?key)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/plan.js", "lib/ai-status.js", "lib/run-core.js"]); // the two Server Actions that call the AI, and the helper that tells pages only "on or off"
+  assert.deepEqual(importers.sort(), ["lib/actions/plan.js", "lib/agent/check.js", "lib/ai-status.js", "lib/run-core.js"]); // the code that calls the AI (plans, steps, the agent's look), and the helper that tells pages only "on or off"
   for (const name of importers) {
     const text = files.find((file) => file.name === name).text;
     assert.ok(!/^\s*["']use client["']/m.test(text), `${name} is browser code and must not import the key reader`);
@@ -305,7 +305,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/skills/connection-status.js"]);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/agent/check.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/skills/connection-status.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${tool}", "/tools/execute/${action.tool}", "/tools/execute/${second.tool}"], "the tools that run are the lookups in the apps list and the actions in the actions list (and the second call of an action that needs two, written in that same action's entry)");

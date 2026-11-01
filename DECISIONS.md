@@ -94,6 +94,7 @@ Last updated: 2026-10-24
 | D-050 | Round 5 (first-time experience): example sentences under the empty box and a 3-step Getting started card; no demo mode | ✅ | 2026-10-28 |
 | D-051 | Docs site on docs.hushwork.in: same app, a host rewrite, 22 markdown pages; technical reference in `docs/reference/` | ✅ | 2026-10-28 |
 | D-052 | hushwork.in and docs.hushwork.in live: Vercel name servers, site address setting, Supabase, Google and Linear callbacks | ✅ | 2026-10-29 |
+| D-053 | The Hushwork Agent: always on once turned on; looks at connected apps at 9:00, 13:00, 17:00; up to 3 notes on the workspace; read-only; emails only on news | ✅ | 2026-11-01 |
 
 ---
 
@@ -540,3 +541,11 @@ Last updated: 2026-10-24
 - **Why:** Google's review needs a real domain; the docs site needs its own host. Name servers instead of single records because Hostinger would not let the owner edit records while DNS was parked.
 - **Other services:** Supabase Site URL `https://hushwork.in` plus redirect list for `hushwork.in/**` and `docs.hushwork.in/**` (the old list had only localhost). Google "Web client 1" and the Linear app now list the `hushwork.in` and `hushwork-six.vercel.app` callbacks. Callbacks are built from the request host, so each host must be registered.
 - **Left alone on purpose:** the clock address in `supabase/clock.sql` and `HUSHWORK_URL` (the old address keeps answering; change them together with the new clock password). Google "Web client 2" lists only `https://hushwork-six.vercel.app` with no path and was not touched; it looks unused.
+
+### D-053: The Hushwork Agent, always on (2026-11-01)
+- **Decision:** A per-person agent the owner asked for ("not a skill: always doing, like the big AI assistants"). Turned on once on the workspace. At 09:00, 13:00 and 17:00 the person's time the clock (`lib/schedule-tick.js`) has it read every connected app (Calendar next 7 days, Gmail senders and subjects, Linear open tasks, up to 3 Composio apps), asks the AI ONCE, and saves up to 3 notes (what needs you, why, a ready request). The notes show at the top of the workspace with **Do this** (fills the request box: plan, then Approve as usual) and **Dismiss**.
+- **Safety:** read-only; never sends or changes anything by itself; emails the person only when a note is new (at most 3 a day because looks are daytime-only), and the email never holds what was found; the pause switch stops it; each look is one of the 15 daily AI steps; email TEXT is never read.
+- **Code:** `lib/agent/brain.js` (times, AI prompt, clean-up), `lib/agent/check.js` (one look), `lib/agent/runner.js` (the clock's part), `lib/actions/agent.js` (buttons), `components/app/AgentPanel.js` + `AgentCard.js`, `supabase/agent.sql` (table `agent_state`, one row per person, RLS). Docs: `content/docs/agent.md`.
+- **Why not reuse watch mode:** a watch is one workflow that reads one place per AI step; the agent reads everything in one AI call, needs no setup and fits the daily AI allowance.
+- **Next action:** the owner pastes `supabase/agent.sql` into Supabase, turns the agent on, and checks the first notes.
+

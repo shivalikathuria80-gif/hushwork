@@ -24,7 +24,8 @@ const EXAMPLES = [
 
 // `ai` is { enabled, limit } from the server (AiWorkspace.js): is AI planning available, and how many AI plans a person gets a day.
 // It never holds the key.
-export default function Workspace({ children, ai }) {
+// `top` (optional) is shown above the request box, inside the same context, so the agent's "Do this" can fill the box.
+export default function Workspace({ children, ai, top = null }) {
   const [seed, setSeed] = useState(null);
   const composer = useRef(null); // gives us the composer's guard: "are there unsaved step edits? ask first"
   // Every call gets a higher id, so clicking the same draft twice still counts as a new request.
@@ -37,6 +38,7 @@ export default function Workspace({ children, ai }) {
 
   return (
     <FillContext value={fill}>
+      {top}
       <Composer ref={composer} seed={seed} ai={ai} />
 
       <section aria-labelledby="examples-heading" className="mt-4">

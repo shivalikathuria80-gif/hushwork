@@ -69,3 +69,25 @@ export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, 
     return "error";
   }
 }
+
+// ---- THE HUSHWORK AGENT (lib/agent/) ---------------------------------------------------------------------------------------------------------------
+// After a look that found a note the person has not seen, ONE short email to the person THEMSELF says to open the workspace. Looks happen only at
+// 09:00, 13:00 and 17:00 their time (lib/agent/brain.js), so that is at most 3 emails a day and never at night. Like the watch email, the words
+// never include what was found. It never throws; it returns "sent" or the reason it did not send.
+export const agentText = (count, siteUrl) => `Your Hushwork agent noticed ${count === 1 ? "something that needs you" : `${count} things that need you`}. Open your workspace to read ${count === 1 ? "it" : "them"} and decide: ${siteUrl}/app\nThe agent only reads. Nothing was sent or changed for you. To stop these emails, turn the agent off on that page.`;
+
+export async function notifyAgent({ admin, userId, notes, send = runActionTool, key = getComposioKey(), siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "" }) {
+  try {
+    if (!key) return "off";
+    const { data: found } = await admin.auth.admin.getUserById(userId);
+    const action = findAction("gmail_send");
+    const target = checkTarget(action, found?.user?.email);
+    if (target.error) return "no_address";
+    const count = Array.isArray(notes) ? notes.length : 1;
+    const result = await send({ key, userId, action, values: { target: target.value, title: "Your Hushwork agent noticed something", details: agentText(count, siteUrl.replace(/\/$/, "")) } });
+    return result.ok ? "sent" : "not_sent";
+  } catch {
+    console.error("an agent email could not be sent");
+    return "error";
+  }
+}

@@ -412,7 +412,7 @@ test("the nudge: 'off' without a Composio key (nothing is even looked up), no re
 
 test("the nudge is the only thing watch mode does by itself, and it is wired in with no new door: source checks", () => {
   const notify = fs.readFileSync(new URL("./schedule-notify.js", import.meta.url), "utf8");
-  const watchPart = notify.slice(notify.indexOf("// ---- WATCH MODE")).replace(/\/\/.*$/gm, "");
+  const watchPart = notify.slice(notify.indexOf("// ---- WATCH MODE"), notify.indexOf("// ---- THE HUSHWORK AGENT")).replace(/\/\/.*$/gm, "");
   assert.ok(watchPart.includes('findAction("gmail_send")') && watchPart.includes("found?.user?.email"), "to the person's own address, through Gmail (send)");
   assert.ok(!/\bfetch\(|webhook|oauth/i.test(watchPart), "no webhook, no raw request");
   assert.equal(watchPart.match(/details:/g).length, 1, "the email body is built in one place");

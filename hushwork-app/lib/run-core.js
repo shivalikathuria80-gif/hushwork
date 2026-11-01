@@ -287,7 +287,7 @@ export async function approveWebCall(input, who) {
 const ALREADY = "This step already ran in this run, so it was not done a second time. To do it again, run the workflow again.";
 const COMPOSIO_OFF = "More apps is not switched on. Add COMPOSIO_API_KEY to .env.local first (see Connections).";
 const LINEAR_OFF = "Linear is not connected yet. Open Connections and press Connect Linear.";
-async function linearAuthorization(supabase, userId) {
+export async function linearAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
   const app = getApp(findApp("linear"));
   if (secretKey && app) {
@@ -301,7 +301,7 @@ async function linearAuthorization(supabase, userId) {
 
 // Google works only through the Connect button (there is no personal-key shortcut). Returns "Bearer <token>" or null.
 const GOOGLE_OFF = "Google is not connected yet. Open Connections and press Connect Google.";
-async function googleAuthorization(supabase, userId) {
+export async function googleAuthorization(supabase, userId) {
   const secretKey = getConnectionsKey();
   const app = getApp(findApp("google"));
   if (!secretKey || !app) return null;
