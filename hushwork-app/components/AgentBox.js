@@ -149,10 +149,10 @@ export default function AgentBox() {
           </ol>
           {phase === "ready" && (
             <motion.div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-              <Btn href="#wait" size="sm" iconRight="ArrowRight">Join the waitlist</Btn>
+              <Btn href="/login#create" size="sm" iconRight="ArrowRight">Sign up to run it</Btn>
               <Btn size="sm" variant="secondary" icon="Pencil" onClick={() => { setPhase("idle"); setPlan([]); }}>Edit request</Btn>
               <Btn size="sm" variant="ghost" icon="RotateCcw" onClick={reset}>Start over</Btn>
-              <p className="w-full text-sm text-mute">Nothing is saved yet. Join the waitlist to be first to run it.</p>
+              <p className="w-full text-sm text-mute">Nothing is saved yet. Make a free account to save this plan and run it.</p>
             </motion.div>
           )}
         </motion.div>

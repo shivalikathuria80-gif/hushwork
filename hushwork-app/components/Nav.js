@@ -32,7 +32,7 @@ export default function Nav() {
             <span className="dark:hidden"><Icon name="Moon" size={18} /></span>
           </button>
           {/* Wrapped so "hidden on phones" cannot be overridden by the button's own display style. */}
-          <div className="hidden sm:block"><Btn href="#wait" size="sm">Join the waitlist</Btn></div>
+          <div className="hidden items-center gap-2 sm:flex"><Btn href="/login" size="sm" variant="ghost">Log in</Btn><Btn href="/login#create" size="sm">Sign up free</Btn></div>
           <button
             className="grid h-11 w-11 place-items-center rounded-xl text-mute transition-colors duration-120 ease-standard hover:bg-raised hover:text-ink active:bg-line md:hidden"
             aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}
@@ -51,7 +51,8 @@ export default function Nav() {
             {LINKS.map(([label, href]) => (
               <a key={label} href={href} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-3 text-ink transition-colors duration-120 ease-standard hover:bg-raised active:bg-line">{label}</a>
             ))}
-            <Btn href="#wait" onClick={() => setOpen(false)} className="mt-2 w-full">Join the waitlist</Btn>
+            <Btn href="/login#create" onClick={() => setOpen(false)} className="mt-2 w-full">Sign up free</Btn>
+            <Btn href="/login" variant="secondary" onClick={() => setOpen(false)} className="mt-2 w-full">Log in</Btn>
           </motion.div>
         )}
       </AnimatePresence>

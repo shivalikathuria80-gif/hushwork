@@ -10,6 +10,7 @@ import { listConnected } from "@/lib/connectors/composio";
 import DisconnectApp from "@/components/app/DisconnectApp";
 import TestConnections from "@/components/app/TestConnections";
 import AppLogo, { AppLogos } from "@/components/AppLogo";
+import { GOOGLE_SOON, googleOpenFor } from "@/lib/connectors/google-gate";
 
 export const metadata = { title: "Connections - Hushwork", robots: { index: false, follow: false } };
 
@@ -27,6 +28,7 @@ const RESULTS = {
   failed: ["problem", "The sign-in was not accepted. Press Connect again."],
   save: ["problem", "The app said yes, but saving it failed. One of the setup steps below may be missing."],
   setup: ["problem", "The Connect button needs its one-time setup first. See below."],
+  soon: ["problem", GOOGLE_SOON],
 };
 
 const buttonLook = "inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-transparent bg-accent px-5 text-[15px] font-semibold text-on-accent transition-[background-color] duration-120 ease-standard hover:bg-accent-hover active:bg-accent-active md:h-9 md:text-sm";
@@ -198,7 +200,8 @@ async function AppCard({ entry, searchParams }) {
   const status = (await connectorStatus(await createClient(), user.id))[app];
   const result = params[app];
   const note = typeof result === "string" && Object.hasOwn(RESULTS, result) ? RESULTS[result] : null;
-  const ready = status.hasApp && status.hasKey && !status.tableMissing; // the one-time setup is done
+  const soon = app === "google" && !googleOpenFor(user.id); // paused for this account until Google approves Hushwork (lib/connectors/google-gate.js)
+  const ready = status.hasApp && status.hasKey && !status.tableMissing && !soon; // the one-time setup is done
   const name = entry.name;
 
   return (
@@ -217,8 +220,8 @@ async function AppCard({ entry, searchParams }) {
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <p className="flex min-w-0 flex-1 items-center gap-2 font-medium">
-            <Icon name={status.personalKey ? "CircleCheck" : "CircleAlert"} className={status.personalKey ? "text-success" : "text-mute"} />
-            {status.personalKey ? "Working with the key in .env.local (this computer only)." : "Not connected yet."}
+            <Icon name={status.personalKey ? "CircleCheck" : soon ? "Clock" : "CircleAlert"} className={status.personalKey ? "text-success" : "text-mute"} />
+            {status.personalKey ? "Working with the key in .env.local (this computer only)." : soon ? "Coming soon." : "Not connected yet."}
           </p>
           {/* A plain link on purpose: it must not be pre-loaded in the background, because opening it starts the sign-in. */}
           {ready && <a href={`/api/connect/${app}`} className={buttonLook}>Connect {name}</a>}
@@ -229,7 +232,9 @@ async function AppCard({ entry, searchParams }) {
         {entry.about}
       </p>
 
-      {!ready && !status.connected && (
+      {soon && !status.connected && <p className="mt-3 rounded-xl bg-raised px-3 py-2 text-sm">{GOOGLE_SOON}</p>}
+
+      {!ready && !soon && !status.connected && (
         <div className="mt-4 rounded-xl border border-line bg-raised p-3">
           <h3 className="text-sm font-medium">One-time setup (the owner does this once, then everybody just presses Connect)</h3>
           <ol className="mt-2 space-y-3 text-sm text-mute">

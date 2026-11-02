@@ -3,7 +3,7 @@ import Hero from "@/components/Hero";
 import HowItWorks from "@/components/HowItWorks";
 import Automations from "@/components/Automations";
 import Features from "@/components/Features";
-import Waitlist from "@/components/Waitlist";
+import SignUpCta from "@/components/SignUpCta";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -18,7 +18,7 @@ export default function Home() {
         <HowItWorks />
         <Automations />
         <Features />
-        <Waitlist />
+        <SignUpCta />
       </main>
       <Footer />
     </div>

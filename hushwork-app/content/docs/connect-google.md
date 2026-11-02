@@ -2,6 +2,8 @@
 
 Press Connect Google once to let Hushwork read your calendar, inbox headers and Drive file names, and add rows to a sheet you name.
 
+**Coming soon.** Google is still reviewing Hushwork, so this connection is switched off for now and the Connections page shows "Coming soon". Sending email and making Docs, Sheets, Slides and Calendar events work now through Composio: see [Google Workspace through Composio](/docs/connect-google-workspace). The rest of this page describes how it will work.
+
 ## What happens when you connect
 
 On the **Connections** page, find the box called **Google (Calendar, Sheets, Gmail and Drive)** and press **Connect Google**. Google shows you four permissions. You press **Allow**. Hushwork then keeps the permission Google gives it, scrambled (encrypted), until you press **Disconnect**.

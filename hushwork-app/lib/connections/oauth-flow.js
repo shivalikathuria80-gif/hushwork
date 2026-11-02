@@ -8,6 +8,7 @@ import { getApp, getConnectionsKey } from "@/lib/connectors/oauth-env";
 import { parseKey } from "@/lib/connections/crypto";
 import { saveConnection } from "@/lib/connections/store";
 import { findApp } from "@/lib/connectors/app-list";
+import { googleOpenFor } from "@/lib/connectors/google-gate";
 import { authorizeUrl, exchangeCode } from "@/lib/connectors/oauth-app";
 
 // The two halves of "Connect <app>", shared by every app in lib/connectors/app-list.js. The two route files (app/api/connect/[provider])
@@ -29,7 +30,8 @@ const redirectUri = (request, provider) => `${new URL(request.url).origin}/api/c
 export async function startConnect(provider, request) {
   const entry = findApp(provider);
   if (!entry) notFound();
-  await requireUser(); // signed out -> sent to /login
+  const user = await requireUser(); // signed out -> sent to /login
+  if (provider === "google" && !googleOpenFor(user.id)) back(provider, "soon"); // Google is paused for this account (lib/connectors/google-gate.js)
   const app = getApp(entry);
   if (!app || !parseKey(getConnectionsKey())) back(provider, "setup");
 
@@ -43,7 +45,8 @@ export async function startConnect(provider, request) {
 export async function finishConnect(provider, request) {
   const entry = findApp(provider);
   if (!entry) notFound();
-  await requireUser(); // signed out -> sent to /login
+  const user = await requireUser(); // signed out -> sent to /login
+  if (provider === "google" && !googleOpenFor(user.id)) back(provider, "soon"); // the same gate on the way back, so a saved link cannot get round it
   const url = new URL(request.url);
   const jar = await cookies();
   const expected = jar.get(cookieName(provider))?.value ?? "";

@@ -17,7 +17,7 @@ export const metadata = {
   metadataBase: new URL(siteUrl),
   title,
   description:
-    "Hushwork turns a plain-English description of your weekly admin into a workflow you can read, approve and let run. Join the early access list.",
+    "Hushwork turns a plain-English description of your weekly admin into a workflow you can read, approve and let run. Free to start.",
   openGraph: {
     type: "website",
     siteName: "Hushwork",

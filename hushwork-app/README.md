@@ -58,7 +58,7 @@ Sign-in, saved workflows and everything else need your Supabase project to have 
 
 | File | What it makes | Needed for |
 |---|---|---|
-| `waitlist.sql` | the waitlist table (insert only for the public) | the home page's waitlist |
+| `waitlist.sql` | the waitlist table (insert only for the public) | the old waitlist (the home page now asks people to sign up; the saved emails stay) |
 | `workflows.sql` | saved workflows and the privacy rules | sign-in + drafts |
 | `runs.sql` | runs (never edited after they are saved) | the Runs page |
 | `connections.sql` (or `connections-any-app.sql` if the table already exists) | each person's encrypted app connections | Connect Linear / Google |
@@ -116,7 +116,7 @@ An environment variable is a value kept outside the code. Locally, copy `.env.ex
 - `app/app/`: the signed-in pages, inside a shared shell (`layout.js`) with a sidebar (`components/app/AppNav.js`): the workspace (`/app`), Workflows (`/app/workflows`, all saved drafts), the Builder (`/app/builder`), Templates (`/app/templates`), Runs (`/app/runs`, your saved practice runs), Connections (`/app/connections`, nothing is connected yet) and Settings (`/app/settings`).
 - `proxy.js`: runs before `/app/*` and `/login`: checks the sign-in cookie, renews it, redirects signed-out visitors to `/login`. (Next.js 16 name for what used to be "middleware".)
 - `app/opengraph-image.js`: the picture shown when the link is shared.
-- `components/`: one file per section (`Hero`, `AgentBox`, `HowItWorks`, `Automations`, `Features`, `Waitlist`, `Footer`), plus shared pieces (`ui.js`, `icons.js`) and helpers (`MotionProvider`, `useTheme`, `usePrefersReducedMotion`).
+- `components/`: one file per section (`Hero`, `AgentBox`, `HowItWorks`, `Automations`, `Features`, `SignUpCta`, `Footer`), plus shared pieces (`ui.js`, `icons.js`) and helpers (`MotionProvider`, `useTheme`, `usePrefersReducedMotion`).
 - `lib/run-engine.js` (the practice-run walk: what each kind of step would do, tested in `lib/run-engine.test.js`) and `lib/actions/runs.js` (the Practice run button's server action).
 - `components/app/`: the workspace pieces (`Composer`, `StepEditor` (the by-hand step editor, shown inside the Composer's plan card), `Workspace`, `AiWorkspace` (asks the server whether AI planning is on), `Builder` (the Builder page: name, palette of step kinds, Save), `Drafts`, `DraftCard`, `DraftList`, `RunsViewer` (the Runs page), `RunTime`, `AppNav`, `UserBadge`, `ThemeToggle`). `components/useWarnBeforeLeaving.js` makes the browser ask "Leave site?" while step edits are unsaved. `components/login/`: the sign-in form and sculpture panel. `components/ui/liquid-sculpture-hero.tsx` is third-party code, see `../docs/sculpture-assets.md`.
 - `lib/actions/waitlist.js` + `lib/waitlist-core.js`: the waitlist form, on the server, counted per visitor. `lib/actions/account.js` + `lib/account-core.js`: Delete my account. `lib/export-data.js` + `app/api/export/`: Download my data. `app/terms/page.js`: the Terms page.

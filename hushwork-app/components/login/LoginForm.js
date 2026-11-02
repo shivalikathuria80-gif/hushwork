@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { Btn } from "../ui";
@@ -20,8 +20,13 @@ const inputClass = "h-12 w-full rounded-xl border bg-surface px-4 text-[15px] te
 // 2. React sends the form to a Server Action (lib/actions/auth.js), which checks it and talks to Supabase.
 // 3. On success the server redirects to /app. On a problem it returns a small { kind, error, field } object,
 //    and this component shows that sentence next to the right field.
+const subscribeToNothing = () => () => {};
+
 export default function LoginForm() {
-  const [mode, setMode] = useState("signin");
+  // /login#create (the "Sign up free" buttons on the home page) opens on Create account. The page is static, so the address is read in the browser.
+  const wantsCreate = useSyncExternalStore(subscribeToNothing, () => window.location.hash === "#create", () => false);
+  const [chosen, setMode] = useState(null); // what the person picked with the switch, once they touch it
+  const mode = chosen ?? (wantsCreate ? "create" : "signin");
   const [email, setEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [dismissed, setDismissed] = useState(null); // a result the person has moved on from (switched mode)

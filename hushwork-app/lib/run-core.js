@@ -31,6 +31,7 @@ import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps
 import { COMPOSIO_FAILED, checkComposioConnections, runActionTool, runChannelMessages, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
+import { GOOGLE_SOON, googleOpenFor } from "@/lib/connectors/google-gate";
 import { makeLimiter } from "@/lib/ai/limits";
 import { takeDbSlot } from "@/lib/db-limits";
 
@@ -301,7 +302,9 @@ export async function linearAuthorization(supabase, userId) {
 
 // Google works only through the Connect button (there is no personal-key shortcut). Returns "Bearer <token>" or null.
 const GOOGLE_OFF = "Google is not connected yet. Open Connections and press Connect Google.";
+const googleOff = (userId) => (googleOpenFor(userId) ? GOOGLE_OFF : GOOGLE_SOON); // paused for this account (lib/connectors/google-gate.js): say so, not "not connected"
 export async function googleAuthorization(supabase, userId) {
+  if (!googleOpenFor(userId)) return null; // THE GATE: every Google read and write here (and the agent's look) starts with this function
   const secretKey = getConnectionsKey();
   const app = getApp(findApp("google"));
   if (!secretKey || !app) return null;
@@ -413,7 +416,7 @@ export async function approveAiStep(input, who) {
     };
   } else if (uses === "calendar") {
     const authorization = await googleAuthorization(supabase, user.id);
-    if (!authorization) return { error: GOOGLE_OFF };
+    if (!authorization) return { error: googleOff(user.id) };
     tools.calendar_next_events = {
       description: "Lists the person's next events in Google Calendar (up to 10, in the next 7 days).",
       run: async () => {
@@ -424,7 +427,7 @@ export async function approveAiStep(input, who) {
     };
   } else if (uses === "gmail") {
     const authorization = await googleAuthorization(supabase, user.id);
-    if (!authorization) return { error: GOOGLE_OFF };
+    if (!authorization) return { error: googleOff(user.id) };
     tools.gmail_latest_mail = {
       description: "Lists the latest 10 messages in the person's Gmail inbox: time, sender and subject (never the text of an email).",
       run: async () => {
@@ -436,7 +439,7 @@ export async function approveAiStep(input, who) {
   } else if (uses === "gmailtext") {
     // The person chose "with the text of each email" in this step: the opening of the text of the 5 newest emails goes to the AI (and Groq). Read only.
     const authorization = await googleAuthorization(supabase, user.id);
-    if (!authorization) return { error: GOOGLE_OFF };
+    if (!authorization) return { error: googleOff(user.id) };
     tools.gmail_latest_mail_with_text = {
       description: "Lists the 5 newest messages in the person's Gmail inbox: time, sender, subject and the opening of the text of each email.",
       run: async () => {
@@ -447,7 +450,7 @@ export async function approveAiStep(input, who) {
     };
   } else if (uses === "drive") {
     const authorization = await googleAuthorization(supabase, user.id);
-    if (!authorization) return { error: GOOGLE_OFF };
+    if (!authorization) return { error: googleOff(user.id) };
     tools.drive_recent_files = {
       description: "Lists the 10 files in the person's Google Drive that changed most recently: time, kind and name (never what is inside a file).",
       run: async () => {
@@ -510,7 +513,7 @@ export async function approveCalendarLookup(input, who) {
   if (loaded.error) return loaded;
   const { run, step } = loaded;
   const authorization = await googleAuthorization(supabase, user.id);
-  if (!authorization) return { error: GOOGLE_OFF };
+  if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
   const tooMany = limitError(calendarLimits(), user.id, now, "calendar lookups");
@@ -535,7 +538,7 @@ export async function approveGmailLookup(input, who) {
   if (loaded.error) return loaded;
   const { run, step } = loaded;
   const authorization = await googleAuthorization(supabase, user.id);
-  if (!authorization) return { error: GOOGLE_OFF };
+  if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
   const tooMany = limitError(gmailLimits(), user.id, now, "inbox lookups");
@@ -559,7 +562,7 @@ export async function approveDriveLookup(input, who) {
   if (loaded.error) return loaded;
   const { run, step } = loaded;
   const authorization = await googleAuthorization(supabase, user.id);
-  if (!authorization) return { error: GOOGLE_OFF };
+  if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
   const tooMany = limitError(driveLimits(), user.id, now, "file lookups");
@@ -723,7 +726,7 @@ export async function approveSheetsRow(input, who) {
   const staleRow = changedSince(input, sheetsSummary(step, sheetAnswer));
   if (staleRow) return staleRow;
   const authorization = await googleAuthorization(supabase, user.id);
-  if (!authorization) return { error: GOOGLE_OFF };
+  if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
   const tooMany = limitError(sheetsLimits(), user.id, now, "added rows");
@@ -770,7 +773,7 @@ export async function testAllConnections(who) {
         await attempt("Gmail (reading)", () => fetchInbox({ authorization: google })),
         await attempt("Google Drive", () => fetchRecentFiles({ authorization: google })),
       ]
-      : [{ name: "Google (Calendar, Gmail, Drive, Sheets)", state: "off", note: "Not connected. Open Connections and press Connect Google." }],
+      : [{ name: "Google (Calendar, Gmail, Drive, Sheets)", state: "off", note: googleOpenFor(user.id) ? "Not connected. Open Connections and press Connect Google." : GOOGLE_SOON }],
   });
 
   const linear = await linearAuthorization(supabase, user.id);

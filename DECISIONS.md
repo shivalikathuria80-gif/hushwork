@@ -95,6 +95,7 @@ Last updated: 2026-10-24
 | D-051 | Docs site on docs.hushwork.in: same app, a host rewrite, 22 markdown pages; technical reference in `docs/reference/` | ✅ | 2026-10-28 |
 | D-052 | hushwork.in and docs.hushwork.in live: Vercel name servers, site address setting, Supabase, Google and Linear callbacks | ✅ | 2026-10-29 |
 | D-053 | The Hushwork Agent: always on once turned on; looks at connected apps at 9:00, 13:00, 17:00; up to 3 notes on the workspace; read-only; emails only on news | ✅ | 2026-11-01 |
+| D-054 | Public launch: Sign up and Log in replace the waitlist; Hushwork's own Google connection paused for everyone but the owner (GOOGLE_ONLY_FOR) until Google approves; Composio Google stays on | ✅ | 2026-11-02 |
 
 ---
 
@@ -548,4 +549,11 @@ Last updated: 2026-10-24
 - **Code:** `lib/agent/brain.js` (times, AI prompt, clean-up), `lib/agent/check.js` (one look), `lib/agent/runner.js` (the clock's part), `lib/actions/agent.js` (buttons), `components/app/AgentPanel.js` + `AgentCard.js`, `supabase/agent.sql` (table `agent_state`, one row per person, RLS). Docs: `content/docs/agent.md`.
 - **Why not reuse watch mode:** a watch is one workflow that reads one place per AI step; the agent reads everything in one AI call, needs no setup and fits the daily AI allowance.
 - **Next action:** the owner pastes `supabase/agent.sql` into Supabase, turns the agent on, and checks the first notes.
+
+### D-054: Open the app to everyone, Google paused (2026-11-02)
+- **Decision:** The home page asks people to **Sign up free** or **Log in** (`/login#create` opens on Create account) instead of joining the waitlist. Existing waitlist emails stay in the database. Hushwork's OWN Google connection (reading Gmail, Calendar, Drive; adding Sheet rows) is paused for everyone except the accounts in the server setting `GOOGLE_ONLY_FOR` (the owner's account id), because Google's app is still in Testing mode. The Google keys stay in place.
+- **Where the gate sits:** `lib/connectors/google-gate.js`; the first line of `googleAuthorization` in `lib/run-core.js` (every Google read, the Sheets row and the agent's look pass through it), both halves of Connect in `lib/connections/oauth-flow.js`, and the Connections page ("Coming soon").
+- **Why an account id, not an email:** the server reads it from the session or a saved schedule row; nothing a browser sends can change it, and it is a server setting, never in the code.
+- **Not gated:** Google apps through Composio (Gmail send and drafts, Docs, Sheets, Slides, Calendar events, Drive folders) use Composio's own Google app and work for everyone.
+- **Next action:** after Google approves the app, delete `GOOGLE_ONLY_FOR` on Vercel and redeploy.
 

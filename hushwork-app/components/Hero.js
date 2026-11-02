@@ -39,7 +39,7 @@ export default function Hero() {
             Tell Hushwork what you do every week. It builds the workflow, connects your tools and runs it.
           </p>
           <div className="hw-rise mt-8 flex flex-wrap gap-3" style={after(0.3)}>
-            <Btn href="#wait" size="lg" iconRight="ArrowRight">Join the waitlist</Btn>
+            <Btn href="/login#create" size="lg" iconRight="ArrowRight">Sign up free</Btn>
             <Btn href="#how" size="lg" variant="secondary">See how it works</Btn>
           </div>
         </div>
