@@ -4,9 +4,7 @@ Short answers to the problems people hit most, using the same words Hushwork sho
 
 ## First thing to try
 
-Open **Connections** and press **Test now** under **Test all my connections**. It really checks Google, Linear and every app you connected, and tells you what each one answered. A red line says what is wrong. See [Connections overview](/docs/connections).
-
-Then open the **Runs** page. A step that stopped shows **It stopped here.** and the reason, including what the app said.
+Open the **Runs** page. A step that stopped shows **It stopped here.** and the reason, including what the app said.
 
 ## Connecting
 

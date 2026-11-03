@@ -28,7 +28,7 @@ import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { LINEAR_CREATE_FAILED, createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps";
-import { COMPOSIO_FAILED, checkComposioConnections, runActionTool, runChannelMessages, runReadTool } from "@/lib/connectors/composio";
+import { COMPOSIO_FAILED, runActionTool, runChannelMessages, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { GOOGLE_SOON, googleOpenFor } from "@/lib/connectors/google-gate";
@@ -741,60 +741,3 @@ export async function approveSheetsRow(input, who) {
   if (!added.ok) return afterFailedWrite(supabase, run, step, added.error, added);
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: `Added one row to your Google Sheet (${row.cells.length} ${row.cells.length === 1 ? "box" : "boxes"}): ${row.cells.join(" | ")}`.slice(0, 700) });
 }
-
-// "Test all my connections": a REAL but harmless look at every connection this person has. Only reads (a few calendar events, a few email
-// headers, a few file names, a task list, each app's one lookup) and only a check that each action's inputs match: nothing is sent, written or
-// changed anywhere. Returns { groups: [{ title, rows: [{ name, state: "ok" | "problem" | "off", note, actions? }] }], off: [app names] } or { error }.
-const testLimits = () => (globalThis.__hushworkConnectionTestLimit ??= makeLimiter({ max: 4, windowMs: 5 * 60_000 }));
-
-export async function testAllConnections(who) {
-  const { user, supabase } = who;
-  const now = Date.now();
-  if (testLimits().left(user.id, now) < 1) return { error: "You just ran this. Wait a few minutes and try again." };
-  testLimits().take(user.id, now);
-
-  // One real look. A throw becomes a plain sentence, so one broken connection never hides the others.
-  const attempt = async (name, look) => {
-    try {
-      const answer = await look();
-      return answer.ok ? { name, state: "ok", note: "Works." } : { name, state: "problem", note: String(answer.error ?? "It did not work.").slice(0, 300) };
-    } catch {
-      return { name, state: "problem", note: "It did not answer. Try again in a minute." };
-    }
-  };
-
-  const groups = [];
-  const google = await googleAuthorization(supabase, user.id);
-  groups.push({
-    title: "Google",
-    rows: google
-      ? [
-        await attempt("Google Calendar", () => fetchUpcomingEvents({ authorization: google })),
-        await attempt("Gmail (reading)", () => fetchInbox({ authorization: google })),
-        await attempt("Google Drive", () => fetchRecentFiles({ authorization: google })),
-      ]
-      : [{ name: "Google (Calendar, Gmail, Drive, Sheets)", state: "off", note: googleOpenFor(user.id) ? "Not connected. Open Connections and press Connect Google." : GOOGLE_SOON }],
-  });
-
-  const linear = await linearAuthorization(supabase, user.id);
-  groups.push({ title: "Linear", rows: [linear ? await attempt("Linear", () => fetchLinearIssues({ authorization: linear })) : { name: "Linear", state: "off", note: "Not connected. Open Connections and press Connect Linear." }] });
-
-  const composioKey = getComposioKey();
-  if (!composioKey) {
-    groups.push({ title: "More apps (through Composio)", rows: [{ name: "Composio", state: "problem", note: COMPOSIO_OFF }] });
-    return { groups, off: [] };
-  }
-  const composio = await checkComposioConnections({ key: composioKey, userId: user.id });
-  if (composio.error) {
-    groups.push({ title: "More apps (through Composio)", rows: [{ name: "Composio", state: "problem", note: composio.error }] });
-    return { groups, off: [] };
-  }
-  groups.push({
-    title: "More apps (through Composio)",
-    rows: composio.rows.length
-      ? composio.rows.map((row) => ({ name: row.name, state: row.ok ? "ok" : "problem", note: row.note, actions: row.actions.map((action) => ({ name: action.name, state: action.ok ? "ok" : "problem", note: action.note })) }))
-      : [{ name: "No apps connected yet", state: "off", note: "Open Connections and press Connect on an app, such as Gmail (send) or Slack." }],
-  });
-  return { groups, off: composio.off };
-}
-

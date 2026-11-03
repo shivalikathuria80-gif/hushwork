@@ -47,8 +47,6 @@ Hushwork reads the latest 10 messages of that one channel and hands them to the 
 
 To send a message, use **Do something in another app** and choose **Send a Slack message**. Write the channel in **Where**, for example `general`.
 
-> **Note:** As of late October 2026, Slack messages and GitHub issues have been tested with pretend servers. If one does not work with your real account, press **Test all my connections** and read what the app said.
-
 ## Stripe payments and invoices
 
 Stripe has two lookups on one sign-in:

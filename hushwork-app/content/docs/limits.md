@@ -20,7 +20,6 @@ The counts for AI use, sent actions, Linear tasks and sheet rows live in the dat
 | Sent actions (Do something in another app) | 3 | 15 |
 | Created Linear tasks | 3 | 15 |
 | Added Google Sheet rows | 5 | 30 |
-| Test all my connections | 4 every 5 minutes | none |
 
 Sign-in: 8 tries per email every 10 minutes. Creating an account: 3 tries per email an hour.
 

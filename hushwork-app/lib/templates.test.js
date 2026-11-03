@@ -49,7 +49,7 @@ test("templates: the three that work for real say what they need, and their step
   const { isAiStep } = await import("./run-engine.js");
   const { checkRequestUrl } = await import("./connectors/http.js");
   const real = TEMPLATES.filter((t) => t.needs);
-  assert.deepEqual(real.map((t) => t.id).slice(0, 13), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "testall", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"]);
+  assert.deepEqual(real.map((t) => t.id).slice(0, 12), ["firsttask", "inboxnow", "recentfiles", "weekahead", "siteup", "hellomail", "emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask", "briefing"]);
   for (const t of real.filter((x) => SIMPLE.includes(x.id))) {
     assert.ok(["Linear", "Google", "Nothing"].includes(t.needs), t.id);
     const checked = checkSteps(t.steps).value;
@@ -58,12 +58,7 @@ test("templates: the three that work for real say what they need, and their step
     assert.equal(ai.fields.uses, { Linear: "linear", Google: { inboxnow: "gmail", recentfiles: "drive" }[t.id] ?? "calendar", Nothing: "web" }[t.needs], `${t.id}: the tool matches what it needs`);
     if (ai.fields.uses === "web") assert.ok(checkRequestUrl(ai.fields.address).value, `${t.id}: the starting web address is valid`);
   }
-  // the check-up uses several apps at once: every step must be one that can really be approved, and its writes must read the AI's line
-  const { isAppLookup, isActionStep, isLinearCreate, isRequestStep } = await import("./run-engine.js");
-  const all = checkSteps(real.find((x) => x.id === "testall").steps).value;
-  for (const s of all.filter((x) => x.kind !== "trigger")) assert.ok(isAiStep(s) || isAppLookup(s) || isActionStep(s) || isLinearCreate(s) || isRequestStep(s), `testall: ${s.kind} can be approved`);
-  assert.equal(all.filter(isActionStep).length + all.filter(isLinearCreate).length, 1, "exactly one test task is written");
-  assert.ok(all.findLast(isAiStep) === all[6] && all[7].fields.title === "{answer}", "the write uses the last AI line");
+  const { isActionStep, isLinearCreate } = await import("./run-engine.js");
   // each one-way chain (look, then write) must be approvable, and its write must use the AI's line
   for (const id of ["emailweek", "emailinbox", "emailfiles", "emailtask", "mailtask"]) {
     const chain = checkSteps(real.find((x) => x.id === id).steps).value;

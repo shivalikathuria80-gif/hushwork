@@ -440,20 +440,6 @@ test("a run that stops says WHY: the reason is saved as its own small record (ru
   assert.ok(viewer.includes("stoppedAt"), "the Runs page shows the stop reason");
 });
 
-
-test("Test all my connections only LOOKS: it never calls a write, is for the signed-in person, and is limited", () => {
-  const core = files.find((file) => file.name === "lib/run-core.js").text;
-  const body = core.slice(core.indexOf("export async function testAllConnections"));
-  for (const writer of ["runActionTool(", "appendRow(", "createIssue(", "saveLiveRun(", ".insert(", ".update(", ".delete("]) assert.ok(!body.includes(writer), `testing connections never uses ${writer}`);
-  assert.ok(body.includes("testLimits().left(user.id, now) < 1"), "it is limited per person");
-  const action = files.find((file) => file.name === "lib/actions/connections-check.js").text;
-  assert.ok(/^"use server"/.test(action) && action.indexOf("requireUser()") > 0 && action.indexOf("requireUser()") < action.indexOf("testAllConnections("), "only for a signed-in person, who is found from the session");
-  assert.ok(!/input|formData/.test(action.replace(/\/\/.*$/gm, "")), "nothing from the browser decides whose connections are tested");
-  const composio = files.find((file) => file.name === "lib/connectors/composio.js").text;
-  const check = composio.slice(composio.indexOf("export async function checkComposioConnections"));
-  assert.ok(!check.includes("runActionTool("), "an action is only checked for fit, never run");
-});
-
 test("shared workflow memory is data, not instructions: person-written and verified only, own rows only, never beside an MCP server, nothing it needs from the all-access client", () => {
   const sql = fs.readFileSync(path.join(root, "..", "supabase", "memory.sql"), "utf8");
   assert.match(sql, /enable row level security/);

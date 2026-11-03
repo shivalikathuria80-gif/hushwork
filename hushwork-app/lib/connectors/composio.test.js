@@ -156,36 +156,3 @@ test("apps Composio cannot sign in for are marked with a plain reason, and nothi
   assert.deepEqual(COMPOSIO_APPS.filter((app) => app.unavailable).map((app) => app.id).sort(), ["cloudflare", "vercel", "xero"]);
   for (const app of COMPOSIO_APPS.filter((one) => one.unavailable)) assert.match(app.unavailable, /Not available yet\.$/, app.id);
 });
-
-
-test("test all connections (Composio part): only connected apps are tried, a working app is ok, a refusing app shows what it said, an action that does not fit is flagged, and nothing is ever sent", async () => {
-  const { checkComposioConnections } = await import("./composio.js");
-  const seen = [];
-  const fetchImpl = async (url, init) => {
-    const u = new URL(url);
-    seen.push(`${init.method} ${u.pathname.replace("/api/v3.1", "")}`);
-    const path = u.pathname.replace("/api/v3.1", "");
-    if (path === "/connected_accounts") return json({ items: [{ id: "ca_1", toolkit: { slug: "slack" } }, { id: "ca_2", toolkit: { slug: "notion" } }] });
-    if (path === "/tools/execute/SLACK_LIST_ALL_CHANNELS") return json({ successful: true, data: { channels: [] } });
-    if (path === "/tools/execute/NOTION_SEARCH_NOTION_PAGE") return json({ successful: false, error: "Forbidden: page not shared with the integration" });
-    if (path === "/tools/SLACK_SEND_MESSAGE") return json({ input_parameters: { channel: { required: true }, markdown_text: { required: true } } });
-    if (path === "/tools/NOTION_CREATE_NOTION_PAGE") return json({ input_parameters: { parent_id: { required: true }, title: { required: true }, markdown: {}, bot_token: { required: true } } });
-    return json({}, 404);
-  };
-  const result = await checkComposioConnections({ key: "ak_k", userId: "u-1", fetchImpl });
-  assert.deepEqual(result.rows.map((row) => [row.name, row.ok]), [["Notion", false], ["Slack", true]].sort((a, b) => result.rows.findIndex((r) => r.name === a[0]) - result.rows.findIndex((r) => r.name === b[0])));
-  const slack = result.rows.find((row) => row.name === "Slack");
-  const notion = result.rows.find((row) => row.name === "Notion");
-  assert.match(slack.note, /^Works\./);
-  assert.deepEqual(slack.actions.map((a) => [a.name, a.ok]), [["Send a Slack message", true]]);
-  assert.match(notion.note, /not allowed to do that.*The app said: "Forbidden: page not shared with the integration"/);
-  assert.deepEqual(notion.actions.map((a) => [a.name, a.ok]), [["Create a Notion page", false]]);
-  assert.match(notion.actions[0].note, /bot_token/, "it says which input the tool wants that Hushwork cannot fill in");
-  assert.ok(result.off.includes("Todoist") && result.off.includes("Vercel") && !result.off.includes("Slack") && !result.off.includes("Notion"));
-  assert.ok(seen.every((line) => line.startsWith("GET ") || /^POST \/tools\/execute\/(SLACK_LIST_ALL_CHANNELS|NOTION_SEARCH_NOTION_PAGE)$/.test(line)), "only the two read-only lookups were run; no action was executed");
-  assert.ok(!seen.some((line) => line.includes("SLACK_SEND_MESSAGE") && line.startsWith("POST")));
-
-  const refused = await checkComposioConnections({ key: "ak_k", userId: "u-1", fetchImpl: async () => json({}, 401) });
-  assert.equal(refused.rows, undefined);
-  assert.equal(refused.error, COMPOSIO_FAILED.key);
-});

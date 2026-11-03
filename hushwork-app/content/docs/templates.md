@@ -34,7 +34,7 @@ The rest need an app connected first. See the [Connections overview](/docs/conne
 | Google and Gmail (send) | Email me my week ahead, Sort your inbox, Receipts and invoices I saved, by email, Feedback roundup by email |
 | Linear | Which task should I do first? Weekly design review task |
 | Linear and Gmail (send) | Send a weekly client report, Email me my top task |
-| Google and Linear | Turn my latest email into a task, Follow up new leads, Test all my connections |
+| Google and Linear | Turn my latest email into a task, Follow up new leads |
 | Stripe and Gmail (send) | Weekly Stripe summary by email, Chase unpaid invoices |
 | GitHub | Weekly dependency check issue |
 | GitHub and Gmail (send) | GitHub digest by email |

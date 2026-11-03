@@ -8,7 +8,7 @@
 //   not set  -> Google is open to everyone (delete the setting once Google has approved the app)
 // The id checked is always the one the server read from the session or from a saved schedule row: nothing a browser sends can change it.
 // No Next.js here, so tests can load it.
-export const GOOGLE_SOON = "Google (reading Gmail, Calendar and Drive, and adding Sheet rows) is coming soon: Google is still reviewing Hushwork. Gmail sending, Docs, Sheets, Slides and Calendar events through Composio work now (Connections, Google Workspace).";
+export const GOOGLE_SOON = "Google is coming soon: Google is still reviewing Hushwork. Use Google Workspace on the Connections page for now.";
 
 export function googleOpenFor(userId, setting = process.env.GOOGLE_ONLY_FOR) {
   const allowed = String(setting ?? "").split(",").map((id) => id.trim()).filter(Boolean);

@@ -56,21 +56,6 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "testall", icon: "ShieldCheck", title: "Test all my connections", needs: "Linear, Google",
-    body: "A check-up. It reads your Calendar, Gmail, Drive and Linear, calls one web address, writes a one-line report, then creates ONE Linear task from it. Connect Google and Linear first, run it on Manual, and delete the test task afterwards.",
-    request: "When I ask, test every connection: read my calendar, inbox, files and Linear, call one web address, write a one-line report, and add a test task in Linear.",
-    steps: [
-      step("trigger", { how: "manual", when: "" }),
-      step("ai", { task: "Say in one line what is on my calendar this week.", uses: "calendar", address: "" }),
-      step("ai", { task: "Say in one line who wrote to me last.", uses: "gmail", address: "" }),
-      step("ai", { task: "Say in one line which file I changed last.", uses: "drive", address: "" }),
-      step("ai", { task: "Say in one line what my top Linear task is.", uses: "linear", address: "" }),
-      step("request", { url: "https://example.com/", why: "check the web call works" }),
-      step("ai", { task: "Write ONE short line: Hushwork connection test passed.", uses: "nothing", address: "" }),
-      step("issue", { title: "{answer}", details: "Test task made by Hushwork. Safe to delete.", team: "" }),
-    ],
-  },
-  {
     id: "hellomail", icon: "Mail", title: "Send a formal hello email", needs: "Gmail (send)",
     body: "When you ask, it sends one short formal hello email to your own address (the step says {myEmail}). Change that to someone else's address to greet them instead. You read the email and press Approve before anything is sent.",
     request: "When I ask, send myself a short formal hello email. Ask me before it is sent.",

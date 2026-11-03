@@ -16,7 +16,6 @@ test("the list: ids are short lowercase names, each entry is complete, every add
     for (const key of ["name", "heading", "about"]) assert.ok(entry[key] && typeof entry[key] === "string", `${entry.id}.${key}`);
     for (const key of ["authorizeUrl", "tokenUrl", "revokeUrl"]) assert.match(entry[key], /^https:\/\/[a-z0-9.]+\//, `${entry.id}.${key}`);
     assert.ok(Array.isArray(entry.scopes) && entry.scopes.length > 0);
-    assert.ok(entry.setup.intro && entry.setup.steps.length > 0);
   }
   assert.equal(new Set(APP_IDS).size, APP_IDS.length, "ids are unique");
   assert.equal(new Set(APP_LIST.map((entry) => entry.envPrefix)).size, APP_LIST.length, "setting names are unique");

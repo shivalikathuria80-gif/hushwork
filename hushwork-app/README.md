@@ -259,7 +259,7 @@ Composio (composio.dev) already holds the sign-in for hundreds of apps, so Hushw
 - **Vercel, Xero and Cloudflare cannot be connected** (Composio has no ready-made sign-in for the first two, and Cloudflare needs an API key, which Hushwork never collects). They stay in the list with an `unavailable` reason and show "Not available yet" instead of a Connect button.
 - **Add an app:** add one entry to `composio-apps.js` (the toolkit name and one list/read tool from https://docs.composio.dev/toolkits/<toolkit> that needs no input). Check the toolkit's page: if it says "Composio-managed OAuth not available", give the entry an `unavailable` sentence.
 - **Setting up:** make a Composio account, copy the **Project API key** (starts with `ak_`; a key starting `ck_` or `uak_` is a different kind and is refused with a plain sentence) into `COMPOSIO_API_KEY`, restart. After a change to what an app may do (new actions), press Disconnect and Connect on that app once so its sign-in gets the new permission.
-- **Real use:** emails, calendar events, Notion pages and Google/Linear reads have been run for real; Slack, GitHub issue and Linear create have been tested with pretend servers only. Use "Test all my connections" (below) to check a connection.
+- **Real use:** emails, calendar events, Notion pages and Google/Linear reads have been run for real; Slack, GitHub issue and Linear create have been tested with pretend servers only.
 
 ## Scheduling (a workflow that runs by itself)
 
@@ -422,10 +422,6 @@ Some steps can only describe what would happen (a note, a draft, a Find that loo
 - When Auto mode or a schedule stops at a step, the reason is saved as a small record under that step (runs are never edited) and the Runs page shows it as "It stopped here. ..." (`saveStopNote` in `lib/run-core.js`).
 - A schedule that starts failing sends one email to the person (see Scheduling).
 
-## Test all my connections
-
-The Connections page has a **Test all my connections** button (`components/app/TestConnections.js`, `lib/actions/connections-check.js`, `testAllConnections` in `lib/run-core.js`). It does a real but harmless look: a few calendar events, a few email headers, a few file names, your Linear tasks, and each connected Composio app's one lookup; for each action it only checks that the tool's inputs match what Hushwork sends (`checkComposioConnections`). Nothing is sent, written or changed. It shows green, red (with what the app said) or "not connected" per line, and is limited to 4 runs every 5 minutes.
-
 ## Settings: Download my data and Delete my account
 
 - **Download my data** (`/api/export`, `lib/export-data.js`): one JSON file with your workflows, your 500 newest runs and your schedules, read with your own database client (so only your rows). Saved app connections are never included (they hold sign-in tokens).
@@ -437,7 +433,7 @@ The Connections page has a **Test all my connections** button (`components/app/T
 | What | Where it is counted |
 |---|---|
 | AI plans, AI steps, AI summaries; sent actions; Linear tasks; sheet rows | the database (`supabase/usage.sql`) and memory |
-| Lookups, web calls, sign-in (8 tries per email per 10 minutes), sign-up (3 per email per hour), the waitlist (5 per visitor per 10 minutes, 100 an hour overall), "Test all my connections" | memory only (friction, not a wall) |
+| Lookups, web calls, sign-in (8 tries per email per 10 minutes), sign-up (3 per email per hour), the waitlist (5 per visitor per 10 minutes, 100 an hour overall) | memory only (friction, not a wall) |
 | The whole-site AI cap | memory only, on purpose; set a spending cap in Groq |
 
 - **New passwords** are checked against the free Pwned Passwords list (`lib/leaked-password.js`): only the first 5 characters of the password's SHA-1 fingerprint leave the server, and a password found on the list is refused. If that service is down, sign-up still works.

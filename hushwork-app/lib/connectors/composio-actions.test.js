@@ -410,23 +410,3 @@ test("a sheet that was made but could not be filled is told honestly: ok with a 
   assert.equal((await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: refused.fetchImpl })).ok, false);
   assert.deepEqual(refused.runs(), ["GOOGLESHEETS_CREATE_GOOGLE_SHEET1"], "the rows are not written when the sheet was not made");
 });
-
-test("test all my connections checks BOTH tools of a two-call action, and an app with no lookup is not asked to look anything up", async () => {
-  const { checkActionFits, checkComposioConnections } = await import("./composio.js");
-  const good = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND } });
-  assert.deepEqual(await checkActionFits({ key: "k", action: findAction("sheet_create"), sample: { target: "", title: "Test", details: "Test" }, fetchImpl: good.fetchImpl }), { ok: true });
-  const bad = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST }, GOOGLESHEETS_VALUES_UPDATE: { described: { input_parameters: { spreadsheet_id: { required: true } } } } });
-  assert.equal((await checkActionFits({ key: "k", action: findAction("sheet_create"), sample: { target: "", title: "Test", details: "Test" }, fetchImpl: bad.fetchImpl })).ok, false);
-  assert.equal(good.sent.filter((entry) => entry.method === "POST").length, 0, "nothing is ever run by the check");
-
-  const slidesOnly = pretendTools({ GOOGLESLIDES_CREATE_SLIDES_MARKDOWN: { described: { input_parameters: { title: { required: true }, markdown_text: { required: true } } } } });
-  const fetchImpl = async (url, init) => {
-    const path = new URL(url).pathname;
-    if (path.endsWith("/connected_accounts")) return json({ items: [{ id: "ca_1", toolkit: { slug: "googleslides" } }] });
-    return slidesOnly.fetchImpl(url, init);
-  };
-  const rows = await checkComposioConnections({ key: "k", userId: "u", fetchImpl });
-  assert.deepEqual(rows.rows.map((row) => [row.name, row.ok]), [["Google Slides (create)", true]]);
-  assert.deepEqual(rows.rows[0].actions.map((action) => action.ok), [true]);
-  assert.deepEqual(slidesOnly.runs(), [], "no tool was run: Google Slides has no lookup and the action is only checked");
-});

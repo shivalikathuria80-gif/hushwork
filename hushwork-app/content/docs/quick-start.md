@@ -34,7 +34,7 @@ Open **Templates** and pick **Is my website up?**. It is the one ready-made temp
 
 ## Connecting apps
 
-Most useful plans read from an app, like Gmail or Linear. To connect one, open **Connections**. Start with the [Connections overview](/docs/connections). Press **Test all my connections** afterward to see which ones work.
+Most useful plans read from an app, like Gmail or Linear. To connect one, open **Connections**. Start with the [Connections overview](/docs/connections).
 
 ## If the AI box says it is off
 

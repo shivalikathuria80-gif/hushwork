@@ -47,8 +47,6 @@ More numbers are on [Limits and numbers](/docs/limits).
 ## If it does not work
 
 - **Linear is not connected yet. Open Connections and press Connect Linear.** Connect first.
-- Press **Test all my connections** on the Connections page. It shows what Linear answered.
-- If the Connect button says it needs setup, the person who runs this copy of Hushwork has not made Hushwork's own app inside Linear yet.
 
 ## Related pages
 

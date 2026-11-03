@@ -39,7 +39,6 @@ Short plain-words meanings for the words you meet in Hushwork.
 - **Connection** - a permission you gave Hushwork on another app's own page, so it can look at that app or add one thing to it.
 - **Connect / Disconnect** - the buttons that give or take back that permission.
 - **Composio** - a separate company that keeps sign-ins for many apps, so Hushwork can reach them. Hushwork never sees those permissions.
-- **Test all my connections** - a button on the Connections page that does a real but harmless look at everything you connected.
 - **Read only** - able to look but not change.
 - **Not available yet** - an app that is listed but cannot be connected yet.
 - **MCP** - a standard way for a company to offer tools to an AI. Hushwork only lets the AI use read-only tools of one server you name.

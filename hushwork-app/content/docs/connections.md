@@ -14,12 +14,6 @@ Hushwork can only read one fixed thing from each app (for example "your open tas
 
 **Through Composio.** Composio is a separate company that already holds sign-ins for many apps, so Hushwork does not need to make an app on each website. When you press Connect, you sign in on Composio's page and Composio keeps the permission. Hushwork never sees it and tells Composio who you are only with a random account number, never your email. Hushwork also asks Composio to refuse every tool except the ones Hushwork needs. More in [More apps through Composio](/docs/connect-other-apps).
 
-## Test all my connections
-
-At the top of the Connections page, press **Test now**. Hushwork does a real but harmless look at everything you connected: a few calendar events, a few email headers, a few file names, your Linear tasks, and each app's one lookup. For actions it only checks that the app's inputs match what Hushwork would send. Nothing is sent, written or changed.
-
-Each line shows green (works), red (with what the app said) or "not connected". You can run it up to 4 times every 5 minutes. After that, wait a few minutes.
-
 ## Disconnect
 
 Press **Disconnect** beside an app, then **Yes, disconnect**. Hushwork deletes its saved permission and, for apps with their own sign-in, asks the app to cancel it. To use the app again, press Connect again.
