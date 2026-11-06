@@ -7,11 +7,13 @@ import { Btn } from "../ui";
 import { Icon } from "../icons";
 import { useFillComposer } from "./Workspace";
 import { dismissNote, lookNow, turnAgentOff, turnAgentOn } from "@/lib/actions/agent";
+import { createAgent } from "@/lib/actions/agents";
 import { niceTime } from "@/lib/connectors/time-format";
 
 // The Hushwork Agent at the top of the workspace (see lib/agent/brain.js). Off: one card that says what it does and a button to turn it on.
 // On: what it noticed, each note with "Do this" (puts the note's request in the box below, where the person gets a plan and approves every
-// writing step as usual) and "Dismiss". `state` comes from AgentPanel.js: { enabled, checkedAt, nextCheckAt, tzOffset, status, notes } or null.
+// writing step as usual), "Make it an agent" (saves the note's request as an agent on the Agents page and runs it once, see lib/agents/create.js;
+// a step that writes still waits for the person's Approve on the Runs page) and "Dismiss". `state` comes from AgentPanel.js: { enabled, checkedAt, nextCheckAt, tzOffset, status, notes } or null.
 const STATUS_TEXT = {
   quiet: "Nothing needs you right now. It looks again at the next time below.",
   nothing_connected: "There is nothing to look at yet. Connect Google, Linear or another app first.",
@@ -40,6 +42,28 @@ export default function AgentCard({ state }) {
       }
       if (result.error) setError(result.error);
       else if (result.note) setError(result.note);
+      router.refresh();
+    });
+  }
+
+  // The same answer handling as the Agents page box (AgentMaker.js): land on the first run, or say the agent was saved when its run could not start.
+  // The Runs page gets only fixed words in the address, never text from the note.
+  function makeAgent(note) {
+    setError("");
+    startTransition(async () => {
+      let result;
+      try {
+        result = await createAgent({ prompt: note.ask, tzOffset: tzOffset() });
+      } catch (problem) {
+        unstable_rethrow(problem);
+        result = { error: "Could not reach Hushwork. Check your connection and try again." };
+      }
+      if (result?.error) { setError(result.error); return; }
+      if (result.runId) {
+        router.push(`/app/runs?run=${result.runId}&auto=${result.auto?.stoppedAt ? "stopped" : "done"}&agent=${result.scheduleText?.startsWith("Scheduled") ? "scheduled" : "new"}`);
+        return;
+      }
+      setError([`Saved your agent \u201c${result.name}\u201d on the Agents page.`, result.runError ? `It could not run yet: ${result.runError}` : ""].filter(Boolean).join(" "));
       router.refresh();
     });
   }
@@ -95,6 +119,7 @@ export default function AgentCard({ state }) {
                   {note.why && <p className="mt-1 text-sm text-mute">{note.why}</p>}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {note.ask && <Btn size="sm" icon="ArrowRight" onClick={() => doThis(note)}>Do this</Btn>}
+                    {note.ask && <Btn size="sm" variant="secondary" icon="Bot" disabled={pending} onClick={() => makeAgent(note)}>Make it an agent</Btn>}
                     <Btn size="sm" variant="ghost" icon="X" disabled={pending} onClick={() => act(dismissNote, { title: note.title })}>Dismiss</Btn>
                   </div>
                 </li>
@@ -106,7 +131,7 @@ export default function AgentCard({ state }) {
               {state.status === "nothing_connected" && <> <Link href="/app/connections" className="font-medium text-accent-text hover:underline">Open Connections</Link></>}
             </p>
           )}
-          {notes.length > 0 && <p className="mt-3 text-xs text-mute">&ldquo;Do this&rdquo; puts the request in the box below. You get a plan, and every step that sends or creates something still waits for your Approve.</p>}
+          {notes.length > 0 && <p className="mt-3 text-xs text-mute">&ldquo;Do this&rdquo; puts the request in the box below and gives you a plan. &ldquo;Make it an agent&rdquo; saves it on the Agents page and runs it once. Either way, every step that sends or creates something still waits for your Approve.</p>}
         </div>
       )}
 

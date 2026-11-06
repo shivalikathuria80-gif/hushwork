@@ -16,7 +16,7 @@ How it works: Claude asks ChatGPT for bright ideas, gives them to Gemini to impr
 - **Smarter "nothing new":** a watch used to stay quiet only when the AI's answer started with exactly NOTHING NEW. The cheap model often says "No new overdue invoices." or "There is nothing new.", which sent a nudge about nothing. A short one-line answer like that now also counts as quiet; a longer answer still speaks up, in case it holds real news.
 - **Client request watch** (in "Watch for me"): weekdays at 12:00 it reads the opening of your 5 newest emails and, only when one newly asks you to do something, suggests ONE Linear task for you to approve.
 
-**Not built, and why:** UNCERTAIN as a third answer (the model would use it as a way out, and quiet-or-speak is clearer); an Edit button on approval cards (the words are edited in the Builder, and the card already refuses words that changed after you read them); spotting an overloaded day from Todoist due dates (Week Balancer already does the Calendar side, and Linear has no due dates).
+**Not built, and why:** UNCERTAIN as a third answer (the model would use it as a way out, and quiet-or-speak is clearer); an Edit button on approval cards (the words are edited in the Builder, and the card already refuses words that changed after you read them); spotting an overloaded day from Todoist due dates (Week Balancer already does the Calendar side, and Linear has no due dates). (Update 2026-11-06: Hushwork now reads each Linear task's due date and priority, so this can be revisited.)
 
 ## Round 5 (2026-10-28): first-time experience
 
@@ -46,7 +46,7 @@ How it works: Claude asks ChatGPT for bright ideas, gives them to Gemini to impr
 - **Content Re-Mixer:** the same as Campaign Repurposer. Claude disagreed with Gemini, who called it real. Also, the Notion read only sees page titles, not the text, so "read a Notion page" is not possible.
 
 **Not built, on purpose:**
-- **Friday Risk Radar:** Gemini called it fake, but for a muddled reason. It is possible in principle (several Ask the AI steps feeding each other with `{answers}`). But it would use 4 AI steps of your 15 a day, and Linear has no due dates, so "risk" would only be guesswork.
+- **Friday Risk Radar:** Gemini called it fake, but for a muddled reason. It is possible in principle (several Ask the AI steps feeding each other with `{answers}`). But it would use 4 AI steps of your 15 a day, and Linear has no due dates, so "risk" would only be guesswork. (Update 2026-11-06: Hushwork now reads each Linear task's due date and priority, so this can be revisited.)
 
 **Lesson:** ChatGPT does not know what Hushwork already has, and Gemini can be wrong about code it cannot see. The real check is reading the code. Most of these ideas were already built.
 
@@ -58,7 +58,7 @@ How it works: Claude asks ChatGPT for bright ideas, gives them to Gemini to impr
 
 **What was built (watch mode):** a scheduled check that stays silent unless something is new. The AI is told what it found last time (`{last}`) and says exactly `NOTHING NEW` when nothing changed; a quiet check leaves no noise. It never runs at night (8 pm to 8 am your time). When something is new it sends ONE short email that only says "open Runs", never more than 3 a day, and the suggestion waits for your Approve click. No new database tables. Ready-made watchers: Overdue invoice watch, Unhappy email watch, GitHub watch.
 
-**Not built, and why:** client follow-up tracking (needs Gmail threads), deadline watching (Linear has no due dates), push notifications and webhooks (not set up yet).
+**Not built, and why:** client follow-up tracking (needs Gmail threads), deadline watching (Linear has no due dates), push notifications and webhooks (not set up yet). (Update 2026-11-06: Hushwork now reads each Linear task's due date and priority, so this can be revisited.)
 
 ## Round 2 (2026-10-25): bright ideas for freelancers
 

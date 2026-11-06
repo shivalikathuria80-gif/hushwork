@@ -8,7 +8,7 @@ On the **Connections** page, open the **Linear** box and press **Connect Linear*
 
 ## What Hushwork reads
 
-Your open tasks assigned to you, up to 10, newest changes first. Hushwork gets each task's id, title and status. Finished and canceled tasks are left out. The lookup is one fixed question that cannot change anything.
+Your open tasks assigned to you, up to 10, newest changes first. Hushwork gets each task's id, title, status, due date and priority. Finished and canceled tasks are left out. The lookup is one fixed question that cannot change anything.
 
 You can use it in two ways:
 

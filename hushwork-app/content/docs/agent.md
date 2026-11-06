@@ -8,10 +8,10 @@ Three times a day, at 9:00, 13:00 and 17:00 your time, the agent looks at the ap
 
 - your Google Calendar for the next 7 days
 - who emailed you and about what (the sender and subject of your newest emails, never the text)
-- your open Linear tasks
+- your open Linear tasks, with each one's due date and priority
 - up to 3 apps connected through Composio, such as Stripe invoices, GitHub or Todoist
 
-Then it picks the few things that need you soon: a meeting to prepare for, an email that looks like it needs an answer, an unpaid invoice, a task that looks stuck. You see at most 3 notes at the top of your workspace. Each note says what needs you, why, and a ready next step.
+Then it picks the few things that need you soon: a meeting to prepare for, an email that looks like it needs an answer, an unpaid invoice, a task that is overdue or due in the next 2 days, a task that looks stuck. You see at most 3 notes at the top of your workspace. Each note says what needs you, why, and a ready next step.
 
 ## Turn it on
 
@@ -21,9 +21,10 @@ Then it picks the few things that need you soon: a meeting to prepare for, an em
 
 To stop it, press **Turn off** in the same card. **Look now** takes an extra look outside the three set times.
 
-## Do this and Dismiss
+## Do this, Make it an agent, and Dismiss
 
 - **Do this** puts the note's next step into the box on your workspace. You get a plan, and every step that sends or creates something still waits for your Approve.
+- **Make it an agent** saves the note's next step as an agent on your Agents page and runs it once. You land on that run on the Runs page, where any step that sends or creates something waits for your Approve. Open the agent later to give it a schedule.
 - **Dismiss** hides the note. The agent remembers it was shown, so it does not bring the same note back unless something changed.
 
 ## What it will never do
