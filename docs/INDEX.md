@@ -7,6 +7,7 @@ Every design, plan and QA note for Hushwork, grouped by the build slice it belon
 - [Try everything Hushwork can do](try-it.md): a plain-words walkthrough of every feature, online or on your own computer.
 - [Putting Hushwork online](deploy.md): the deploy checklist (Vercel, Supabase, the schedule clock, limits, custom domain, troubleshooting). Always current.
 - [Technical reference](reference/README.md): architecture, data model, run model, connectors, AI planner, safety and limits, env vars, testing, deployment and domains, the docs site.
+- [Workspace, Builder, Agents and the Hushwork Agent](hushwork.md): the four ways Hushwork makes and runs work, and how they differ.
 - The public user guide (docs.hushwork.in): 22 markdown pages in `hushwork-app/content/docs/`, listed in `hushwork-app/lib/docs/pages.js`.
 - [Google review checklist](google-review.md): what Google needs before strangers can connect Google (the app is in Testing mode now).
 - [Idea log](ideas.md): what ChatGPT and Gemini suggested, and what was built.
