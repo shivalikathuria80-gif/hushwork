@@ -48,9 +48,9 @@ const NO_TABLE = new Set(["42P01", "PGRST205"]);
 // at the first step that does not work, so a failed step never lets later steps run on top of it. At most 20 steps. Returns
 // { done: how many steps were done, stoppedAt: the step number it stopped at, or 0 }.
 const AUTO_ACTIONS = [
-  [isAiStep, (input, who) => approveAiStep(input, who)], [isLinearLookup, (input, who) => approveLinearLookup(input, who)], [isCalendarLookup, (input, who) => approveCalendarLookup(input, who)],
-  [isGmailLookup, (input, who) => approveGmailLookup(input, who)], [isDriveLookup, (input, who) => approveDriveLookup(input, who)], [isLinearCreate, (input, who) => approveLinearCreate(input, who)],
-  [isAppLookup, (input, who) => approveAppLookup(input, who)], [isActionStep, (input, who) => approveActionStep(input, who)], [isSheetsRow, (input, who) => approveSheetsRow(input, who)], [isRequestStep, (input, who) => approveWebCall(input, who)],
+  [isAiStep, (input, who, options) => approveAiStep(input, who, options)], [isLinearLookup, (input, who, options) => approveLinearLookup(input, who, options)], [isCalendarLookup, (input, who, options) => approveCalendarLookup(input, who, options)],
+  [isGmailLookup, (input, who, options) => approveGmailLookup(input, who, options)], [isDriveLookup, (input, who, options) => approveDriveLookup(input, who, options)], [isLinearCreate, (input, who, options) => approveLinearCreate(input, who, options)],
+  [isAppLookup, (input, who, options) => approveAppLookup(input, who, options)], [isActionStep, (input, who, options) => approveActionStep(input, who, options)], [isSheetsRow, (input, who, options) => approveSheetsRow(input, who, options)], [isRequestStep, (input, who, options) => approveWebCall(input, who, options)],
 ];
 // When Auto mode (or a schedule) stops at a step, the REASON is saved as a small record under that step (never edited into the run itself: runs
 // are never changed once saved), so the Runs page can say why instead of leaving the person to guess. `run` = { id, user_id, workflow_id, workflow_name }.
@@ -78,7 +78,7 @@ export async function runAutomatically(runId, results, who, { allowWrites = true
     const state = states?.get(index)?.status;
     if (state === "done") { skipped += 1; continue; }
     if (state === "pending") return { done, stoppedAt: index + 1, reason: PENDING_MESSAGE, ...counted() };
-    const outcome = await action({ runId, index }, who);
+    const outcome = await action({ runId, index }, who, { auto: true });
     if (outcome?.error) {
       if (run) await saveStopNote(who.supabase, run, index, step, outcome.error);
       return { done, stoppedAt: index + 1, reason: String(outcome.error).slice(0, 400), ...counted() };
@@ -179,7 +179,12 @@ export async function startPracticeRun(input, who) {
 // them), like the AI limits. Web calls and Linear lookups: 5 a minute and 30 a day per person (each counted separately).
 const MINUTE = 60_000;
 const DAY = 86_400_000;
-const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
+// AUTO MODE does the steps of a run back to back, so a small per-minute limit (meant to stop a loop of Approve clicks) would stop every Auto run
+// with a 4th AI step, or a 6th lookup, at "Try again in a minute", and two schedules due at the same minute would trip over each other. Steps done
+// by Auto mode therefore count against their own, larger per-minute limit: at most AUTO_PER_MINUTE (the most steps one run can have). The DAILY
+// limits are the same for every step, Auto or not, so Auto mode can never do more in a day than the buttons can.
+export const AUTO_PER_MINUTE = 20;
+const limiters = (name, perMinute, perDay) => (globalThis[name] ??= { minute: makeLimiter({ max: perMinute, windowMs: MINUTE }), auto: makeLimiter({ max: AUTO_PER_MINUTE, windowMs: MINUTE }), day: makeLimiter({ max: perDay, windowMs: DAY, calendar: true }) });
 const webCallLimits = () => limiters("__hushworkWebCallLimits", 5, 30);
 const linearLimits = () => limiters("__hushworkLinearLimits", 5, 30);
 const calendarLimits = () => limiters("__hushworkCalendarLimits", 5, 30);
@@ -226,11 +231,18 @@ async function dbLimitError(supabase, bucket, perMinute, perDay, what) {
   return slot.why === "limit_minute" ? "You did that a moment ago. Try again in a minute." : `You have reached today's limit for ${what}. It resets at midnight UTC.`;
 }
 
-// Checks the person's limits, without using a slot yet.
-function limitError(limits, userId, now, what) {
-  if (limits.minute.left(userId, now) < 1) return `You did that a moment ago. Try again in a minute.`;
+// Checks the person's limits, without using a slot yet. `auto` = the step is done by Auto mode (see AUTO_PER_MINUTE).
+function limitError(limits, userId, now, what, auto = false) {
+  if ((auto ? limits.auto : limits.minute).left(userId, now) < 1) return `You did that a moment ago. Try again in a minute.`;
   if (limits.day.left(userId, now) < 1) return `You have reached today's limit for ${what}. It resets at midnight UTC.`;
   return "";
+}
+
+// Uses one slot of the person's limits. An Auto step also takes a click slot when one is free, so pressing Approve right after an Auto run still waits.
+function spendSlot(limits, userId, now, auto = false) {
+  if (auto) limits.auto.take(userId, now);
+  limits.minute.take(userId, now);
+  limits.day.take(userId, now);
 }
 
 // Saves what really happened as a separate "live" run. Best effort: the real action already happened, so a failure to
@@ -289,17 +301,16 @@ async function saveLiveRun(supabase, run, record) {
 
 // The "Approve and call the address" button for a web-call step. lib/connectors/http.js does the careful part (https
 // only, public addresses only, no redirects, size and time limits); the answer is kept as a short text excerpt.
-export async function approveWebCall(input, who) {
+export async function approveWebCall(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isRequestStep);
   if (loaded.error) return loaded;
   const { run, step } = loaded;
 
   const now = Date.now();
-  const tooMany = limitError(webCallLimits(), user.id, now, "web calls");
+  const tooMany = limitError(webCallLimits(), user.id, now, "web calls", auto);
   if (tooMany) return { error: tooMany };
-  webCallLimits().minute.take(user.id, now);
-  webCallLimits().day.take(user.id, now);
+  spendSlot(webCallLimits(), user.id, now, auto);
 
   if (looksSensitive(step.fields.url)) return { error: "That address looks like it holds a secret key, so it was not used. Remove the key from the address." };
   const answer = await fetchPublic(step.fields.url);
@@ -352,21 +363,20 @@ const eventLines = (events) => events.map((event) => `- ${event.start}  ${event.
 // What a lookup saves as its result: a clear AI summary FIRST, then the app's own list exactly as it answered (so a summary can never
 // hide the facts). The summary is skipped without any error when the AI is off, the person's AI limit is used up, or the AI fails: the
 // result is then just the app's own list. `goal` says what the person wants to know; `note` is the step's own note (the person's words).
-async function withSummary({ supabase, userId, appName, header, list, goal, note }) {
+async function withSummary({ supabase, userId, appName, header, list, goal, note, auto = false }) {
   const plain = `Asked ${appName}. ${header}\n${list}`;
   const groqKey = getGroqKey();
   const now = Date.now();
-  if (!groqKey || aiLimits().minute.left(userId, now) < 1 || aiLimits().day.left(userId, now) < 1) return plain;
-  if (!(await takeDbSlot(supabase, "ai_step", 3, 15)).ok) return plain; // the database count (see supabase/usage.sql) is the one that holds across servers
-  aiLimits().minute.take(userId, now);
-  aiLimits().day.take(userId, now);
+  if (!groqKey || limitError(aiLimits(), userId, now, "AI steps", auto)) return plain;
+  if (!(await takeDbSlot(supabase, "ai_step", auto ? AUTO_PER_MINUTE : 3, 15)).ok) return plain; // the database count (see supabase/usage.sql) is the one that holds across servers
+  spendSlot(aiLimits(), userId, now, auto);
   const summary = await summarizeData({ goal: note ? `${goal} The person's own note: ${note}` : goal, data: `${header}\n${list}`, groqKey });
   return summary.ok ? `${summary.text}\n\nThe list from ${appName}, exactly as it answered:\n${list}` : plain;
 }
 
 // The "Approve and ask Linear" button. READ-ONLY: lib/connectors/linear.js can only ask, never change. Only a Look something
 // up step set to Linear qualifies, and the key comes from .env.local on the server.
-export async function approveLinearLookup(input, who) {
+export async function approveLinearLookup(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isLinearLookup);
   if (loaded.error) return loaded;
@@ -376,24 +386,23 @@ export async function approveLinearLookup(input, who) {
   if (!authorization) return { error: LINEAR_OFF };
 
   const now = Date.now();
-  const tooMany = limitError(linearLimits(), user.id, now, "Linear lookups");
+  const tooMany = limitError(linearLimits(), user.id, now, "Linear lookups", auto);
   if (tooMany) return { error: tooMany };
-  linearLimits().minute.take(user.id, now);
-  linearLimits().day.take(user.id, now);
+  spendSlot(linearLimits(), user.id, now, auto);
 
   const answer = await fetchLinearIssues({ authorization });
   if (!answer.ok) return { error: answer.error };
 
   const list = answer.issues.map((issue) => `- ${issueLine(issue)}`).join("\n");
   const outcome = answer.issues.length
-    ? await withSummary({ supabase, userId: user.id, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why (use the due dates and priorities when they are given), and say which one to do first." })
+    ? await withSummary({ supabase, userId: user.id, auto, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why (use the due dates and priorities when they are given), and say which one to do first." })
     : "Asked Linear. You have no open tasks.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Approve and ask the AI" button. The AI gets ONE read-only tool at most, decided by the saved step (never by the
 // model): "My Linear tasks" or "the web address written in the step". lib/ai/agent.js is the loop; it cannot change anything.
-export async function approveAiStep(input, who) {
+export async function approveAiStep(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const groqKey = getGroqKey();
   if (!groqKey) return { error: "AI is switched off. Add the Groq key to .env.local first." };
@@ -417,12 +426,11 @@ export async function approveAiStep(input, who) {
 
   // Counted BEFORE anything goes out (an MCP step connects to an outside server), so a loop of Approves cannot be used as a request relay.
   const now = Date.now();
-  const tooMany = limitError(aiLimits(), user.id, now, "AI steps");
+  const tooMany = limitError(aiLimits(), user.id, now, "AI steps", auto);
   if (tooMany) return { error: tooMany };
-  const dbSlot = await takeDbSlot(supabase, "ai_step", 3, 15);
+  const dbSlot = await takeDbSlot(supabase, "ai_step", auto ? AUTO_PER_MINUTE : 3, 15);
   if (!dbSlot.ok) return { error: dbSlot.why === "limit_minute" ? "You did that a moment ago. Try again in a minute." : "You have reached today's limit for AI steps. It resets at midnight UTC." };
-  aiLimits().minute.take(user.id, now);
-  aiLimits().day.take(user.id, now);
+  spendSlot(aiLimits(), user.id, now, auto);
 
   // When a built-in tool fails (for example Google refused), the person is told the real reason instead of the AI's vague sentence about it.
   let toolError = "";
@@ -542,7 +550,7 @@ export async function approveAiStep(input, who) {
 
 // The "Approve and look at my calendar" button. READ-ONLY (the permission Google gave is read-only, and
 // lib/connectors/google-calendar.js only sends a GET). Only a Look something up step set to Calendar qualifies.
-export async function approveCalendarLookup(input, who) {
+export async function approveCalendarLookup(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isCalendarLookup);
   if (loaded.error) return loaded;
@@ -551,15 +559,14 @@ export async function approveCalendarLookup(input, who) {
   if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
-  const tooMany = limitError(calendarLimits(), user.id, now, "calendar lookups");
+  const tooMany = limitError(calendarLimits(), user.id, now, "calendar lookups", auto);
   if (tooMany) return { error: tooMany };
-  calendarLimits().minute.take(user.id, now);
-  calendarLimits().day.take(user.id, now);
+  spendSlot(calendarLimits(), user.id, now, auto);
 
   const answer = await fetchUpcomingEvents({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.events.length
-    ? await withSummary({ supabase, userId: user.id, appName: "Google Calendar", header: `You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days:`, list: eventLines(answer.events), note: step.fields.what, goal: "The person asked Google Calendar for their events in the next 7 days. Summarise the week: how many events there are, which days are busy or free, and what they should prepare." })
+    ? await withSummary({ supabase, userId: user.id, auto, appName: "Google Calendar", header: `You have ${answer.events.length} ${answer.events.length === 1 ? "event" : "events"} in the next 7 days:`, list: eventLines(answer.events), note: step.fields.what, goal: "The person asked Google Calendar for their events in the next 7 days. Summarise the week: how many events there are, which days are busy or free, and what they should prepare." })
     : "Asked Google Calendar. You have no events in the next 7 days.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -567,7 +574,7 @@ export async function approveCalendarLookup(input, who) {
 // The "Approve and look at my inbox" button. READ-ONLY (the permission Google gave cannot send, change or delete mail, and
 // lib/connectors/google-gmail.js only sends GET requests for sender, subject and time). Only a Look something up step set to
 // Inbox qualifies. Mail subjects are saved in the person's own run, so they are private to the person like any other run.
-export async function approveGmailLookup(input, who) {
+export async function approveGmailLookup(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isGmailLookup);
   if (loaded.error) return loaded;
@@ -576,22 +583,21 @@ export async function approveGmailLookup(input, who) {
   if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
-  const tooMany = limitError(gmailLimits(), user.id, now, "inbox lookups");
+  const tooMany = limitError(gmailLimits(), user.id, now, "inbox lookups", auto);
   if (tooMany) return { error: tooMany };
-  gmailLimits().minute.take(user.id, now);
-  gmailLimits().day.take(user.id, now);
+  spendSlot(gmailLimits(), user.id, now, auto);
 
   const answer = await fetchInbox({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.mails.length
-    ? await withSummary({ supabase, userId: user.id, appName: "Gmail", header: `The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox (senders, subjects and times only; the text inside each email was not read):`, list: mailLines(answer.mails), note: step.fields.what, goal: "The person asked Gmail for the latest messages in their inbox. Only the sender, subject and time of each message were read, never the text inside, so judge only from those. Summarise who wrote and what each message seems to be about, say which ones probably need an answer first and why, and say clearly that you only saw senders and subjects." })
+    ? await withSummary({ supabase, userId: user.id, auto, appName: "Gmail", header: `The latest ${answer.mails.length} ${answer.mails.length === 1 ? "message" : "messages"} in your inbox (senders, subjects and times only; the text inside each email was not read):`, list: mailLines(answer.mails), note: step.fields.what, goal: "The person asked Gmail for the latest messages in their inbox. Only the sender, subject and time of each message were read, never the text inside, so judge only from those. Summarise who wrote and what each message seems to be about, say which ones probably need an answer first and why, and say clearly that you only saw senders and subjects." })
     : "Asked Gmail. Your inbox is empty.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
 // The "Approve and look at my files" button. READ-ONLY (the permission Google gave only sees file names and details, and
 // lib/connectors/google-drive.js only sends one GET request). Only a Look something up step set to Files qualifies.
-export async function approveDriveLookup(input, who) {
+export async function approveDriveLookup(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isDriveLookup);
   if (loaded.error) return loaded;
@@ -600,15 +606,14 @@ export async function approveDriveLookup(input, who) {
   if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
-  const tooMany = limitError(driveLimits(), user.id, now, "file lookups");
+  const tooMany = limitError(driveLimits(), user.id, now, "file lookups", auto);
   if (tooMany) return { error: tooMany };
-  driveLimits().minute.take(user.id, now);
-  driveLimits().day.take(user.id, now);
+  spendSlot(driveLimits(), user.id, now, auto);
 
   const answer = await fetchRecentFiles({ authorization });
   if (!answer.ok) return { error: answer.error };
   const outcome = answer.files.length
-    ? await withSummary({ supabase, userId: user.id, appName: "Google Drive", header: `The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently (names, kinds and times only; nothing inside a file was read):`, list: fileLines(answer.files), note: step.fields.what, goal: "The person asked Google Drive for the files they changed most recently. Only the name, kind and time of each file were read, never what is inside. Summarise what they seem to have worked on lately judging from the names, group them by kind or topic, and say clearly that you only saw names." })
+    ? await withSummary({ supabase, userId: user.id, auto, appName: "Google Drive", header: `The ${answer.files.length} ${answer.files.length === 1 ? "file" : "files"} you changed most recently (names, kinds and times only; nothing inside a file was read):`, list: fileLines(answer.files), note: step.fields.what, goal: "The person asked Google Drive for the files they changed most recently. Only the name, kind and time of each file were read, never what is inside. Summarise what they seem to have worked on lately judging from the names, group them by kind or topic, and say clearly that you only saw names." })
     : "Asked Google Drive. There are no files.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -616,7 +621,7 @@ export async function approveDriveLookup(input, who) {
 // The "Approve and create the task" button. This WRITES one thing: a new task in Linear (lib/connectors/linear-create.js sends one
 // fixed request; what is written travels as separate values). Only a Create a Linear task step with a title qualifies, it can be
 // approved once per practice run, and the title and details the person read on the Runs page are built again here from the saved run.
-export async function approveLinearCreate(input, who) {
+export async function approveLinearCreate(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isLinearCreate);
   if (loaded.error) return loaded;
@@ -637,12 +642,11 @@ export async function approveLinearCreate(input, who) {
   if (!authorization) return { error: LINEAR_OFF };
 
   const now = Date.now();
-  const tooMany = limitError(linearCreateLimits(), user.id, now, "created tasks");
+  const tooMany = limitError(linearCreateLimits(), user.id, now, "created tasks", auto);
   if (tooMany) return { error: tooMany };
-  const dbFull = await dbLimitError(supabase, "linear_create", 3, 15, "created tasks");
+  const dbFull = await dbLimitError(supabase, "linear_create", auto ? AUTO_PER_MINUTE : 3, 15, "created tasks");
   if (dbFull) return { error: dbFull };
-  linearCreateLimits().minute.take(user.id, now);
-  linearCreateLimits().day.take(user.id, now);
+  spendSlot(linearCreateLimits(), user.id, now, auto);
 
   if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
   const made = await createIssue({ authorization, title: title.text, details: details.text, team: step.fields.team });
@@ -652,7 +656,7 @@ export async function approveLinearCreate(input, who) {
 
 // The "Approve and look in the app" button. READ-ONLY: the tool is always the one written in the app's list entry, called with nothing
 // to fill in, through Composio (lib/connectors/composio.js). Only a Look in another app step naming an app from the list qualifies.
-export async function approveAppLookup(input, who) {
+export async function approveAppLookup(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isAppLookup);
   if (loaded.error) return loaded;
@@ -662,14 +666,13 @@ export async function approveAppLookup(input, who) {
   if (!composioKey) return { error: COMPOSIO_OFF };
 
   const now = Date.now();
-  const tooMany = limitError(appLimits(), user.id, now, "app lookups");
+  const tooMany = limitError(appLimits(), user.id, now, "app lookups", auto);
   if (tooMany) return { error: tooMany };
-  appLimits().minute.take(user.id, now);
-  appLimits().day.take(user.id, now);
+  spendSlot(appLimits(), user.id, now, auto);
 
   const answer = await runReadTool({ key: composioKey, userId: user.id, app });
   if (!answer.ok) return { error: withSaid(answer) };
-  const outcome = await withSummary({ supabase, userId: user.id, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
+  const outcome = await withSummary({ supabase, userId: user.id, auto, appName: app.name, header: `${app.name} answered with ${app.what}:`, list: answer.text, note: step.fields.what, goal: `The person asked ${app.name} for ${app.what}. Summarise what the answer shows in plain words.` });
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
 
@@ -694,7 +697,7 @@ async function accountEmail({ user, supabase }) {
 // issue, a Todoist task) through Composio. Only a step naming an action from lib/connectors/composio-actions.js qualifies; its words are
 // built again here from the saved run (never from the browser), checked, and shown in full on the approval card first; it can be approved
 // once per run; and lib/connectors/composio.js sends nothing unless the tool's real inputs match what we fill in.
-export async function approveActionStep(input, who) {
+export async function approveActionStep(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isActionStep);
   if (loaded.error) return loaded;
@@ -724,12 +727,11 @@ export async function approveActionStep(input, who) {
   if (!composioKey) return { error: COMPOSIO_OFF };
 
   const now = Date.now();
-  const tooMany = limitError(actionLimits(), user.id, now, "sent actions");
+  const tooMany = limitError(actionLimits(), user.id, now, "sent actions", auto);
   if (tooMany) return { error: tooMany };
-  const dbFull = await dbLimitError(supabase, "action", 3, 15, "sent actions");
+  const dbFull = await dbLimitError(supabase, "action", auto ? AUTO_PER_MINUTE : 3, 15, "sent actions");
   if (dbFull) return { error: dbFull };
-  actionLimits().minute.take(user.id, now);
-  actionLimits().day.take(user.id, now);
+  spendSlot(actionLimits(), user.id, now, auto);
 
   const values = { target: target.value, title: title.text, details: details.text };
   if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
@@ -747,7 +749,7 @@ export async function approveActionStep(input, who) {
 // The "Approve and add the row" button. The ONE action that writes into somebody's Google account, so: the sheet address and the
 // boxes come from the SAVED run (never from the browser), they are checked again here, the person saw the exact boxes on the
 // approval card, and lib/connectors/google-sheets.js can only append a row (it cannot read, change or delete cells).
-export async function approveSheetsRow(input, who) {
+export async function approveSheetsRow(input, who, { auto = false } = {}) {
   const { user, supabase } = who;
   const loaded = await loadPracticeStep(supabase, user, input, isSheetsRow);
   if (loaded.error) return loaded;
@@ -767,12 +769,11 @@ export async function approveSheetsRow(input, who) {
   if (!authorization) return { error: googleOff(user.id) };
 
   const now = Date.now();
-  const tooMany = limitError(sheetsLimits(), user.id, now, "added rows");
+  const tooMany = limitError(sheetsLimits(), user.id, now, "added rows", auto);
   if (tooMany) return { error: tooMany };
-  const dbFull = await dbLimitError(supabase, "sheets_row", 5, 30, "added rows");
+  const dbFull = await dbLimitError(supabase, "sheets_row", auto ? AUTO_PER_MINUTE : 5, 30, "added rows");
   if (dbFull) return { error: dbFull };
-  sheetsLimits().minute.take(user.id, now);
-  sheetsLimits().day.take(user.id, now);
+  spendSlot(sheetsLimits(), user.id, now, auto);
 
   if (!(await markPending(supabase, run, step))) return { error: RECORD_FIRST };
   const added = await appendRow({ authorization, spreadsheetId: sheet.id, cells: row.cells });

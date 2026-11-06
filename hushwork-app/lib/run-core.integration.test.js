@@ -370,3 +370,21 @@ test("a calendar event whose start day has already passed is never added (an AI 
     assert.equal(livePosts(composio).length, 0, "nothing was sent to the calendar");
   } finally { composio.restore(); }
 });
+
+test("Auto mode does a run's steps back to back: a 4th email in the same minute is sent, not stopped at 'Try again in a minute'; an Approve click right after still waits", async () => {
+  const emails = [1, 2, 3, 4].map((n) => ({ icon: "Mail", title: `Email ${n}`, detail: "hi", block: "action", choice: "gmail_send", a: "me", b: `Note ${n}` }));
+  const plan = finishSteps({ steps: [trigger, ...emails] });
+  assert.equal(plan.filter((step) => step.kind === "action").length, 4, "four real emails in one workflow");
+  const { workflow, supabase, who } = setup({ plan });
+  const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
+  try {
+    const result = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.deepEqual(result.auto, { done: 4, stoppedAt: 0 }, "all four steps ran; the per-click limit of 3 a minute does not stop an Auto run");
+    assert.equal(livePosts(composio).length, 4);
+    // the click limit still holds for a person pressing Approve by hand in the same minute
+    const practice = supabase.tables.runs.find((run) => run.mode === "practice");
+    const again = await approveActionStep({ runId: practice.id, index: actionIndex(plan), confirmRetry: true }, who);
+    assert.match(again.error ?? "", /a moment ago|already/);
+    assert.equal(livePosts(composio).length, 4, "nothing more was sent");
+  } finally { composio.restore(); }
+});

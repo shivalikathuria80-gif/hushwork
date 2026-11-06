@@ -80,6 +80,8 @@ These caps are **triggers**, not row-level policies. A policy that counts rows i
 | Connect an app via Composio | 5 a minute | memory | `lib/connections/composio-flow.js` |
 | Waitlist | 5 per 10 minutes per visitor, 100 an hour for everyone | memory | `lib/waitlist-core.js` |
 
+Steps done by Auto mode (an Auto run, a schedule, "Continue from where it stopped") run back to back, so they use a separate per-minute limit of 20 (`AUTO_PER_MINUTE` in `lib/run-core.js`, the most steps one run can hold) instead of the per-minute numbers above; the daily numbers are the same. An Auto step also uses a click slot when one is free, so an Approve press right after an Auto run still waits.
+
 Days reset at midnight UTC. The database counter is `take_usage` in `supabase/usage.sql`; if the table is missing the request is allowed and the memory count still applies (`lib/db-limits.js`). The clock's client skips the database counter. Set a spending cap in Groq as the only whole-site protection.
 
 ## Sign-in limits (`lib/auth-limits.js`)
