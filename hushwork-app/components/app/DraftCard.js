@@ -8,6 +8,7 @@ import { Icon } from "../icons";
 import { useFillComposer } from "./Workspace";
 import { renameDraft, deleteDraft } from "@/lib/actions/drafts";
 import { startPracticeRun } from "@/lib/actions/runs";
+import { runAgentNow } from "@/lib/actions/agents";
 import { useRunMode } from "./RunMode";
 import ScheduleEditor from "./ScheduleEditor";
 import { LIMITS } from "@/lib/validate";
@@ -44,7 +45,9 @@ async function call(action, input, fallback) {
   }
 }
 
-export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
+// `agent` (the Agents page): the card of an agent. It always runs by itself ("Run now": reads and AI steps happen, a step that writes waits for
+// Approve on the Runs page), shows the sentence it was made from, and its name still opens it in the Builder.
+export default function DraftCard({ draft, onDeleted, openBase, scheduling, agent = false }) {
   const fill = useFillComposer();
   const router = useRouter();
   const [mode, setMode] = useState("view"); // view | rename | delete
@@ -92,7 +95,8 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
   // Manual: walks the steps without sending anything, saves the run, then opens it on the Runs page (the person approves each real step there).
   // Auto: the same, and then every real step is done straight away, in order. The Runs page opens with the results under each step.
   const runMode = useRunMode();
-  const auto = runMode === "auto";
+  const auto = agent || runMode === "auto";
+  const noun = agent ? "agent" : "draft";
   const kindOf = (step) => (Array.isArray(step) ? step[3] : step?.kind);
   const writes = draft.plan.filter((step) => ["row", "issue", "action"].includes(kindOf(step))).length;
   // What the Start step says about WHEN (empty unless it says "On a schedule"): the Schedule panel warns when it differs from the real schedule.
@@ -102,7 +106,9 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
   function practice() {
     setError("");
     startTransition(async () => {
-      const result = await call(startPracticeRun, { id: draft.id, auto }, auto ? "Could not run it. Try again." : "Could not start the run. Try again.");
+      const result = agent
+        ? await call(runAgentNow, { id: draft.id }, "Could not run it. Try again.")
+        : await call(startPracticeRun, { id: draft.id, auto }, auto ? "Could not run it. Try again." : "Could not start the run. Try again.");
       if (result.error) setError(result.error);
       else router.push(`/app/runs?run=${result.runId}${auto ? `&auto=${result.auto?.stoppedAt ? "stopped" : "done"}` : ""}`);
     });
@@ -119,19 +125,19 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
       {mode === "delete" ? (
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <p className="min-w-0 flex-1 px-1 text-[15px]">Delete this draft? This cannot be undone.</p>
-            <Btn variant="dark" size="sm" loading={pending} onClick={confirmDelete}>Delete draft</Btn>
-            <Btn variant="secondary" size="sm" ref={keepRef} disabled={pending} onClick={() => back("delete")}>Keep draft</Btn>
+            <p className="min-w-0 flex-1 px-1 text-[15px]">Delete this {noun}? This cannot be undone.</p>
+            <Btn variant="dark" size="sm" loading={pending} onClick={confirmDelete}>Delete {noun}</Btn>
+            <Btn variant="secondary" size="sm" ref={keepRef} disabled={pending} onClick={() => back("delete")}>Keep {noun}</Btn>
           </div>
           {error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name="Workflow" size={18} /></span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name={agent ? "Bot" : "Workflow"} size={18} /></span>
           {mode === "rename" ? (
             <div className="min-w-0 flex-1">
               <input
-                ref={inputRef} value={name} onChange={(event) => setName(event.target.value)} aria-label="Draft name"
+                ref={inputRef} value={name} onChange={(event) => setName(event.target.value)} aria-label={agent ? "Agent name" : "Draft name"}
                 onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); saveName(); } }}
                 aria-invalid={error ? true : undefined} aria-describedby={error ? `rename-error-${draft.id}` : undefined}
                 className={`h-11 w-full rounded-xl border bg-surface px-3 text-[15px] focus-visible:border-accent ${error ? "border-error" : "border-field"}`}
@@ -156,6 +162,7 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
                 </button>
               )}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-mute">
+                {agent && draft.prompt && <span className="w-full truncate" title={draft.prompt}>{draft.prompt}</span>}
                 <span>{savedText && <>Updated <time dateTime={draft.updatedAt}>{savedText}</time> · </>}{steps}</span>
                 {!openBase && <span className="rounded-md border border-line bg-raised px-2 text-xs font-medium text-ink">Draft</span>}
               </p>
@@ -170,15 +177,17 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling }) {
             </>
           ) : (
             <>
-              {openBase && <Btn variant={auto ? "primary" : "secondary"} size="sm" icon={auto ? "Zap" : "Play"} loading={pending} onClick={practice} aria-label={auto ? `Run automatically: ${draft.name}` : `Run: ${draft.name}`}>{auto ? "Run automatically" : "Run"}</Btn>}
-              <button type="button" ref={renameRef} aria-label={`Rename draft: ${draft.name}`} onClick={startRename} className={iconButton}><Icon name="Pencil" size={18} /></button>
-              <button type="button" ref={deleteRef} aria-label={`Delete draft: ${draft.name}`} onClick={() => { setError(""); setMode("delete"); }} className={iconButton}><Icon name="Trash" size={18} /></button>
+              {openBase && agent && <Btn size="sm" icon="Play" loading={pending} onClick={practice} aria-label={`Run now: ${draft.name}`}>Run now</Btn>}
+              {openBase && !agent && <Btn variant={auto ? "primary" : "secondary"} size="sm" icon={auto ? "Zap" : "Play"} loading={pending} onClick={practice} aria-label={auto ? `Run automatically: ${draft.name}` : `Run: ${draft.name}`}>{auto ? "Run automatically" : "Run"}</Btn>}
+              <button type="button" ref={renameRef} aria-label={`Rename ${noun}: ${draft.name}`} onClick={startRename} className={iconButton}><Icon name="Pencil" size={18} /></button>
+              <button type="button" ref={deleteRef} aria-label={`Delete ${noun}: ${draft.name}`} onClick={() => { setError(""); setMode("delete"); }} className={iconButton}><Icon name="Trash" size={18} /></button>
             </>
           )}
         </div>
       )}
       {mode === "view" && openBase && scheduling && <ScheduleEditor workflowId={draft.id} startWhen={startWhen} schedule={draft.schedule ?? null} tableMissing={scheduling.tableMissing} clockReady={scheduling.clockReady} />}
-      {mode === "view" && openBase && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step sends something, adds a row or creates a task" : "steps send things, add rows or create tasks"}.</p>}
+      {mode === "view" && openBase && agent && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">{writes === 1 ? "1 step sends something, adds a row or creates a task: it" : `${writes} steps send things, add rows or create tasks: they`} wait{writes === 1 ? "s" : ""} for your Approve on the Runs page.</p>}
+      {mode === "view" && openBase && !agent && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step sends something, adds a row or creates a task" : "steps send things, add rows or create tasks"}.</p>}
       {mode === "view" && error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>
   );

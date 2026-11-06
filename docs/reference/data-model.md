@@ -44,7 +44,7 @@ One signup per address, ignoring capitals (a unique index on `lower(email)`). Th
 | `plan` | jsonb array of steps, at most 20,000 bytes as text (the app stops at 19,000) and at most 12 steps |
 | `created_at`, `updated_at` | `updated_at` is set by a trigger |
 
-A step is an object such as `{"icon":"Mail","title":"Send the report","detail":"...","kind":"action","fields":{"action":"gmail_send","target":"{myEmail}","title":"Weekly report","details":"{answer}"}}`. Steps with no `kind` are plain notes. The person may select and delete, insert and update only `name`, `prompt`, `plan`. The `updated_at` value doubles as the "version" the Builder compares to notice that a draft was changed elsewhere.
+A step is an object such as `{"icon":"Mail","title":"Send the report","detail":"...","kind":"action","fields":{"action":"gmail_send","target":"{myEmail}","title":"Weekly report","details":"{answer}"}}`. Steps with no `kind` are plain notes. `kind` (added by `agents.sql`) is `workflow` (the default) or `agent` (made from one sentence on the Agents page, D-055). The person may select and delete, insert `name`, `prompt`, `plan` and `kind`, and update only `name`, `prompt`, `plan`. The `updated_at` value doubles as the "version" the Builder compares to notice that a draft was changed elsewhere.
 
 ## runs
 
@@ -117,6 +117,7 @@ Primary key (`user_id`, `bucket`, `kind`, `window_start`) plus `hits`. `kind` is
 | `workflow_memories` | the AI runs without memory |
 | `enabled_bundles` | Skills page shows bundles but Turn on says a setup step is missing |
 | `schedules` | the Schedule panel says one setup step is not done |
+| `workflows.kind` (`agents.sql`) | the Agents page says one setup step is not done; workflow lists show every row |
 | `runs`, `connections` | Runs page / Connect button say a setup step is missing |
 
 `workflows` and `waitlist` are core and have no such fallback.

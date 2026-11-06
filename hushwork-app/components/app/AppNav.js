@@ -75,6 +75,7 @@ export default function AppNav({ userBadge }) {
           <Btn href="/app" icon="Plus" onClick={newWorkflow} className="mb-2 w-full">New workflow</Btn>
           {/* Build: where workflows are made and kept. Run: what they do and where they could act. */}
           <NavLink href="/app" icon="Sparkles" onNavigate={close} exact>Workspace</NavLink>
+          <NavLink href="/app/agents" icon="Bot" onNavigate={close}>Agents</NavLink>
           <NavLink href="/app/workflows" icon="Folder" onNavigate={close}>Workflows</NavLink>
           <NavLink href="/app/builder" icon="Workflow" onNavigate={close}>Builder</NavLink>
           <NavLink href="/app/templates" icon="ListTodo" onNavigate={close}>Templates</NavLink>
