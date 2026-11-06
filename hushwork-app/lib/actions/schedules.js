@@ -47,6 +47,7 @@ export async function saveSchedule(input) {
     return { error: NO_TABLE.has(error.code) ? SETUP : FAILED };
   }
   revalidatePath("/app/workflows");
+  revalidatePath("/app/agents");
   return { ok: true, nextRunAt };
 }
 
@@ -62,6 +63,7 @@ export async function deleteSchedule(input) {
     return { error: "Could not remove the schedule. Try again." };
   }
   revalidatePath("/app/workflows");
+  revalidatePath("/app/agents");
   return { ok: true };
 }
 
@@ -76,7 +78,7 @@ export async function syncScheduleFromStart(input) {
   const { data: rows, error } = await supabase.from("workflows").select("plan").eq("id", id.value).eq("user_id", user.id);
   if (error || !rows?.[0]) return { error: "That workflow no longer exists." };
   const result = await syncStartSchedule({ supabase, userId: user.id, workflowId: id.value, plan: rows[0].plan, tzOffset: input?.tzOffset });
-  if (result.text) revalidatePath("/app/workflows");
+  if (result.text) { revalidatePath("/app/workflows"); revalidatePath("/app/agents"); }
   return result;
 }
 

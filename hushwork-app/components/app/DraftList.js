@@ -9,7 +9,8 @@ import DraftCard from "./DraftCard";
 import { RunModeSwitch } from "./RunMode";
 
 // The list part of "Your drafts": the three states (could not load, empty, list) plus the "Draft deleted." notice.
-export default function DraftList({ drafts, loadFailed, openBase, scheduling }) {
+// `agents`: the Agents page (its own empty and setup states, no Manual/Auto switch: an agent always runs by itself).
+export default function DraftList({ drafts, loadFailed, openBase, scheduling, agents = false, needsSetup = false }) {
   const router = useRouter();
   const [notice, setNotice] = useState("");
 
@@ -20,7 +21,7 @@ export default function DraftList({ drafts, loadFailed, openBase, scheduling }) 
     const neighbour = drafts[at + 1] ?? drafts[at - 1];
     const target = neighbour ? document.getElementById(`draft-open-${neighbour.id}`) : document.getElementById("drafts-heading");
     target?.focus();
-    setNotice("Draft deleted.");
+    setNotice(agents ? "Agent deleted." : "Draft deleted.");
     setTimeout(() => setNotice(""), 5000);
   }
 
@@ -33,6 +34,16 @@ export default function DraftList({ drafts, loadFailed, openBase, scheduling }) 
         <div className="mt-1 rounded-2xl border border-error bg-surface p-4 shadow-sm">
           <p className="flex items-center gap-2 text-[15px]"><Icon name="CircleAlert" className="shrink-0 text-error" />Could not load your drafts. Check your connection and try again.</p>
           <Btn className="mt-3" size="sm" variant="secondary" icon="RotateCcw" onClick={() => router.refresh()}>Try again</Btn>
+        </div>
+      ) : agents && needsSetup ? (
+        <div className="mt-1 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="flex items-start gap-2 text-[15px]"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span>Agents need one setup step that is not done yet. Open <code className="rounded bg-sunken px-1 py-0.5 text-[13px]">supabase/agents.sql</code> and run it in Supabase.</span></p>
+        </div>
+      ) : agents && drafts.length === 0 ? (
+        <div className="mt-1 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="font-medium">No agents yet.</p>
+          <p className="mt-1 text-[15px] text-mute">Describe a task above and press Create agent. It is saved here and runs straight away.</p>
+          <Btn className="mt-3" size="sm" variant="ghost" icon="Pencil" onClick={() => document.getElementById("agent-task")?.focus()}>Describe a task</Btn>
         </div>
       ) : drafts.length === 0 && openBase ? (
         <div className="mt-1 rounded-2xl border border-line bg-surface p-4 shadow-sm">
@@ -51,7 +62,7 @@ export default function DraftList({ drafts, loadFailed, openBase, scheduling }) 
         </div>
       ) : (
         <>
-        {openBase && <RunModeSwitch />}
+        {openBase && !agents && <RunModeSwitch />}
         <ul className="mt-3">
           <AnimatePresence initial={false}>
             {drafts.map((draft) => (
@@ -59,7 +70,7 @@ export default function DraftList({ drafts, loadFailed, openBase, scheduling }) 
                 key={draft.id} className="overflow-hidden pb-3"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0, paddingBottom: 0 }} transition={{ duration: 0.2 }}
               >
-                <DraftCard draft={draft} onDeleted={onDeleted} openBase={openBase} scheduling={scheduling} />
+                <DraftCard draft={draft} onDeleted={onDeleted} openBase={openBase} scheduling={scheduling} agent={agents} />
               </motion.li>
             ))}
           </AnimatePresence>

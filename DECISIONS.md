@@ -96,6 +96,7 @@ Last updated: 2026-10-24
 | D-052 | hushwork.in and docs.hushwork.in live: Vercel name servers, site address setting, Supabase, Google and Linear callbacks | ✅ | 2026-10-29 |
 | D-053 | The Hushwork Agent: always on once turned on; looks at connected apps at 9:00, 13:00, 17:00; up to 3 notes on the workspace; read-only; emails only on news | ✅ | 2026-11-01 |
 | D-054 | Public launch: Sign up and Log in replace the waitlist; Hushwork's own Google connection paused for everyone but the owner (GOOGLE_ONLY_FOR) until Google approves; Composio Google stays on | ✅ | 2026-11-02 |
+| D-055 | Agents: describe a task in one sentence on the Agents page; Hushwork plans it, saves it (a workflow with kind = agent), schedules it if the sentence says when, and runs it once; writing steps still wait for Approve | ✅ | 2026-11-06 |
 
 ---
 
@@ -557,3 +558,10 @@ Last updated: 2026-10-24
 - **Not gated:** Google apps through Composio (Gmail send and drafts, Docs, Sheets, Slides, Calendar events, Drive folders) use Composio's own Google app and work for everyone.
 - **Next action:** after Google approves the app, delete `GOOGLE_ONLY_FOR` on Vercel and redeploy.
 
+### D-055: Agents, made from one sentence (2026-11-06)
+- **Decision:** The owner asked for agents next to the Builder: "describe a task in plain English, and it does it. It creates a saved agent, and it runs. If you want to schedule it, you can." A new **Agents** page (`/app/agents`) has one box and a **Create agent** button. The server plans the sentence with the usual AI planner (keyword plan when AI is off), saves it, turns a time in the sentence ("every Monday at 9") into a real schedule, runs it once in Auto, and opens that run.
+- **An agent is a workflow:** one row in `workflows` with the new column `kind = 'agent'` (`supabase/agents.sql`; insert-only, so an agent stays an agent). Every existing safety rule therefore applies: `cleanPlan`, the run engine and its write gates, schedules, the pause switch, limits. Its name opens it in the Builder. The Workflows page and the workspace list leave agents out; before the SQL is run they show everything as before and the Agents page names the missing step.
+- **What runs by itself:** reads, look-ups and Ask the AI steps. A step that writes waits for Approve on the Runs page (`allowWrites: false`), on the first run and on **Run now**. A scheduled agent writes only when its schedule's "Let it write by itself" is ticked (new schedules start with it off, as in `lib/schedule-sync.js`).
+- **Not the Hushwork Agent (D-053):** that one is always on and leaves notes; these are per-task agents the person makes. Code names keep them apart: `lib/agents/` and `lib/actions/agents.js` versus `lib/agent/` and `lib/actions/agent.js`.
+- **Code:** `lib/agents/create.js` (plan, save, schedule, run), `lib/agents/kinds.js`, `lib/actions/agents.js`, `app/app/agents/page.js`, `components/app/AgentMaker.js`, the `agent` mode of `DraftCard`/`DraftList`/`Drafts`, a fixed `agent=` note on the Runs page. Docs: `content/docs/agents.md`. Tests: `lib/agents/agents.test.js`.
+- **Next action:** the owner pastes `supabase/agents.sql` into Supabase, then creates a first agent.

@@ -88,7 +88,7 @@ function Notice({ icon, title, children }) {
 
 export default async function RunsViewer({ searchParams }) {
   const user = await requireUser(); // outside try/catch on purpose: a signed-out visitor is redirected
-  const { run: wanted, auto } = await searchParams;
+  const { run: wanted, auto, agent } = await searchParams;
 
   let runs = [];
   let failure = "";
@@ -216,6 +216,15 @@ export default async function RunsViewer({ searchParams }) {
           <p id="run-summary" className="mt-3 flex items-start gap-2 text-[15px] font-medium">
             <Icon name={summary.state === "done" ? "CircleCheck" : summary.state === "waiting" ? "Info" : "CircleAlert"} className={`mt-0.5 shrink-0 ${summary.state === "done" ? "text-success" : summary.state === "waiting" ? "text-info" : "text-error"}`} />
             <span>{summary.line}</span>
+          </p>
+        )}
+        {!selected.live && (agent === "new" || agent === "scheduled") && (
+          <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-accent-subtle px-3 py-2 text-sm">
+            <Icon name="Bot" className="mt-0.5 shrink-0 text-accent-text" />
+            <span>
+              Your agent is saved and just ran once. {agent === "scheduled" ? "It will also run on the schedule you described. " : ""}
+              Any step that sends, adds or creates something waits below for your Approve. <Link href="/app/agents" className="font-medium text-accent-text hover:underline">See your agents</Link>
+            </span>
           </p>
         )}
         {!selected.live && (auto === "done" || auto === "stopped") && (
