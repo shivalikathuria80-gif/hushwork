@@ -310,7 +310,7 @@ test("the text of emails: a step set to 'with the text of each email' needs Goog
   const composio = fakeComposio({}, { groq: ["x"] });
   try {
     const result = await startPracticeRun({ id: workflow, auto: true }, who);
-    assert.match(result.auto.reason, /Google is not connected/);
+    assert.match(result.auto.reason, /cannot reach your Google account/);
     assert.equal(composio.calls.length, 0);
   } finally { composio.restore(); }
 });
