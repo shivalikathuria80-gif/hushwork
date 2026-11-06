@@ -43,7 +43,7 @@ Settings needed (names only): `CONNECTIONS_KEY`, `<PREFIX>_CLIENT_ID`, `<PREFIX>
 | `toolkit` | Composio's name for the app |
 | `tool` | the ONE read-only Composio tool, called with no inputs (`null` if `noLookup`) |
 | `what`, `about` | plain words for the pages |
-| `lookupOf` | optional: shares another app's sign-in (`slackmessages` of `slack`, `stripeinvoices` of `stripe`); no Connect button |
+| `lookupOf` | optional: shares another app's sign-in (`slackmessages` of `slack`, `stripeinvoices` of `stripe`, `gmailsearch` of `gmailsend`); no Connect button |
 | `input` | optional `{ label, pattern }`: the lookup needs one typed thing (Slack channel); never offered to the AI planner |
 | `noLookup` | optional: no usable read tool (only `gslides`); only used for its create action |
 | `unavailable` | optional sentence: cannot be connected (`vercel`, `xero`, `cloudflare`, D-038); shows text instead of Connect |

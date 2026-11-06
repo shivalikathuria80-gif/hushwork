@@ -340,6 +340,29 @@ export const TEMPLATES = [
       step("action", { action: "gmail_send", target: "{myEmail}", title: "Receipts and contracts this week", details: "{answer}" }),
     ],
   },
+  // ---- follow-ups through Gmail search (Composio's Gmail, so it works for everyone): it searches, then reads each conversation to see who wrote last ----
+  {
+    id: "followup", pack: "everyday", icon: "Clock", title: "Client follow-up", needs: "Gmail (send)",
+    body: "Every weekday it searches the emails you sent in the last two weeks, sees which conversations never got a reply, and emails YOU who to nudge, with a one-line nudge for each. It does not email your clients. It uses senders, subjects and times, never the text of an email. You press Approve before the email is sent.",
+    request: "Every weekday morning, find emails I sent in the last two weeks that got no reply and email me who to follow up with. Ask me before it is sent.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 9, minute: 30 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every weekday at 9:30" }),
+      step("ai", { task: "Who has not replied? For each one waiting: who, subject, days waiting, and a one-line nudge. Up to 6 lines.", uses: "app", address: "gmailsearch:in:sent newer_than:14d older_than:2d" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Follow-ups to send", details: "{answer}" }),
+    ],
+  },
+  {
+    id: "warmleads", pack: "marketing", icon: "UserPlus", title: "Warm lead revival", needs: "Gmail (send)",
+    body: "Every Monday it searches the emails you sent one to three months ago, finds the conversations that went quiet, and emails YOU up to three worth reviving, each with a friendly one-line check-in. It does not email anyone else. It uses senders, subjects and times, never the text of an email. You press Approve before the email is sent.",
+    request: "Every Monday, find conversations from one to three months ago that went quiet and email me three worth reviving with a short check-in for each. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 1, hour: 10, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Monday at 10:00" }),
+      step("ai", { task: "Pick up to 3 quiet conversations worth reviving: who, subject, and a friendly one-line check-in for each.", uses: "app", address: "gmailsearch:in:sent newer_than:90d older_than:30d" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Leads worth reviving", details: "{answer}" }),
+    ],
+  },
 ];
 
 // The checked steps of a template (every step rebuilt by the same rules as everything else), or null for an unknown id.

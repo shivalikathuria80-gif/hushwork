@@ -106,8 +106,9 @@ async function call(key, method, path, { query, body, fetchImpl = fetch, notFoun
 // The tools an app's sign-in is limited to at Composio: its ONE read-only lookup, plus the tools of the actions Hushwork can do in it
 // (composio-actions.js). Nothing else can be run with that sign-in, whatever anyone asks.
 // (An app's second lookups, `lookupOf`, share its sign-in, so the sign-in allows all of the toolkit's lookups.)
-// (An action that needs two calls also allows its second tool; an app with no lookup, `noLookup`, allows only its actions.)
-export const allowedTools = (app) => [...new Set(COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, ...actionsForApp(one.id).flatMap((action) => [action.tool, action.then?.tool])]).filter(Boolean))];
+// (An action that needs two calls also allows its second tool; an app with no lookup, `noLookup`, allows only its actions; a lookup that also reads each
+// conversation it finds, `threadTool`, allows that read too.)
+export const allowedTools = (app) => [...new Set(COMPOSIO_APPS.filter((one) => one.toolkit === app.toolkit).flatMap((one) => [one.tool, one.threadTool, ...actionsForApp(one.id).flatMap((action) => [action.tool, action.then?.tool])]).filter(Boolean))];
 const sameTools = (list, wanted) => Array.isArray(list) && list.length === wanted.length && wanted.every((tool) => list.includes(tool));
 
 // The sign-in blueprint ("auth config") for an app, limited to its allowed tools. Found if it already exists, made if not.
@@ -201,18 +202,21 @@ export function messageLines(data) {
   return lines;
 }
 
+// Runs one read-only tool from the apps list with the arguments given. Returns { ok: true, data } or { ok: false, error, said }.
+async function executeTool({ key, userId, tool, args, fetchImpl }) {
+  const ran = await call(key, "POST", `/tools/execute/${tool}`, { body: { user_id: userId, arguments: args }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
+  if (ran.error) return { ok: false, error: ran.error, said: ran.said };
+  if (ran.body?.successful !== true) {
+    const said = cleanSaid(ran.body?.error, key);
+    return { ok: false, error: explainFailure(said || ran.body?.error), said };
+  }
+  return { ok: true, data: ran.body.data ?? null };
+}
+
 // Reads the latest messages of one Slack channel (read only). `channel` is a name ("general") or an id ("C0123ABCD"): a name is first looked up in the
 // person's own channel list (the Slack app's one lookup). Returns { ok: true, text } or { ok: false, error, said }.
 export async function runChannelMessages({ key, userId, app, channel, fetchImpl }) {
-  const execute = async (tool, args) => {
-    const ran = await call(key, "POST", `/tools/execute/${tool}`, { body: { user_id: userId, arguments: args }, fetchImpl, notFound: COMPOSIO_FAILED.notConnected });
-    if (ran.error) return { ok: false, error: ran.error, said: ran.said };
-    if (ran.body?.successful !== true) {
-      const said = cleanSaid(ran.body?.error, key);
-      return { ok: false, error: explainFailure(said || ran.body?.error), said };
-    }
-    return { ok: true, data: ran.body.data ?? null };
-  };
+  const execute = (tool, args) => executeTool({ key, userId, tool, args, fetchImpl });
   let id = /^[A-Z0-9]{6,20}$/.test(channel) && /\d/.test(channel) ? channel : "";
   if (!id) {
     const slack = COMPOSIO_APPS.find((one) => one.id === app.lookupOf);
@@ -225,6 +229,96 @@ export async function runChannelMessages({ key, userId, app, channel, fetchImpl 
   if (!history.ok) return history;
   const lines = messageLines(history.data);
   return { ok: true, text: lines.length ? lines.join("\n").slice(0, 1500) : "(no messages found)" };
+}
+
+// ---- Gmail search: which conversations got a reply ---------------------------------------------------------------------------------------------------------------
+// Runs ONE Gmail search the person wrote in the step (Gmail's own search words, checked by the app's `input.pattern`), then reads each conversation it found (up to
+// MAX_THREADS) to see who wrote last. Only the sender, the "to", the subject, the time and Gmail's labels are used: never the text of an email, even when Composio's
+// answer holds it. A conversation whose newest message carries Gmail's SENT label is "waiting for a reply" (you wrote last); any other is "replied".
+// Composio is asked for each tool's inputs first (like an action), and if a tool needs something we do not fill in, nothing is run.
+const MAX_SEARCH = 10;
+const MAX_THREADS = 8;
+const QUERY_INPUTS = ["query", "q", "search_query"];
+const MAX_INPUTS = ["max_results", "maxResults", "limit"];
+const THREAD_INPUTS = ["thread_id", "threadId", "id"];
+const PLAIN_ID = /^[A-Za-z0-9_-]{6,80}$/;
+
+// A time Composio gave (milliseconds as a number or text, seconds, or a date text) -> milliseconds, or NaN.
+export function mailTime(value) {
+  if (typeof value === "number" || (typeof value === "string" && /^\d{9,14}$/.test(value.trim()))) {
+    const n = Number(value);
+    return n > 1e11 ? n : n * 1000;
+  }
+  return typeof value === "string" ? Date.parse(value) : Number.NaN;
+}
+const firstText = (item, keys) => { for (const key of keys) if (typeof item[key] === "string" && item[key].trim()) return item[key]; return ""; };
+const labelsOf = (item) => (Array.isArray(item.labelIds) ? item.labelIds : Array.isArray(item.label_ids) ? item.label_ids : Array.isArray(item.labels) ? item.labels : []).filter((one) => typeof one === "string");
+
+// The messages in an answer, found by their shape (a thread id and a message id), newest last: [{ id, thread, from, to, subject, time, sent }].
+export function mailMessages(data) {
+  const found = [];
+  const seen = new Set();
+  walkAnswer(data, (item) => {
+    const thread = firstText(item, ["threadId", "thread_id"]);
+    const id = firstText(item, ["messageId", "message_id", "id"]);
+    if (!PLAIN_ID.test(thread) || !PLAIN_ID.test(id) || seen.has(id)) return;
+    seen.add(id);
+    const headers = Array.isArray(item.payload?.headers) ? item.payload.headers : [];
+    const header = (name) => headers.find((h) => typeof h?.name === "string" && h.name.toLowerCase() === name && typeof h.value === "string")?.value ?? "";
+    found.push({
+      id, thread,
+      from: flat(firstText(item, ["sender", "from"]) || header("from"), 80),
+      to: flat(firstText(item, ["to", "recipient"]) || header("to"), 80),
+      subject: flat(firstText(item, ["subject"]) || (typeof item.preview?.subject === "string" ? item.preview.subject : "") || header("subject"), 100),
+      time: mailTime(item.messageTimestamp ?? item.internalDate ?? item.internal_date ?? item.date ?? header("date")),
+      sent: labelsOf(item).includes("SENT"),
+    });
+  });
+  return found.map((one, index) => ({ ...one, index })).sort((a, b) => (Number.isFinite(a.time) && Number.isFinite(b.time) ? a.time - b.time : a.index - b.index));
+}
+
+// One conversation in one line: subject, who it is with, when the newest message came and whether someone answered.
+export function threadLine(number, messages) {
+  const newest = messages.at(-1);
+  const theirs = [...messages].reverse().find((one) => !one.sent);
+  const who = (theirs ? theirs.from : newest.to) || "someone";
+  const when = Number.isFinite(newest.time) ? niceTime(newest.time) : "";
+  const state = newest.sent ? "WAITING FOR A REPLY (you wrote last)" : "REPLIED (they wrote last)";
+  return `${number}. ${messages[0].subject || messages.find((one) => one.subject)?.subject || "(no subject)"} | with ${who} | ${messages.length} message${messages.length === 1 ? "" : "s"}${when ? ` | newest ${when}` : ""} | ${state}`;
+}
+
+export async function runMailSearch({ key, userId, app, query, fetchImpl }) {
+  const inputsOf = async (tool) => {
+    const described = await call(key, "GET", `/tools/${tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
+    return described.error ? { error: described } : readToolInputs(described.body);
+  };
+  const execute = (tool, args) => executeTool({ key, userId, tool, args, fetchImpl });
+  // Only the inputs we fill (and ones the tool does not insist on) may exist: anything else required means nothing is run.
+  const fits = (inputs, filled) => [...inputs.required].every((name) => filled.includes(name) || name === "user_id");
+
+  const [search, thread] = await Promise.all([inputsOf(app.tool), inputsOf(app.threadTool)]);
+  if (search.error) return { ok: false, error: search.error.error, said: search.error.said };
+  if (thread.error) return { ok: false, error: thread.error.error, said: thread.error.said };
+  const queryName = QUERY_INPUTS.find((name) => search.names.has(name));
+  const maxName = MAX_INPUTS.find((name) => search.names.has(name));
+  const threadName = THREAD_INPUTS.find((name) => thread.names.has(name));
+  if (!queryName || !threadName || !fits(search, [queryName, maxName]) || !fits(thread, [threadName])) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
+
+  const args = { [queryName]: query, ...(maxName ? { [maxName]: MAX_SEARCH } : {}), ...(search.names.has("include_payload") ? { include_payload: false } : {}) };
+  const found = await execute(app.tool, args);
+  if (!found.ok) return found;
+  const threads = [...new Set(mailMessages(found.data).reverse().map((one) => one.thread))].slice(0, MAX_THREADS); // newest conversations first
+  if (!threads.length) return { ok: true, text: `Nothing in Gmail matches the search "${query}".` };
+
+  const read = await Promise.all(threads.map((id) => execute(app.threadTool, { [threadName]: id })));
+  const broken = read.find((one) => !one.ok);
+  if (broken) return { ok: false, error: `${broken.error} If you connected Gmail (send) before Gmail search was added, open Connections, press Disconnect for Gmail (send) and Connect once more.`, said: broken.said };
+  const lines = read.map((one, index) => {
+    const messages = mailMessages(one.data).filter((m) => m.thread === threads[index]);
+    return messages.length ? threadLine(index + 1, messages) : `${index + 1}. (Gmail did not return this conversation)`;
+  });
+  const waiting = lines.filter((line) => line.includes("WAITING FOR A REPLY")).length;
+  return { ok: true, text: `Gmail search "${query}": ${threads.length} conversation${threads.length === 1 ? "" : "s"}, ${waiting} waiting for a reply.\n${lines.join("\n")}`.slice(0, 1500) };
 }
 
 // Does ONE write in an app (send a message, create an issue, add a task) for this person. `action` is an entry of composio-actions.js

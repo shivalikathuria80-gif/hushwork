@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { PACKS, PACK_IDS, packOf, suggestedSchedule } from "./template-packs.js";
 import { TEMPLATES } from "./templates.js";
 import { checkSteps } from "./validate.js";
-import { findComposioApp } from "./connectors/composio-apps.js";
+import { parseAppAddress } from "./connectors/composio-apps.js";
 import { findAction } from "./connectors/composio-actions.js";
 import { ICON_NAMES } from "./ai/icon-names.js";
 
@@ -44,7 +44,7 @@ test("packs: every template that says what it needs can really be approved, step
     for (const s of checked.filter((x) => x.kind !== "trigger")) {
       assert.ok(isAiStep(s) || isAppLookup(s) || isActionStep(s) || isLinearCreate(s) || isRequestStep(s), `${t.id}: a ${s.kind} step can be approved`);
       if (s.kind === "ai" && s.fields.uses === "app") {
-        const app = findComposioApp(s.fields.address);
+        const app = parseAppAddress(s.fields.address)?.app; // "gmailsearch:in:sent newer_than:14d" names a search too
         assert.ok(app && !app.unavailable, `${t.id}: the app ${s.fields.address} exists and can be connected`);
       }
       if (s.kind === "action") assert.ok(findAction(s.fields.action), `${t.id}: a listed action`);

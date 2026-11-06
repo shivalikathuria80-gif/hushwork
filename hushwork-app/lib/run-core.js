@@ -28,7 +28,7 @@ import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { LINEAR_CREATE_FAILED, createIssue } from "@/lib/connectors/linear-create";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps";
-import { COMPOSIO_FAILED, runActionTool, runChannelMessages, runReadTool } from "@/lib/connectors/composio";
+import { COMPOSIO_FAILED, runActionTool, runChannelMessages, runMailSearch, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
 import { fetchLinearIssues } from "@/lib/connectors/linear";
 import { GOOGLE_SOON, googleOpenFor } from "@/lib/connectors/google-gate";
@@ -461,10 +461,10 @@ export async function approveAiStep(input, who) {
     };
   } else if (uses === "app") {
     // The app is named in the step's address box and must be one from lib/connectors/composio-apps.js; the tool is always that app's one read-only tool.
-    // A lookup that needs one typed thing (Slack messages: the channel) is written like slackmessages:general.
+    // A lookup that needs one typed thing is written after a colon: slackmessages:general (the channel), gmailsearch:in:sent newer_than:14d (a Gmail search).
     const wanted = parseAppAddress(address);
     const named = typeof address === "string" ? address.split(":")[0].trim().toLowerCase() : "";
-    if (!wanted && findComposioApp(named)?.input) return { error: `Write the ${findComposioApp(named).input.label} after the name in this step, like ${named}:general (letters, numbers, dots and dashes only).` };
+    if (!wanted && findComposioApp(named)?.input) return { error: `Write the ${findComposioApp(named).input.label} after the name in this step, like ${named}:${findComposioApp(named).input.example} (${findComposioApp(named).input.rule}).` };
     if (!wanted) return { error: "Write the short name of the app in this step first (for example todoist, github or slack: the names are on the Connections page)." };
     const { app, input } = wanted;
     const composioKey = getComposioKey();
@@ -472,7 +472,8 @@ export async function approveAiStep(input, who) {
     tools.app_read = {
       description: `Reads ${app.what} from ${app.name} (read-only).`,
       run: async () => {
-        const answer = app.input ? await runChannelMessages({ key: composioKey, userId: user.id, app, channel: input }) : await runReadTool({ key: composioKey, userId: user.id, app });
+        const answer = app.threadTool ? await runMailSearch({ key: composioKey, userId: user.id, app, query: input })
+          : app.input ? await runChannelMessages({ key: composioKey, userId: user.id, app, channel: input }) : await runReadTool({ key: composioKey, userId: user.id, app });
         return answer.ok ? answer.text : failed(withSaid(answer));
       },
     };

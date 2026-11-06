@@ -4,7 +4,7 @@
 // so `node --test` and the server load the same code.
 import { STEP_KINDS, describeStep, isTypedKind } from "./steps.js";
 import { checkId } from "./validate.js";
-import { findComposioApp, parseAppAddress } from "./connectors/composio-apps.js";
+import { findComposioApp, parseAppAddress, showInput } from "./connectors/composio-apps.js";
 import { EXAMPLE_NOTICE, checkTarget, findAction, isExampleTarget, labelFor, resolveTarget } from "./connectors/composio-actions.js";
 import { fillActionDetails, fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
@@ -77,7 +77,7 @@ export const appSummary = (step) => {
 export const isAiStep = (step) => step?.kind === "ai" && typeof step?.fields?.task === "string" && step.fields.task.trim() !== "";
 
 export const aiSummary = (step) => {
-  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", gmail: "your Gmail inbox (sender, subject and time of the latest 10 messages)", gmailtext: "your Gmail inbox INCLUDING THE TEXT of your 5 newest emails (about the first 450 characters of each). That text goes to Groq with your request", drive: "your Google Drive (names and times of your 10 latest files)", app: parseAppAddress(step?.fields?.address) ? `${parseAppAddress(step.fields.address).app.name}${parseAppAddress(step.fields.address).input ? ` #${parseAppAddress(step.fields.address).input}` : ""} (${parseAppAddress(step.fields.address).app.what}, through Composio)` : "a connected app", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
+  const uses = { linear: "your Linear tasks", calendar: "your Google Calendar", gmail: "your Gmail inbox (sender, subject and time of the latest 10 messages)", gmailtext: "your Gmail inbox INCLUDING THE TEXT of your 5 newest emails (about the first 450 characters of each). That text goes to Groq with your request", drive: "your Google Drive (names and times of your 10 latest files)", app: parseAppAddress(step?.fields?.address) ? `${parseAppAddress(step.fields.address).app.name}${parseAppAddress(step.fields.address).input ? ` ${showInput(parseAppAddress(step.fields.address).app, parseAppAddress(step.fields.address).input)}` : ""} (${parseAppAddress(step.fields.address).app.what}, through Composio)` : "a connected app", mcp: step?.fields?.address ? `the MCP server ${step.fields.address}` : "an MCP server", web: step?.fields?.address ? `the web address ${step.fields.address}` : "a web address" }[step?.fields?.uses];
   const earlier = String(step?.fields?.task ?? "").includes("{answers}") ? "This step also gets what the Ask the AI steps before it found (as information only)." : "";
   const last = String(step?.fields?.task ?? "").includes("{last}") ? "This step also gets what it answered the last time this workflow ran (as information only), so it can tell what is new." : "";
   return [`Hushwork will ask the AI: ${step?.fields?.task ?? ""}`, earlier, last, uses ? `The AI may look at ${uses}. It can only read; it cannot change anything.` : "The AI will only think; it will not look at anything.", "Your request" + (uses ? " and what it reads" : "") + " go to Groq, the company that runs the AI." + (step?.fields?.uses === "mcp" ? " The AI\u2019s questions to the MCP server go to that server. Only its read-only tools can be used." : "")].filter(Boolean).join(String.fromCharCode(10));
