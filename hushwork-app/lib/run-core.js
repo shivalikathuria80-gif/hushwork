@@ -301,7 +301,7 @@ export async function linearAuthorization(supabase, userId) {
 }
 
 // Google works only through the Connect button (there is no personal-key shortcut). Returns "Bearer <token>" or null.
-const GOOGLE_OFF = "Google is not connected yet. Open Connections and press Connect Google.";
+const GOOGLE_OFF = "Hushwork cannot reach your Google account: it is not connected, or its sign-in has expired. Open Connections and connect Google again.";
 const googleOff = (userId) => (googleOpenFor(userId) ? GOOGLE_OFF : GOOGLE_SOON); // paused for this account (lib/connectors/google-gate.js): say so, not "not connected"
 export async function googleAuthorization(supabase, userId) {
   if (!googleOpenFor(userId)) return null; // THE GATE: every Google read and write here (and the agent's look) starts with this function

@@ -65,6 +65,9 @@ export async function loadAccess({ supabase, userId, provider, key, app, now = D
     } catch {
       // unreadable: treated as not connected below
     }
+    // The app said the sign-in is over for good: remove the dead row, so Connections shows "Connect" instead of "Connected". Only the row
+    // that still holds the refresh token we just used is removed (a request that saved a fresh sign-in in the meantime is left alone).
+    if (renewed.revoked) await supabase.from(TABLE).delete().eq("user_id", userId).eq("provider", provider).eq("refresh_token_enc", row.refresh_token_enc);
     return null;
   }
   const nextRefresh = renewed.refreshToken ?? refresh; // Google keeps the same refresh token; Linear sends a new one each time

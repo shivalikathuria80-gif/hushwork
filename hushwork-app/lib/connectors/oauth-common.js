@@ -21,7 +21,12 @@ export async function postTokenForm(url, fields, { fetchImpl = fetch, now = Date
       body: formBody(fields),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!response.ok) return { ok: false, error: response.status >= 500 ? OAUTH_FAILED.network : OAUTH_FAILED.failed };
+    if (!response.ok) {
+      // "invalid_grant" = the app says this sign-in is over for good (expired, or the person removed the permission). Only that answer is
+      // marked `revoked`: any other refusal (a wrong client secret, a busy server) must never look like the person's sign-in has ended.
+      const said = response.status === 400 ? await response.json().catch(() => null) : null;
+      return { ok: false, error: response.status >= 500 ? OAUTH_FAILED.network : OAUTH_FAILED.failed, ...(said?.error === "invalid_grant" ? { revoked: true } : {}) };
+    }
     const body = await response.json();
     const accessToken = typeof body?.access_token === "string" ? body.access_token : "";
     if (!accessToken || accessToken.length > 1500) return { ok: false, error: OAUTH_FAILED.failed };
