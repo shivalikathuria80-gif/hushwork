@@ -47,6 +47,18 @@ Hushwork reads the latest 10 messages of that one channel and hands them to the 
 
 To send a message, use **Do something in another app** and choose **Send a Slack message**. Write the channel in **Where**, for example `general`.
 
+## Searching Gmail and seeing who replied
+
+Gmail search uses the **Gmail (send)** sign-in, so it works for everyone, even while Connect Google is limited. In an **Ask the AI** step set to **Another app**, write `gmailsearch:` and then the search, written the way Gmail's own search box takes it:
+
+```
+gmailsearch:in:sent newer_than:14d
+```
+
+Hushwork runs that one search (up to 10 messages), then reads each conversation it found (up to 8) and tells the AI whether it is **waiting for a reply** (you wrote last) or **replied** (someone else wrote last). It uses the sender, recipient, subject, time and labels only, never the text of an email. It cannot send, change or delete anything. The **Client follow-up** and **Warm lead revival** templates use it.
+
+If you connected Gmail (send) before Gmail search was added, press **Disconnect** and **Connect** once more so the sign-in allows the search.
+
 ## Stripe payments and invoices
 
 Stripe has two lookups on one sign-in:
@@ -59,7 +71,7 @@ Connecting Stripe allows both. If you connected Stripe before invoices were adde
 ## Using the apps in a workflow
 
 - **Look in another app** (the **Another app** block): pick the app and Hushwork reads its one fixed thing after you approve.
-- **Ask the AI** set to **Another app**: write the app's short name in the address box, for example `todoist`, `github`, `stripe` or `stripeinvoices`.
+- **Ask the AI** set to **Another app**: write the app's short name in the address box, for example `todoist`, `github`, `stripe` or `stripeinvoices`. A Slack channel or a Gmail search goes after a colon: `slackmessages:general`, `gmailsearch:in:sent newer_than:14d`.
 - **Do something in another app**: pick the action, fill in **Where**, a title and more details.
 
 For Notion, the page also has to be shared with the connection: open the page, press the three dots, then **Connections**. A Notion page id is the long code of 32 letters and numbers at the end of the page's address.

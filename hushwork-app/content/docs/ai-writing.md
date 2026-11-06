@@ -24,7 +24,7 @@ The field **What may it look at?** has these choices:
 - **A web address**
 - **An MCP server**
 
-A step looks in **one** place only. To look in two places, use two Ask the AI steps. For **Another app**, write the app's short name in the address box, for example `todoist`, `github`, `stripe` or `stripeinvoices`. For the latest messages of one Slack channel, write `slackmessages:channelname`. For **A web address** or **An MCP server**, write an https address.
+A step looks in **one** place only. To look in two places, use two Ask the AI steps. For **Another app**, write the app's short name in the address box, for example `todoist`, `github`, `stripe` or `stripeinvoices`. For the latest messages of one Slack channel, write `slackmessages:channelname`. To search Gmail and see which conversations got a reply, write `gmailsearch:` and the search, for example `gmailsearch:in:sent newer_than:14d`. For **A web address** or **An MCP server**, write an https address.
 
 Linear, Calendar, Gmail and Drive need [Google](/docs/connect-google) or [Linear](/docs/connect-linear) connected. Other apps need their connection from [More apps through Composio](/docs/connect-other-apps).
 

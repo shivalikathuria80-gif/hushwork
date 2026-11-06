@@ -104,7 +104,7 @@ export const STEP_KINDS = {
     fields: [
       text("task", "What should the AI do?", 110, { hint: "For example: Tell me which task to do first" }),
       choice("uses", "What may it look at?", { nothing: "Nothing, just think", linear: "My Linear tasks", calendar: "My Google Calendar", gmail: "My Gmail inbox (senders and subjects)", gmailtext: "My Gmail inbox, with the text of each email", drive: "My Google Drive files", app: "Another app (Todoist, Notion...)", web: "A web address", mcp: "An MCP server" }),
-      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server (starts with https://), or Another app (its short name from the Connections page, for example todoist, github, stripe or stripeinvoices; for the messages of one Slack channel write slackmessages:channelname)" }),
+      text("address", "Web address", 100, { optional: true, hint: "Only for A web address or An MCP server (starts with https://), or Another app (its short name from the Connections page, for example todoist, github, stripe or stripeinvoices; for the messages of one Slack channel write slackmessages:channelname; to search Gmail and see who replied write gmailsearch: and the search, like gmailsearch:in:sent newer_than:14d)" }),
     ],
     describe: (fields, label) => ({ title: "Ask the AI", detail: join(fields.task, label("uses") === "Nothing, just think" ? "" : label("uses")) }),
   },

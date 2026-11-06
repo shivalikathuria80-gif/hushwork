@@ -53,7 +53,7 @@ export default function ConnectionsPage({ searchParams }) {
 
       <section aria-labelledby="workspace-heading" className="mt-8">
         <div className="flex items-center gap-3">
-          <AppLogos ids={COMPOSIO_APPS.filter(isGoogle).slice(0, 4).map((app) => app.id)} size={32} />
+          <AppLogos ids={COMPOSIO_APPS.filter((app) => isGoogle(app) && !app.lookupOf).slice(0, 4).map((app) => app.id)} size={32} />
           <h2 id="workspace-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Google Workspace (through Composio)</h2>
         </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
@@ -63,7 +63,7 @@ export default function ConnectionsPage({ searchParams }) {
 
       <section aria-labelledby="more-heading" className="mt-8">
         <div className="flex items-center gap-3">
-          <AppLogos ids={COMPOSIO_APPS.slice(0, 6).map((app) => app.id)} size={32} />
+          <AppLogos ids={COMPOSIO_APPS.filter((app) => !app.lookupOf).slice(0, 6).map((app) => app.id)} size={32} />
           <h2 id="more-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">More apps (through Composio)</h2>
         </div>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">

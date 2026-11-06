@@ -295,6 +295,31 @@ test("Slack messages: the channel is looked up by name, ONE history read follows
   } finally { fake.restore(); }
 });
 
+test("Gmail search: an Ask the AI step set to gmailsearch:... runs the search and one read per conversation, and the AI sees who replied; no search in the step stops with a plain sentence", async () => {
+  const OKAY = (data) => ({ successful: true, data });
+  const sent = { messageId: "m_aaaaa1", threadId: "t_aaaaa1", sender: "me@x.co", to: "Ana <ana@client.co>", subject: "Proposal", labelIds: ["SENT"] };
+  const good = setup({ plan: lookupPlan("app", "gmailsearch:in:sent newer_than:14d") });
+  const composio = fakeComposio({
+    GMAIL_FETCH_EMAILS: { inputs: { query: {}, max_results: {} }, answer: OKAY({ messages: [sent] }) },
+    GMAIL_FETCH_MESSAGE_BY_THREAD_ID: { inputs: { thread_id: { required: true } }, answer: OKAY({ messages: [sent] }) },
+  }, { groq: ["TOOL", "Ana has not replied."] });
+  try {
+    const result = await startPracticeRun({ id: good.workflow, auto: true }, good.who);
+    assert.deepEqual(result.auto, { done: 1, stoppedAt: 0 });
+    assert.deepEqual(livePosts(composio).map((call) => call.path), ["/tools/execute/GMAIL_FETCH_EMAILS", "/tools/execute/GMAIL_FETCH_MESSAGE_BY_THREAD_ID"]);
+    assert.deepEqual(livePosts(composio)[0].body.arguments, { query: "in:sent newer_than:14d", max_results: 10 });
+    const groqBodies = composio.calls.filter((call) => call.path === "groq");
+    assert.ok(JSON.stringify(groqBodies[1].body.messages).includes("WAITING FOR A REPLY"), "the reply state was handed to the AI as data");
+  } finally { composio.restore(); }
+  const half = setup({ plan: lookupPlan("app", "gmailsearch") });
+  const fake = fakeComposio({}, { groq: ["x"] });
+  try {
+    const result = await startPracticeRun({ id: half.workflow, auto: true }, half.who);
+    assert.match(result.auto.reason, /Write the search after the name in this step, like gmailsearch:in:sent newer_than:14d/);
+    assert.equal(fake.calls.length, 0, "nothing was asked of Gmail or the AI");
+  } finally { fake.restore(); }
+});
+
 test("Stripe invoices: the invoices tool runs for an Ask the AI step set to stripeinvoices, and only that tool", async () => {
   const { workflow, who } = setup({ plan: lookupPlan("app", "stripeinvoices") });
   const composio = fakeComposio({ STRIPE_LIST_INVOICES: { answer: { successful: true, data: { data: [{ id: "in_1", status: "open", amount_due: 500 }] } } } }, { groq: ["TOOL", "One open invoice, 500."] });

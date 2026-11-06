@@ -100,7 +100,7 @@ test("an email: the address, subject and text go to the tool's own boxes, and th
   const inputs = readToolInputs({ input_parameters: { recipient_email: { required: true }, subject: {}, body: { required: true }, cc: {} } });
   assert.deepEqual(buildArguments(email, { target: "a@b.co", title: "Greetings", details: "Dear Arjun" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Greetings", body: "Dear Arjun" });
   assert.deepEqual(buildArguments(email, { target: "a@b.co", title: "Greetings", details: "" }, inputs).arguments, { recipient_email: "a@b.co", subject: "Greetings", body: "Greetings" });
-  assert.deepEqual(allowedTools(findComposioApp("gmailsend")), ["GMAIL_LIST_LABELS", "GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT"]);
+  assert.deepEqual(allowedTools(findComposioApp("gmailsend")), ["GMAIL_LIST_LABELS", "GMAIL_SEND_EMAIL", "GMAIL_CREATE_EMAIL_DRAFT", "GMAIL_FETCH_EMAILS", "GMAIL_FETCH_MESSAGE_BY_THREAD_ID"], "Gmail: the label list, the send, the draft, and the search with its thread read (all read-only except the two approved writes)");
 });
 
 test("doing an action: the tool's inputs are asked for first, then ONE request with exactly the built inputs for this person; nothing else is ever sent", async () => {
@@ -409,4 +409,83 @@ test("a sheet that was made but could not be filled is told honestly: ok with a 
   const refused = pretendTools({ GOOGLESHEETS_CREATE_GOOGLE_SHEET1: { described: SHEET_FIRST, answer: wrong }, GOOGLESHEETS_VALUES_UPDATE: { described: SHEET_SECOND } });
   assert.equal((await runActionTool({ key: "k", userId: "u", action: findAction("sheet_create"), values: { target: "", title: "x", details: "a|b" }, fetchImpl: refused.fetchImpl })).ok, false);
   assert.deepEqual(refused.runs(), ["GOOGLESHEETS_CREATE_GOOGLE_SHEET1"], "the rows are not written when the sheet was not made");
+});
+
+// ---- Gmail search: which conversations got a reply ----
+test("parseAppAddress: gmailsearch takes a Gmail search after the colon (colons, spaces and quotes kept), and refuses an empty or odd one", async () => {
+  const { parseAppAddress, showInput } = await import("./composio-apps.js");
+  const one = parseAppAddress("gmailsearch:in:sent newer_than:14d");
+  assert.deepEqual([one.app.id, one.app.lookupOf, one.input], ["gmailsearch", "gmailsend", "in:sent newer_than:14d"]);
+  assert.equal(parseAppAddress('GmailSearch: subject:"Proposal" from:Ana ').input, 'subject:"Proposal" from:Ana');
+  assert.equal(showInput(one.app, one.input), '"in:sent newer_than:14d"');
+  assert.equal(showInput(parseAppAddress("slackmessages:general").app, "general"), "#general");
+  for (const bad of ["gmailsearch", "gmailsearch:", "gmailsearch:   ", "gmailsearch:a\nb", "gmailsearch:<script>", "gmailsearch:a\\b", "gmailsearch:" + "a".repeat(89)]) assert.equal(parseAppAddress(bad), null, bad);
+});
+
+test("Gmail search: ONE search, then one read per conversation; a conversation where you wrote last is WAITING, any other REPLIED; the text of an email is never used", async () => {
+  const { findComposioApp } = await import("./composio-apps.js");
+  const { runMailSearch, mailMessages, mailTime } = await import("./composio.js");
+  const app = findComposioApp("gmailsearch");
+  const calls = [];
+  const threads = {
+    t_waiting1: [{ messageId: "m_aaaaa1", threadId: "t_waiting1", sender: "Me <me@x.co>", to: "Ana <ana@client.co>", subject: "Proposal", messageTimestamp: "2026-10-30T10:00:00Z", labelIds: ["SENT"], messageText: "SECRET BODY" }],
+    t_replied1: [
+      { messageId: "m_bbbbb1", threadId: "t_replied1", sender: "Me <me@x.co>", to: "Bo <bo@lead.co>", subject: "Quote", messageTimestamp: "2026-10-28T10:00:00Z", labelIds: ["SENT"] },
+      { messageId: "m_bbbbb2", threadId: "t_replied1", sender: "Bo <bo@lead.co>", to: "me@x.co", subject: "Re: Quote", messageTimestamp: "2026-10-29T09:00:00Z", labelIds: ["INBOX"] },
+    ],
+  };
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname.replace("/api/v3.1", "");
+    const body = init.body ? JSON.parse(init.body) : undefined;
+    calls.push({ method: init.method, path, body });
+    const ok = (json) => ({ ok: true, status: 200, json: async () => json, text: async () => "" });
+    if (path === "/tools/GMAIL_FETCH_EMAILS") return ok({ input_parameters: { properties: { query: {}, max_results: {}, include_payload: {}, user_id: {} }, required: [] } });
+    if (path === "/tools/GMAIL_FETCH_MESSAGE_BY_THREAD_ID") return ok({ input_parameters: { properties: { thread_id: {}, page_token: {} }, required: ["thread_id"] } });
+    if (path === "/tools/execute/GMAIL_FETCH_EMAILS") return ok({ successful: true, data: { messages: [threads.t_replied1[0], threads.t_waiting1[0]] } });
+    if (path === "/tools/execute/GMAIL_FETCH_MESSAGE_BY_THREAD_ID") return ok({ successful: true, data: { messages: threads[body.arguments.thread_id] } });
+    return { ok: false, status: 404, json: async () => ({}), text: async () => "" };
+  };
+  const result = await runMailSearch({ key: "ak_k", userId: "u1", app, query: "in:sent newer_than:14d", fetchImpl });
+  assert.equal(result.ok, true, result.error);
+  assert.match(result.text, /^Gmail search "in:sent newer_than:14d": 2 conversations, 1 waiting for a reply\./);
+  assert.match(result.text, /1\. Proposal \| with Ana <ana@client\.co> \| 1 message \| newest .* \| WAITING FOR A REPLY/);
+  assert.match(result.text, /2\. Quote \| with Bo <bo@lead\.co> \| 2 messages \| newest .* \| REPLIED/);
+  assert.ok(!result.text.includes("SECRET BODY"), "the text of an email is never used");
+  const posts = calls.filter((c) => c.method === "POST");
+  assert.deepEqual(posts[0].body, { user_id: "u1", arguments: { query: "in:sent newer_than:14d", max_results: 10, include_payload: false } });
+  assert.deepEqual(posts.slice(1).map((c) => c.body.arguments.thread_id), ["t_waiting1", "t_replied1"], "newest conversation first");
+
+  assert.deepEqual(mailMessages("nothing"), []);
+  assert.equal(mailTime("1792800000000"), 1792800000000);
+  assert.equal(mailTime(1792800000), 1792800000000, "seconds become milliseconds");
+  assert.ok(Number.isNaN(mailTime(undefined)));
+});
+
+test("Gmail search: nothing found says so; a tool that needs something we do not fill runs nothing; an old sign-in that refuses the thread read says how to fix it", async () => {
+  const { findComposioApp } = await import("./composio-apps.js");
+  const { runMailSearch, COMPOSIO_FAILED } = await import("./composio.js");
+  const app = findComposioApp("gmailsearch");
+  const make = ({ searchInputs = { query: {} }, required = [], found = [], thread = null }) => {
+    const posts = [];
+    const fetchImpl = async (url, init) => {
+      const path = new URL(url).pathname.replace("/api/v3.1", "");
+      const ok = (json) => ({ ok: true, status: 200, json: async () => json, text: async () => "" });
+      if (init.method === "POST") posts.push(path);
+      if (path === "/tools/GMAIL_FETCH_EMAILS") return ok({ input_parameters: { properties: searchInputs, required } });
+      if (path === "/tools/GMAIL_FETCH_MESSAGE_BY_THREAD_ID") return ok({ input_parameters: { properties: { thread_id: {} }, required: ["thread_id"] } });
+      if (path === "/tools/execute/GMAIL_FETCH_EMAILS") return ok({ successful: true, data: { messages: found } });
+      if (path === "/tools/execute/GMAIL_FETCH_MESSAGE_BY_THREAD_ID") return thread ?? ok({ successful: true, data: {} });
+      return { ok: false, status: 404, json: async () => ({}), text: async () => "" };
+    };
+    return { posts, fetchImpl };
+  };
+  const empty = make({});
+  assert.deepEqual(await runMailSearch({ key: "ak_k", userId: "u1", app, query: "from:nobody", fetchImpl: empty.fetchImpl }), { ok: true, text: 'Nothing in Gmail matches the search "from:nobody".' });
+  const odd = make({ searchInputs: { query: {}, label: {} }, required: ["label"] });
+  assert.deepEqual(await runMailSearch({ key: "ak_k", userId: "u1", app, query: "x", fetchImpl: odd.fetchImpl }), { ok: false, error: COMPOSIO_FAILED.cannotFill });
+  assert.deepEqual(odd.posts, [], "nothing was run");
+  const old = make({ found: [{ messageId: "m_ccccc1", threadId: "t_ccccc1", labelIds: ["SENT"] }], thread: { ok: false, status: 400, json: async () => ({}), text: async () => JSON.stringify({ error: "Tool not allowed for this connected account" }) } });
+  const refused = await runMailSearch({ key: "ak_k", userId: "u1", app, query: "x", fetchImpl: old.fetchImpl });
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, /press Disconnect for Gmail \(send\) and Connect once more/);
 });

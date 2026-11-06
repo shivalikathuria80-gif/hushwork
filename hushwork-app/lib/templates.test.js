@@ -82,3 +82,20 @@ test("templates: no real person's email address is written into any template, an
   for (const s of emails) assert.equal(s.fields.target, "{myEmail}");
 });
 
+
+test("templates: the two follow-up templates search Gmail through Composio, see who replied, and only email the person themself", async () => {
+  const { parseAppAddress } = await import("./connectors/composio-apps.js");
+  const { isAiStep, isActionStep } = await import("./run-engine.js");
+  for (const id of ["followup", "warmleads"]) {
+    const t = templateById(id);
+    assert.ok(t, id);
+    assert.equal(t.needs, "Gmail (send)", `${id}: the search shares the Gmail (send) sign-in`);
+    const ai = t.steps.find((s) => s.kind === "ai");
+    assert.ok(isAiStep(ai), `${id}: the AI step can be approved`);
+    const wanted = parseAppAddress(ai.fields.address);
+    assert.equal(wanted?.app.id, "gmailsearch", `${id}: it reads a Gmail search`);
+    assert.match(wanted.input, /^in:sent /, `${id}: it searches what the person sent`);
+    const send = t.steps.at(-1);
+    assert.ok(isActionStep(send) && send.fields.target === "{myEmail}" && send.fields.details === "{answer}", `${id}: it emails the person, with the AI's words`);
+  }
+});
