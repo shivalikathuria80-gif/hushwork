@@ -1,0 +1,18 @@
+{
+  "name": "hushwork",
+  "owner": {
+    "name": "Hushwork",
+    "url": "https://hushwork.in"
+  },
+  "metadata": {
+    "description": "The Hushwork plugin for Claude and other chatbots."
+  },
+  "plugins": [
+    {
+      "name": "hushwork",
+      "source": "./plugins/hushwork",
+      "description": "Run Hushwork from your chatbot: make, run and review agents, read the Hushwork Agent's notes, and approve what they want to send.",
+      "category": "productivity"
+    }
+  ]
+}

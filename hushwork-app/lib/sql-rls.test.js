@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "supabase");
 // The tables that belong to one person each. (waitlist is public-insert-only and usage_counters is reached through a function: both are checked elsewhere.)
-const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state" };
+const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens" };
 const read = (file) => fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n");
 const noComments = (sql) => sql.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n");
 
@@ -86,4 +86,15 @@ test("the pause switch table: signed-in people can only READ it, nobody can chan
   assert.deepEqual(grants, ["grant select on public.app_controls to authenticated;"], "the only grant is read");
   assert.ok(!/create policy[^;]*for (insert|update|delete|all)/i.test(sql), "no policy lets anyone write");
   assert.ok(!/\bto (anon|public)\b/i.test(sql.replace(/revoke all on public\.app_controls from anon;/, "")), "never granted to the public");
+});
+
+test("API tokens: only a hash is kept, the person never reads it back, and the token limits counter is for the all-access key only", () => {
+  const tokens = noComments(read("api-tokens.sql"));
+  assert.match(tokens, /token_hash text not null unique/);
+  assert.match(tokens, /token_hash ~ '\^\[0-9a-f\]\{64\}\$'/, "the database refuses anything but a sha-256 hash");
+  assert.ok(!/grant update/.test(tokens), "a token is never changed, only made or removed");
+  const usage = noComments(read("usage-tokens.sql"));
+  assert.match(usage, /revoke execute on function public\.take_usage_for\(uuid, text, integer, integer\) from public, anon, authenticated;/);
+  assert.match(usage, /grant execute on function public\.take_usage_for\(uuid, text, integer, integer\) to service_role;/);
+  assert.match(usage, /security definer\s+set search_path = ''/);
 });

@@ -94,6 +94,34 @@ export async function runAutomatically(runId, results, who, { allowWrites = true
   return { done, stoppedAt: 0, ...counted() };
 }
 
+// ONE step, approved by the person somewhere other than the Runs page (a chatbot through lib/plugin/, after showing them what it will do).
+// Picks the very same action the Approve button and Auto mode use, so every check, limit, write gate and "changed since you read it"
+// test applies. `input` = { runId, index, seen?, confirmRetry? }. Returns what that action returns, or { error }.
+export async function approveStep(input, who) {
+  const loaded = await loadPracticeStep(who.supabase, who.user, input, isApprovable);
+  if (loaded.error) return loaded;
+  const action = AUTO_ACTIONS.find(([matches]) => matches(loaded.step))?.[1];
+  if (!action) return { error: "That step has nothing Hushwork can do for real." };
+  return action({ runId: input.runId, index: input.index, ...(typeof input?.seen === "string" ? { seen: input.seen } : {}), ...(input?.confirmRetry === true ? { confirmRetry: true } : {}) }, who);
+}
+
+// "Turn it down": the person said no to a step that was waiting for them. Nothing is sent; a small "failed" record is saved under the step
+// (the same kind a clear refusal from an app leaves), so it no longer counts as waiting and the Runs page shows why. Like any stopped step it
+// can still be approved later. A step that is done, or whose end is unknown, is left alone. Returns { ok: true } or { error }.
+export async function rejectStep(input, who) {
+  const { user, supabase } = who;
+  const loaded = await loadPracticeStep(supabase, user, input, isApprovable);
+  if (loaded.error) return loaded;
+  const state = await stepStatus(supabase, user.id, loaded.run);
+  if (state.error) return { error: UNCHECKED_MESSAGE };
+  if (state.status === "done") return { error: "That step was already done, so there is nothing to turn down." };
+  if (state.status === "pending") return { error: PENDING_MESSAGE };
+  const why = typeof input?.reason === "string" && input.reason.trim() ? ` Reason: ${input.reason.trim().slice(0, 200)}` : "";
+  if (!(await markStep(supabase, loaded.run, loaded.step, "failed", `Turned down by you, so nothing was sent.${why}`))) return { error: "Could not save that. Try again." };
+  revalidatePath("/app", "layout");
+  return { ok: true };
+}
+
 // "Continue from where it stopped": does the steps of a run that are not done yet, in order, and skips the ones that are. Safe to press twice: a done
 // step is never done again, and a step whose result is unknown stops it. Returns { ok: true, auto } or { error }.
 export async function resumeRun(input, who) {

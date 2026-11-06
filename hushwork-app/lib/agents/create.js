@@ -74,7 +74,8 @@ export async function createAgent({ prompt, user, supabase, groqKey, memory = ""
   const planned = await planAgent({ prompt, userId: user.id, groqKey, memory, dbTake, fetchImpl, now, limiters, log });
   if (planned.error) return { error: planned.error };
 
-  const { data, error } = await supabase.from("workflows").insert({ name: defaultName(prompt), prompt, plan: planned.steps, kind: AGENT_KIND }).select("id, name");
+  // A chatbot's request (lib/plugin/, the all-access client for one token's owner) has no session to fill user_id in, so it says whose it is.
+  const { data, error } = await supabase.from("workflows").insert({ ...(supabase.__hushworkAdmin === true ? { user_id: user.id } : {}), name: defaultName(prompt), prompt, plan: planned.steps, kind: AGENT_KIND }).select("id, name");
   if (error) {
     console.error("createAgent save failed:", error.code);
     return { error: NO_KIND_COLUMN.has(error.code) ? SETUP : FAILED_SAVE };

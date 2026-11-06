@@ -140,6 +140,17 @@ The Skills page lets a person turn on a Skill Bundle (a package of ready-made wo
 
 The whole pre-launch list is in `launch.md`.
 
+## 12f. The chatbot plugin (optional, two pastes)
+
+The Hushwork plugin (`plugins/hushwork/`) lets a person use Hushwork from Claude or another chatbot through `/api/mcp`, with a personal API token made on the Settings page.
+
+1. Paste `supabase/api-tokens.sql` into Supabase (SQL Editor, New query, paste, Run).
+2. Paste `supabase/usage-tokens.sql` the same way (it needs `usage.sql` from section 12 first). It makes the AI and sending limits count for chatbot requests too.
+3. The endpoint uses the all-access key that the clock already uses (section 7). Nothing else to add on Vercel.
+4. Until step 1 is done, Settings says one setup step is missing and `/api/mcp` refuses every token.
+
+How it works, the tools and the safety rules: [reference/plugin.md](reference/plugin.md).
+
 ## 12d. After the 2026-10-25 update: reconnect Stripe (and Slack)
 
 Stripe invoices and Slack messages are extra read-only tools on the same sign-in as Stripe and Slack. A sign-in made before only allowed the first tool. On the Connections page press **Disconnect** and then **Connect** for Stripe (and for Slack if you use it). Nothing else is needed.

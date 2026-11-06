@@ -15,6 +15,7 @@ These pages describe the code as it is now. Each one ends with a "Where in the c
 - [AI planner](ai-planner.md): how a sentence becomes steps, the safety nets, and what the AI sees.
 - [Skills and bundles](skills-and-bundles.md): how ready-made workflows are defined and added.
 - [Schedules and watch mode](schedules-and-watch.md): the clock, quiet hours and the speak-up limit.
+- [Chatbot plugin](plugin.md): the MCP endpoint, API tokens, the nine tools and the four skills.
 
 ## Rules and numbers
 

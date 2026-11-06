@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 
 // ---- a pretend Supabase -------------------------------------------------------------------------------------------------------------------------
-// Supports exactly what the app uses: from(table).select/insert/delete/eq/gte/contains/order/limit, rpc(), and auth.admin.getUserById.
+// Supports exactly what the app uses: from(table).select/insert/delete/eq/in/gte/contains/order/limit, rpc(), and auth.admin.getUserById.
 // `asUser` is who rows belong to when a signed-in person inserts (the real database fills user_id in from the session).
 export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, rpc = () => ({ data: "ok", error: null }), admin = false } = {}) {
   const tables = { workflows: workflows.map((row) => ({ ...row })), runs: [] };
@@ -16,6 +16,7 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
     insert(values) { this.mode = "insert"; this.values = values; return this; }
     delete() { this.mode = "delete"; return this; }
     eq(column, value) { this.filters.push((row) => row[column] === value); return this; }
+    in(column, values) { this.filters.push((row) => values.includes(row[column])); return this; }
     gte(column, value) { this.filters.push((row) => String(row[column]) >= String(value)); return this; }
     contains(column, json) {
       this.asksState = true; // the app's "what state is each step in?" question
