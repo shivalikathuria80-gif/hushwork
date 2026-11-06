@@ -179,7 +179,7 @@ export default async function RunsViewer({ searchParams }) {
   if (!selected.live) {
     try {
       const { data } = await (await createClient()).from("runs").select("results, created_at")
-        .eq("user_id", user.id).eq("mode", "live").contains("results", JSON.stringify([{ from: selected.id }])) /* JSON text on purpose (see loadStepStates in lib/run-state.js) */.order("created_at", { ascending: true }).limit(60);
+        .eq("user_id", user.id).eq("mode", "live").contains("results", JSON.stringify([{ from: selected.id }])) /* JSON text on purpose (see loadStepStates in lib/run-state.js) */.gte("created_at", selected.createdAt || "1970-01-01T00:00:00Z") /* records come after their run */.order("created_at", { ascending: true }).limit(60);
       for (const row of data ?? []) {
         const first = readSavedResults(row.results)[0];
         if (first && first.from === selected.id && Number.isInteger(first.fromStep)) {

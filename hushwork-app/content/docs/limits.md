@@ -21,6 +21,8 @@ The counts for AI use, sent actions, Linear tasks and sheet rows live in the dat
 | Created Linear tasks | 3 | 15 |
 | Added Google Sheet rows | 5 | 30 |
 
+The per-minute numbers are for pressing Approve by hand. An Auto run or a schedule does its steps one after the other, so it may do up to 20 steps a minute; the daily numbers are the same either way.
+
 Sign-in: 8 tries per email every 10 minutes. Creating an account: 3 tries per email an hour.
 
 ## Watch mode and quiet hours

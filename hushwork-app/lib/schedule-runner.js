@@ -10,7 +10,9 @@ import { inQuietHours, isWatchPlan } from "./watch-rules.js";
 //      person ticked "allow writing" for this schedule.
 //   3. WRITE DOWN how it went (ok, stopped at a step, or failed).
 // A schedule that is days overdue (the server was off) runs ONCE and then waits for its next normal time: there is no catching up.
-// At most `limit` schedules per call, so one call cannot run for ever.
+// At most `limit` schedules per call, so one call cannot run for ever. And no new schedule is STARTED after `deadline` (a time in milliseconds, read
+// from `clock`): a call that has run long leaves the rest unclaimed, still due, for the next call a minute later, instead of being cut off by the
+// host halfway through a run. Those are counted as `deferred` (only present when > 0).
 // WATCH MODE (lib/watch-rules.js) adds two things, and changes nothing for other schedules:
 //   - a due WATCH schedule in the person's quiet hours (20:00 to 08:00 their time) is still claimed, so its next time moves on, but it is NOT run: no AI
 //     cost, no email. It is counted as `skipped`.
@@ -30,7 +32,7 @@ async function isWatchWorkflow(admin, row) {
   }
 }
 
-export async function runDueSchedules({ admin, run, notify = async () => {}, nudge = async () => {}, now = Date.now(), limit = 20 }) {
+export async function runDueSchedules({ admin, run, notify = async () => {}, nudge = async () => {}, now = Date.now(), limit = 20, deadline = Infinity, clock = Date.now }) {
   const { data: due, error } = await admin
     .from("schedules")
     .select("id, user_id, workflow_id, frequency, hour, minute, weekday, tz_offset, allow_writes, next_run_at, last_status")
@@ -42,7 +44,11 @@ export async function runDueSchedules({ admin, run, notify = async () => {}, nud
   }
   const summary = { ok: true, due: due.length, ran: 0, stopped: 0, failed: 0, skipped: 0 };
 
-  for (const row of due) {
+  for (const [position, row] of due.entries()) {
+    if (clock() >= deadline) {
+      summary.deferred = due.length - position; // not claimed: still due, so the next call runs them
+      break;
+    }
     const claimed = await admin
       .from("schedules")
       .update({ next_run_at: new Date(nextRun(toSchedule(row), now)).toISOString(), last_run_at: new Date(now).toISOString() })

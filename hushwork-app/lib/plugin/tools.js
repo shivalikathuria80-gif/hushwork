@@ -108,10 +108,11 @@ export const TOOLS = [
 
 // The records saved under one practice run (lib/run-state.js), sorted the way the Runs page sorts them. Returns { done, stopped, unknown }
 // (Maps step number -> record) or null when they could not be read.
-async function loadRecords(supabase, userId, runId) {
+async function loadRecords(supabase, userId, runId, since) {
   try {
     const { data, error } = await supabase.from("runs").select("results, created_at")
       .eq("user_id", userId).eq("mode", "live").contains("results", JSON.stringify([{ from: runId }]))
+      .gte("created_at", typeof since === "string" && since ? since : "1970-01-01T00:00:00Z") // records come after their run (see loadStepStates in lib/run-state.js)
       .order("created_at", { ascending: true }).limit(60);
     if (error || !Array.isArray(data)) return null;
     const done = new Map(); const stopped = new Map(); const unknown = new Map();
@@ -155,7 +156,7 @@ async function readRun(who, runId) {
   if (!row || row.mode !== "practice") return { error: "That run does not exist, or it is a record of one step (open the run it came from)." };
   const steps = readSavedResults(row.results);
   const rawSteps = Array.isArray(row.results) ? row.results : [];
-  const records = await loadRecords(supabase, user.id, String(row.id));
+  const records = await loadRecords(supabase, user.id, String(row.id), row.created_at);
   if (!records) return { error: TRY_AGAIN };
   const { done, stopped, unknown } = records;
   const quiet = [...done.values(), ...stopped.values()].some((record) => record.quiet);

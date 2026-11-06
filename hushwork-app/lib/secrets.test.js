@@ -361,7 +361,7 @@ test("Auto mode: only an explicit true turns it on; it uses the very same Approv
   assert.ok(loop.includes("Math.min(results.length, 20)") && loop.includes("if (outcome?.error) {") && loop.includes("stoppedAt: index + 1"), "capped, and stops at the first failure");
   assert.ok(loop.includes("await action("), "one step at a time, in order");
   const table = action.slice(action.indexOf("const AUTO_ACTIONS"), action.indexOf("async function runAutomatically"));
-  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveActionStep", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input, who)`), `${name} is run through its normal Approve action`);
+  for (const name of ["approveAiStep", "approveLinearLookup", "approveCalendarLookup", "approveGmailLookup", "approveDriveLookup", "approveLinearCreate", "approveAppLookup", "approveActionStep", "approveSheetsRow", "approveWebCall"]) assert.ok(table.includes(`${name}(input, who, options)`), `${name} is run through its normal Approve action`);
   assert.ok(!/fetchLinearIssues|createIssue|appendRow|fetchInbox|runReadTool|fetchPublic/.test(table + loop), "Auto mode never reaches a connector without going through an Approve action");
   const mode = files.find((file) => file.name === "components/app/RunMode.js").text;
   assert.match(mode, /localStorage\.getItem\(KEY\) === "auto" \? "auto" : "manual"/, "Manual is the default and anything unexpected means Manual");

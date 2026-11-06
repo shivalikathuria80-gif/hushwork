@@ -118,3 +118,14 @@ test("the agent's email says only that something was noticed: no note text, to t
   const tick = fs.readFileSync(new URL("../schedule-tick.js", import.meta.url), "utf8");
   assert.ok(tick.indexOf("isPaused(admin)") < tick.indexOf("runDueAgents("), "a paused app takes no looks");
 });
+
+test("runDueAgents: past the clock call's deadline no new look starts, and the agent is not claimed (so it is still due next minute)", async () => {
+  const due = [{ user_id: "a", tz_offset: INDIA, next_check_at: "2026-11-01T07:30:00Z" }, { user_id: "b", tz_offset: INDIA, next_check_at: "2026-11-01T07:30:00Z" }];
+  const admin = pretendAdmin(due);
+  let time = 0;
+  const looked = [];
+  const summary = await runDueAgents({ admin, check: async ({ userId }) => { looked.push(userId); time += 50_000; return { ok: true, fresh: false, notes: [] }; }, now: at("2026-11-01T07:31:00Z"), deadline: 45_000, clock: () => time });
+  assert.deepEqual(looked, ["a"]);
+  assert.equal(admin.updates.length, 1, "only the agent that was looked at was claimed");
+  assert.equal(summary.looked, 1);
+});
