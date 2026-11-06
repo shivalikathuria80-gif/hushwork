@@ -11,7 +11,7 @@ import { summarizeRun } from "@/lib/studio/run-summary";
 import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isPlanOnly, isSheetsRow, sheetsSummary, isAiStep, aiSummary, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, runOutcome, stepState, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 import { ANSWERS_TAG, findAnswer, findAnswers } from "@/lib/run-answer";
@@ -26,6 +26,16 @@ const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-
 const chipWaiting = "rounded-md border border-accent bg-accent-subtle px-2 text-xs font-medium text-accent-text";
 const text = (value) => (typeof value === "string" ? value : "");
 const heading = "text-xl font-semibold leading-[1.35] tracking-tight";
+
+// The small marker at the right of a step in a practice run: words as well as an icon, so it never relies on colour alone.
+function markFor(state) {
+  if (state === "done") return <span className="flex items-center gap-1 text-xs text-success"><Icon name="Check" size={14} />Done</span>;
+  if (state === "stopped") return <span className="flex items-center gap-1 text-xs text-error"><Icon name="CircleAlert" size={14} />Stopped</span>;
+  if (state === "unsure") return <span className="flex items-center gap-1 text-xs text-error"><Icon name="CircleAlert" size={14} />Not sure</span>;
+  if (state === "waiting") return <span className="text-xs text-mute">Waiting</span>;
+  if (state === "plan-only") return <span className="text-xs text-mute" title="This step only describes what would happen. It does nothing when run.">Plan only</span>;
+  return null;
+}
 
 // The words a real run saved, laid out so they are easy to read: blank lines keep their gaps, lines that start with "- " become bullet
 // points, "Next step:" stands out, and the app's own list is set apart in a quieter style. Plain text only (React never treats it as HTML).
@@ -124,12 +134,23 @@ export default async function RunsViewer({ searchParams }) {
 
   // A run is one go at a workflow; each step that acted on an app saves its result as its own small record that points back to the run. The
   // list shows the runs (their results appear inside them), and a result whose run is not loaded still shows on its own.
-  const doneByRun = new Map();
+  // Each real record is sorted by what it says: done, stopped (a stop note is not a finished step) or only started (never seen to finish).
+  const byRun = { done: new Map(), failed: new Map(), pending: new Map() };
   for (const run of runs) {
     const first = run.live ? run.results[0] : null;
-    if (first?.from && Number.isInteger(first.fromStep) && first.status === "done") doneByRun.set(first.from, (doneByRun.get(first.from) ?? new Set()).add(first.fromStep)); // a stopped note or a step that was only started is not a finished step
+    if (!first?.from || !Number.isInteger(first.fromStep)) continue;
+    const into = byRun[first.status] ?? byRun.done;
+    into.set(first.from, (into.get(first.from) ?? new Set()).add(first.fromStep));
   }
-  const waitingIn = (run) => (run.live ? 0 : run.results.filter((step, index) => isApprovable(step) && !doneByRun.get(run.id)?.has(index)).length);
+  // The honest headline of a run (see runOutcome in lib/run-engine.js). A saved real record is "Completed", unless it says a step stopped or never finished.
+  const outcomeOf = (run) => {
+    if (!run.live) return runOutcome(run.results, byRun.done.get(run.id), byRun.failed.get(run.id), byRun.pending.get(run.id));
+    const status = run.results[0]?.status;
+    if (status === "failed") return { key: "stopped", label: "Stopped at a step", notRun: [], text: run.results[0].outcome };
+    if (status === "pending") return { key: "unsure", label: "Not sure it finished", notRun: [], text: "" };
+    return { key: "completed", label: "Completed", notRun: [], text: "" };
+  };
+  const chipFor = (outcome) => (outcome.key === "completed" ? chip : chipWaiting);
   const runIds = new Set(runs.filter((run) => !run.live).map((run) => run.id));
   // WATCH MODE: a check that found "nothing new" is not listed (it would bury the runs that matter). All of them are folded into one quiet line.
   const quiet = quietRunIds(runs);
@@ -172,6 +193,7 @@ export default async function RunsViewer({ searchParams }) {
     }
   }
   const summary = selected.live ? { line: "" } : summarizeRun({ steps: selected.results, doneAt, stoppedAt, unknownAt }); // one plain line of what was really done, built only from saved results
+  const selectedOutcome = selected.live ? outcomeOf(selected) : runOutcome(selected.results, doneAt, stoppedAt, unknownAt);
   const approvals = selected.live ? [] : selected.results.map((step, index) => ({ step, index })).filter(({ step, index }) => !doneAt.has(index) && isApprovable(step));
   // A row step that uses {answer} shows the real words, so you read exactly what will be written before you press Approve.
   const needsAnswer = approvals.some(({ step }) => (isSheetsRow(step) && String(step.fields?.values).includes(ANSWER_TAG)) || ((isLinearCreate(step) || isActionStep(step)) && `${step.fields?.title}${step.fields?.details}`.includes(ANSWER_TAG)));
@@ -192,7 +214,7 @@ export default async function RunsViewer({ searchParams }) {
                 href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
                 className={`block rounded-xl px-4 py-3 hover:bg-raised ${run.id === selected.id ? "bg-accent-subtle" : ""}`}
               >
-                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={waitingIn(run) > 0 ? chipWaiting : chip}>{waitingIn(run) > 0 ? "Needs approval" : "Completed"}</span></span>
+                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chipFor(outcomeOf(run))}>{outcomeOf(run).label}</span></span>
                 <span className="mt-1 block text-sm text-mute"><RunTime iso={run.createdAt} /> · {run.results.length} {run.results.length === 1 ? "step" : "steps"}</span>
               </Link>
             </li>
@@ -203,13 +225,11 @@ export default async function RunsViewer({ searchParams }) {
       <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
         {paused && <p role="status" className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{PAUSED_MESSAGE}</p>}
         <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
-          <span className={!selected.live && approvals.length > 0 ? chipWaiting : chip}>{!selected.live && approvals.length > 0 ? "Needs approval" : "Completed"}</span>
+          <span className={chipFor(selectedOutcome)}>{selectedOutcome.label}</span>
           <p className="text-sm">
             {selected.live
-              ? (liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.")
-              : approvals.length > 0
-                ? `${approvals.length} ${approvals.length === 1 ? "step is" : "steps are"} waiting for your approval. Nothing is sent, written or changed in your apps until you approve it.`
-                : "All steps are done."}
+              ? (selectedOutcome.key === "stopped" ? "A step stopped before it could finish. The reason is below." : selectedOutcome.key === "unsure" ? "This was started, but Hushwork never saw it finish. Look in the app first." : liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.")
+              : selectedOutcome.text}
           </p>
         </div>
         {summary.line && (
@@ -231,7 +251,9 @@ export default async function RunsViewer({ searchParams }) {
           <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-raised px-3 py-2 text-sm">
             <Icon name={auto === "done" ? "CircleCheck" : "CircleAlert"} className={`mt-0.5 shrink-0 ${auto === "done" ? "text-success" : "text-error"}`} />
             {auto === "done"
-              ? `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} for you, without asking. The results are under each step below.`
+              ? (doneAt.size === 0
+                ? "Auto mode ran, but it had nothing it could carry out for real, so nothing was sent, written or changed. The steps below say why."
+                : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} for you, without asking. The results are under each step below.${selectedOutcome.notRun.length ? ` ${selectedOutcome.notRun.length} only ${selectedOutcome.notRun.length === 1 ? "describes" : "describe"} what would happen (see the note above).` : ""}`)
               : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} and then stopped at a step that needs attention. Press Approve on that step to see why.`}
           </p>
         )}
@@ -259,7 +281,7 @@ export default async function RunsViewer({ searchParams }) {
               <Fragment key={index}>
                 <StepRow
                   icon={step.icon} title={step.title} sub={step.detail}
-                  right={doneAt.has(index) ? <span className="text-success"><Icon name="Check" size={14} /></span> : isApprovable(step) ? <span className="text-xs text-mute">Waiting</span> : isPlanOnly(step) ? <span className="text-xs text-mute" title="This step only describes what would happen. It does nothing when run.">Plan only</span> : null}
+                  right={markFor(stepState(step, index, doneAt, stoppedAt, unknownAt))}
                 />
                 {step.kind && step.kind !== "trigger" && (
                   <li className="list-none pb-1">
