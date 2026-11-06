@@ -4,6 +4,7 @@ import { readSavedStep } from "@/lib/steps";
 import DraftList from "./DraftList";
 import { clockReady } from "@/lib/schedule-status";
 import { AGENT_KIND, NO_KIND_COLUMN } from "@/lib/agents/kinds";
+import { loadWaiting } from "@/lib/run-waiting";
 
 // "Your drafts". It reads the session and the database, so the page wraps it in <Suspense>: everything above it
 // appears first, and this section streams in. It re-checks who you are (requireUser) right next to the data;
@@ -86,6 +87,11 @@ export default async function Drafts({ openBase, agents = false }) {
           const draft = drafts.find((entry) => entry.id === row.workflow_id);
           if (draft) draft.schedule = toSchedule(row);
         }
+      }
+      if (agents) {
+        // "Waiting for you" on each agent card: how many steps of its latest run wait for Approve (lib/run-waiting.js; none shown if it fails).
+        const waiting = await loadWaiting(supabase, user.id, drafts.map((draft) => draft.id));
+        for (const draft of drafts) if (waiting.has(draft.id)) draft.waiting = waiting.get(draft.id);
       }
     }
   } catch {
