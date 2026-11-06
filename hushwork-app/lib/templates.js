@@ -363,6 +363,18 @@ export const TEMPLATES = [
       step("action", { action: "gmail_send", target: "{myEmail}", title: "Leads worth reviving", details: "{answer}" }),
     ],
   },
+  // ---- deadlines: the Linear lookup gives each task's due date and says how far away it is ----
+  {
+    id: "deadlines", pack: "everyday", icon: "Bell", title: "Deadline watch", needs: "Linear, Gmail (send)",
+    body: "Every weekday morning the AI reads your open Linear tasks with their due dates and emails YOU the ones due in the next 48 hours or already overdue. It cannot change any task. You press Approve before the email is sent.",
+    request: "Every weekday morning, look at my Linear tasks and email me the ones due in the next 48 hours or overdue. Ask me before it is sent.",
+    schedule: { frequency: "weekdays", weekday: 1, hour: 8, minute: 30 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every weekday at 8:30" }),
+      step("ai", { task: "List tasks overdue or due within 48 hours: task, due day, status. If none, say: Nothing due soon.", uses: "linear", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Due in the next 48 hours", details: "{answer}" }),
+    ],
+  },
 ];
 
 // The checked steps of a template (every step rebuilt by the same rules as everything else), or null for an unknown id.

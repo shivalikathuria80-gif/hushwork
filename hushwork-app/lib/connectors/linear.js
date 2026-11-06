@@ -12,9 +12,11 @@ export const LINEAR_FAILED = {
   network: "Could not reach Linear. Check your connection and try again.",
 };
 
-const QUERY = `{
+// The open tasks assigned to the person: the 10 changed most recently, or (with `dueBy`, a "YYYY-MM-DD" day checked before it is used) up to 10 that
+// have a due date on or before that day, so a task due soon is seen even when nobody touched it lately.
+const queryFor = (dueBy = "") => `{
   viewer {
-    assignedIssues(first: 10, orderBy: updatedAt, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+    assignedIssues(first: 10, orderBy: updatedAt, filter: { state: { type: { nin: ["completed", "canceled"] } }${dueBy ? `, dueDate: { lte: "${dueBy}" }` : ""} }) {
       nodes { identifier title dueDate priority state { name } }
     }
   }
@@ -33,8 +35,18 @@ export function issueLine(issue) {
   return `${issue.id} ${issue.title}${extra ? ` (${extra})` : ""}`;
 }
 
+// How far a due day is from today (both "YYYY-MM-DD", today in UTC): "overdue by 2 days", "due today", "due tomorrow", "due in 5 days", or "" with no due day.
+export function dueNote(due, today) {
+  const days = Math.round((Date.parse(day(due)) - Date.parse(day(today))) / 86_400_000);
+  if (!Number.isFinite(days)) return "";
+  if (days < 0) return `overdue by ${-days} day${days === -1 ? "" : "s"}`;
+  return days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${days} days`;
+}
+
 // Returns { ok: true, issues: [{ id, title, state, due, priority }] } or { ok: false, error }. `due` is "YYYY-MM-DD" or "", `priority` a word or "".
-export async function fetchLinearIssues({ authorization, fetchImpl = fetch }) {
+// `dueBy` (optional, "YYYY-MM-DD") asks only for tasks due on or before that day; anything else in it is ignored.
+export async function fetchLinearIssues({ authorization, dueBy = "", fetchImpl = fetch }) {
+  const QUERY = queryFor(day(dueBy));
   try {
     const response = await fetchImpl("https://api.linear.app/graphql", {
       method: "POST",

@@ -50,3 +50,25 @@ test("due dates and priorities are asked for, kept only when they look right, an
   assert.equal(issueLine(result.issues[2]), "ENG-5 Docs");
   assert.equal(issueLine(result.issues[3]), "ENG-6 Call (Todo, Low)");
 });
+
+test("dueBy asks Linear only for tasks due on or before that day, and anything that is not a plain day is never put in the query", async () => {
+  const bodies = [];
+  const fetchImpl = async (_u, init) => { bodies.push(JSON.parse(init.body).query); return { ok: true, status: 200, json: async () => ({ data: { viewer: { assignedIssues: { nodes: [] } } } }) }; };
+  await fetchLinearIssues({ authorization: "k", dueBy: "2026-11-13", fetchImpl });
+  await fetchLinearIssues({ authorization: "k", dueBy: '2026-11-13" } }) { x', fetchImpl });
+  await fetchLinearIssues({ authorization: "k", fetchImpl });
+  assert.match(bodies[0], /dueDate: \{ lte: "2026-11-13" \}/);
+  assert.ok(!bodies[1].includes("lte:"), "an odd value is dropped, not sent");
+  assert.ok(!bodies[2].includes("lte:"));
+});
+
+test("dueNote says how far a due day is from today", async () => {
+  const { dueNote } = await import("./linear.js");
+  assert.equal(dueNote("2026-11-06", "2026-11-06"), "due today");
+  assert.equal(dueNote("2026-11-07", "2026-11-06"), "due tomorrow");
+  assert.equal(dueNote("2026-11-10", "2026-11-06"), "due in 4 days");
+  assert.equal(dueNote("2026-11-05", "2026-11-06"), "overdue by 1 day");
+  assert.equal(dueNote("2026-11-01", "2026-11-06"), "overdue by 5 days");
+  assert.equal(dueNote("", "2026-11-06"), "");
+  assert.equal(dueNote("soon", "2026-11-06"), "");
+});
