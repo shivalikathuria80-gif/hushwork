@@ -99,3 +99,14 @@ test("templates: the two follow-up templates search Gmail through Composio, see 
     assert.ok(isActionStep(send) && send.fields.target === "{myEmail}" && send.fields.details === "{answer}", `${id}: it emails the person, with the AI's words`);
   }
 });
+
+test("templates: Deadline watch reads Linear (which now gives due dates) and emails only the person themself", async () => {
+  const { isAiStep, isActionStep } = await import("./run-engine.js");
+  const t = templateById("deadlines");
+  assert.equal(t.needs, "Linear, Gmail (send)");
+  const ai = t.steps.find((s) => s.kind === "ai");
+  assert.ok(isAiStep(ai) && ai.fields.uses === "linear");
+  assert.match(ai.fields.task, /48 hours/);
+  const send = t.steps.at(-1);
+  assert.ok(isActionStep(send) && send.fields.target === "{myEmail}" && send.fields.details === "{answer}");
+});

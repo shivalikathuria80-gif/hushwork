@@ -30,7 +30,7 @@ import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps";
 import { COMPOSIO_FAILED, runActionTool, runChannelMessages, runMailSearch, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
-import { fetchLinearIssues, issueLine } from "@/lib/connectors/linear";
+import { dueNote, fetchLinearIssues, issueLine } from "@/lib/connectors/linear";
 import { GOOGLE_SOON, googleOpenFor } from "@/lib/connectors/google-gate";
 import { makeLimiter } from "@/lib/ai/limits";
 import { takeDbSlot } from "@/lib/db-limits";
@@ -407,11 +407,17 @@ export async function approveAiStep(input, who) {
     const authorization = await linearAuthorization(supabase, user.id);
     if (!authorization) return { error: LINEAR_OFF };
     tools.linear_open_tasks = {
-      description: "Lists the person's open Linear tasks (up to 10) with their status, due date and priority.",
+      description: "Lists the person's open Linear tasks with their status, due date and priority: the 10 changed most recently, plus any due within the next 7 days. Starts with today's date, and says how far each due date is.",
       run: async () => {
-        const answer = await fetchLinearIssues({ authorization });
+        // Two reads: the usual recent list, and the tasks due within 7 days (so a deadline is seen even on a task nobody touched lately).
+        // The second one only adds to the first: if it fails, the usual list is still given.
+        const today = new Date().toISOString().slice(0, 10);
+        const [answer, soon] = await Promise.all([fetchLinearIssues({ authorization }), fetchLinearIssues({ authorization, dueBy: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10) })]);
         if (!answer.ok) return failed(answer.error);
-        return answer.issues.length ? answer.issues.map(issueLine).join("\n") : "There are no open tasks.";
+        const seen = new Set(answer.issues.map((issue) => issue.id));
+        const issues = [...answer.issues, ...(soon.ok ? soon.issues.filter((issue) => !seen.has(issue.id)) : [])];
+        if (!issues.length) return "There are no open tasks.";
+        return [`Today is ${today} (UTC).`, ...issues.map((issue) => `${issueLine(issue)}${issue.due ? ` [${dueNote(issue.due, today)}]` : ""}`)].join("\n");
       },
     };
   } else if (uses === "calendar") {
