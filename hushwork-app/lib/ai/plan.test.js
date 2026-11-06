@@ -460,3 +460,23 @@ test("notes: whatever notes arrive, the result passes the strict gate unchanged"
     assert.deepEqual(cleanPlan(JSON.stringify(steps)).value, steps, `round ${round}`);
   }
 });
+
+test("an email after an Ask the AI step always carries its answer, even when the model wrote what the email is for as its text", async () => {
+  const { carryAnswer, AI_BLOCKS: blocks } = await import("./plan.js");
+  const ai = blocks.ai("calendar", "Sum up my week");
+  const email = blocks.action("gmail_send", "{myEmail}", "Week", "Email you the week summary");
+  assert.equal(carryAnswer([ai, email])[1].fields.details, "{answer}");
+  assert.equal(carryAnswer([email])[0].fields.details, "Email you the week summary", "no Ask the AI step before it: the words stay");
+  const both = blocks.action("gmail_send", "{myEmail}", "Brief", "{answers}");
+  assert.equal(carryAnswer([ai, both])[1].fields.details, "{answers}");
+  const event = blocks.action("calendar_event", "2026-11-09 09:00", "Focus", "No meetings");
+  assert.equal(carryAnswer([ai, event])[1].fields.details, "No meetings", "an event's notes are left alone");
+});
+
+test("the AI may pick a Gmail search (checked by its own pattern), so a 'who did not reply' task can really tell", async () => {
+  const { AI_BLOCKS: blocks } = await import("./plan.js");
+  assert.deepEqual(blocks.ai("gmailsearch:in:sent newer_than:14d", "Who has not replied?").fields, { task: "Who has not replied?", uses: "app", address: "gmailsearch:in:sent newer_than:14d" });
+  assert.equal(blocks.ai("gmailsearch:", "x").fields.uses, "nothing", "an empty search is not a lookup");
+  assert.equal(blocks.ai("gmailsearch:<script>", "x").fields.uses, "nothing", "a search with odd characters is refused");
+  assert.equal(blocks.ai("slackmessages:general", "x").fields.uses, "nothing", "other typed lookups stay for the Builder");
+});
