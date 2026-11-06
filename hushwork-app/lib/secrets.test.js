@@ -40,7 +40,7 @@ test("lib/ai/key.js is marked server-only and is imported only by server code", 
   const key = files.find((file) => file.name === "lib/ai/key.js").text;
   assert.match(key, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/ai\/key|(?:\.\.?\/)+(?:lib\/)?(?:ai\/)?key)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["lib/actions/agents.js", "lib/actions/plan.js", "lib/agent/check.js", "lib/ai-status.js", "lib/run-core.js"]); // the code that calls the AI (plans, agents, steps, the agent's look), and the helper that tells pages only "on or off"
+  assert.deepEqual(importers.sort(), ["app/api/mcp/route.js", "lib/actions/agents.js", "lib/actions/plan.js", "lib/agent/check.js", "lib/ai-status.js", "lib/run-core.js"]); // the code that calls the AI (plans, agents, steps, the agent's look), and the helper that tells pages only "on or off"
   for (const name of importers) {
     const text = files.find((file) => file.name === name).text;
     assert.ok(!/^\s*["']use client["']/m.test(text), `${name} is browser code and must not import the key reader`);
@@ -403,7 +403,12 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   assert.match(env, /^import "server-only";/m);
   assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example" && name !== "scripts/clock.mjs"), ["lib/schedule-env.js"], "only schedule-env.js reads them (the clock script on your own computer sends the password, it is not server code)");
   const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(adminImporters, ["lib/actions/account.js", "lib/schedule-tick.js"], "the all-access client has exactly two users: the clock's handler and Delete my account");
+  assert.deepEqual(adminImporters.sort(), ["app/api/mcp/route.js", "lib/actions/account.js", "lib/schedule-tick.js"], "the all-access client has exactly three users: the clock's handler, Delete my account, and the plugin endpoint (for the token's owner only)");
+  const mcp = files.find((file) => file.name === "app/api/mcp/route.js").text;
+  assert.ok(mcp.indexOf("bearerToken(") > 0 && mcp.indexOf("findTokenOwner(") > mcp.indexOf("bearerToken(") && mcp.indexOf("findTokenOwner(") < mcp.indexOf("createTokenClient(owner.userId)") && mcp.indexOf("createTokenClient(owner.userId)") < mcp.indexOf("handleBody("), "the plugin endpoint finds the token's owner before anything runs, and acts only as that person");
+  assert.ok(!/userId:\s*body|body\??\.user/.test(mcp), "the request body never says who it is");
+  const tools = files.find((file) => file.name === "lib/plugin/tools.js").text;
+  assert.ok(tools.includes("allowWrites: false") && !/allowWrites:\s*true/.test(tools), "a chatbot's run never writes by itself");
   const account = files.find((file) => file.name === "lib/actions/account.js").text;
   assert.ok(/^"use server"/.test(account) && account.indexOf("requireUser()") > 0 && account.indexOf("userId: user.id") > account.indexOf("requireUser()"), "the account that is deleted is the signed-in person's, from the session");
   assert.ok(!/input\??\.(userId|id)\b/.test(account), "the browser never says which account to delete");

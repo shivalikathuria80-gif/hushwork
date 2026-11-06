@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { aiStatus } from "@/lib/ai-status";
 import DeleteAccount from "@/components/app/DeleteAccount";
 import MemorySettings from "@/components/app/MemorySettings";
+import PluginTokens from "@/components/app/PluginTokens";
+import { NO_TABLE, TOKEN_SETUP } from "@/lib/plugin/tokens";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Settings - Hushwork", robots: { index: false, follow: false } };
@@ -58,6 +60,16 @@ export default function SettingsPage() {
           </Suspense>
         </div>
       </section>
+
+      <section aria-labelledby="plugin-heading" className="mt-8">
+        <h2 id="plugin-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Chatbot plugin</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="mb-3 text-sm text-mute">Use Hushwork from Claude or another AI chatbot: list and run your agents, read runs and the Hushwork Agent&rsquo;s notes, and approve waiting steps. Make a token, then paste it when the Hushwork plugin asks. Anything that sends or creates still waits for your yes. Remove a token to cut that chatbot off at once.</p>
+          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
+            <Tokens />
+          </Suspense>
+        </div>
+      </section>
     </main>
   );
 }
@@ -71,6 +83,17 @@ async function Memory() {
     return <p className="text-[15px]">{missing ? "Memory needs one setup step: paste supabase/memory.sql into the Supabase SQL Editor and press Run." : "Could not load your saved facts. Try again in a minute."}</p>;
   }
   return <MemorySettings facts={data.map((row) => ({ id: String(row.id), key: String(row.key), value: String(row.value) }))} />;
+}
+
+async function Tokens() {
+  const user = await requireUser();
+  const { data, error } = await (await createClient()).from("api_tokens").select("id, name, prefix, created_at, last_used_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10);
+  if (error) {
+    if (!NO_TABLE.has(error.code)) console.error("Loading tokens failed:", error.code);
+    return <p className="text-[15px]">{NO_TABLE.has(error.code) ? TOKEN_SETUP : "Could not load your tokens. Try again in a minute."}</p>;
+  }
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://hushwork.in").replace(/\/$/, "");
+  return <PluginTokens endpoint={`${site}/api/mcp`} tokens={data.map((row) => ({ id: String(row.id), name: String(row.name), prefix: String(row.prefix), createdAt: row.created_at, lastUsedAt: row.last_used_at }))} />;
 }
 
 async function AccountEmail() {

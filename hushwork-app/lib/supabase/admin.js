@@ -17,3 +17,11 @@ export function createAdminClient() {
   client.__hushworkAdmin = true;
   return client;
 }
+
+// The same client for ONE person who reached Hushwork with their own API token (app/api/mcp, lib/plugin/). Besides __hushworkAdmin it
+// carries __hushworkUserId, so lib/db-limits.js counts the AI and action limits for that person (the clock's client skips them).
+export function createTokenClient(userId) {
+  const client = createAdminClient();
+  if (client) client.__hushworkUserId = String(userId);
+  return client;
+}

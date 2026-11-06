@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "hushwork": {
+      "type": "http",
+      "url": "${user_config.hushwork_url}/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${user_config.api_token}"
+      }
+    }
+  }
+}

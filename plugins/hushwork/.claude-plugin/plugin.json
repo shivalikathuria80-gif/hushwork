@@ -1,0 +1,40 @@
+{
+  "name": "hushwork",
+  "displayName": "Hushwork",
+  "version": "1.0.0",
+  "description": "Run Hushwork from your chatbot: make, run and review agents, read the Hushwork Agent's notes, and approve what they want to send.",
+  "author": {
+    "name": "Hushwork",
+    "url": "https://hushwork.in"
+  },
+  "homepage": "https://hushwork.in",
+  "repository": "https://github.com/shivalikathuria80-gif/hushwork",
+  "license": "MIT",
+  "keywords": [
+    "hushwork",
+    "agents",
+    "automation",
+    "workflows",
+    "approvals",
+    "briefing"
+  ],
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/shivalikathuria80-gif/hushwork/tree/main/plugins/hushwork#readme",
+  "privacyPolicyUrl": "https://hushwork.in/privacy",
+  "termsOfServiceUrl": "https://hushwork.in/terms",
+  "userConfig": {
+    "hushwork_url": {
+      "type": "string",
+      "title": "Hushwork address",
+      "description": "Where your Hushwork runs, without a trailing slash. Leave the default unless you host your own.",
+      "default": "https://hushwork.in"
+    },
+    "api_token": {
+      "type": "string",
+      "title": "Hushwork API token",
+      "description": "Make one in Hushwork: Settings, Chatbot plugin, Make a token. It starts with hw_.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

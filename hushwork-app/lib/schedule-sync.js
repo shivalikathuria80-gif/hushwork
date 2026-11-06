@@ -45,7 +45,7 @@ export async function syncStartSchedule({ supabase, userId, workflowId, plan, tz
   const choices = { frequency: s.frequency, hour: s.hour, minute: s.minute, weekday: s.weekday, tz_offset: s.tzOffset, allow_writes: s.allowWrites, enabled: s.enabled, next_run_at: new Date(nextRun(s, now)).toISOString() };
   const { error } = existing
     ? await supabase.from("schedules").update(choices).eq("workflow_id", workflowId).eq("user_id", userId)
-    : await supabase.from("schedules").insert({ workflow_id: workflowId, ...choices });
+    : await supabase.from("schedules").insert({ ...(supabase.__hushworkAdmin === true ? { user_id: userId } : {}), workflow_id: workflowId, ...choices });
   if (error) {
     console.error("saving a schedule from the Start step failed:", error.code);
     return { text: NO_TABLE.has(error.code) ? "Scheduling is not set up on this server yet, so nothing is scheduled." : "The workflow was saved, but its schedule could not be saved. Set it on the Workflows page." };
