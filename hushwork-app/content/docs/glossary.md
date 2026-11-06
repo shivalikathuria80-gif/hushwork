@@ -16,7 +16,7 @@ Short plain-words meanings for the words you meet in Hushwork.
 - **Schedule** - a time rule such as "Every weekday at 17:30". Hushwork then runs the workflow by itself at that time.
 - **Watch** - a scheduled check that stays quiet unless something is new. It is made with the Start choice **Keep watching**.
 - **Quiet hours** - from 20:00 to 08:00 your time. A watch never speaks up then.
-- **Speak-up** - the one plain email a watch sends to tell you something is waiting. It says to open the Runs page. It never holds what was found. At most 3 a day.
+- **Speak-up** - the one plain email a watch, or any other schedule, sends to tell you something is waiting. It says to open the Runs page. It never holds what was found. At most 3 a day in all.
 - **Memory** - short facts you save in Settings, such as your timezone, that the AI may use as background.
 
 ## Words about running and approving

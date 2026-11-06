@@ -21,8 +21,17 @@ To add, change or pause a schedule later, use the schedule panel on the agent's 
 - It reads, looks things up and asks the AI by itself.
 - A step that sends an email, adds a row or creates a task waits for your **Approve** on the Runs page, exactly like a Manual run. You read the exact words first.
 - A scheduled agent only reads by itself until you tick **Let it write by itself** on its schedule.
+- When a scheduled run leaves a step waiting, you get one short email saying so, with a link to the Runs page. Never at night, at most 3 a day. See [Schedules](/docs/schedules).
+
+When the agent's latest run has steps waiting for you, its card says so, for example "2 steps are waiting for your Approve". Click it to open that run on the Runs page. When nothing waits, the card says nothing.
 
 See [Runs and Approve](/docs/runs-and-approvals) for how approving works.
+
+## AI steps
+
+You have **15 AI steps a day**. They are shared by every Ask the AI step in your runs, by the AI summary a look in Linear, Google Calendar, Gmail, Google Drive or another app adds, by watch checks, and by your Hushwork Agent (3 a day when it is on). They reset at midnight UTC.
+
+Each agent card says how many one run uses, for example "Uses up to 2 of your 15 AI steps each run". It says "up to" because a look that finds nothing adds no summary. When an agent uses none, the card says nothing.
 
 ## Agents and the Builder
 

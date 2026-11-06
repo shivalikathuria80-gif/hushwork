@@ -64,14 +64,14 @@ async function saveStopNote(supabase, run, index, step, reason) {
 export async function runAutomatically(runId, results, who, { allowWrites = true, run = null } = {}) {
   let done = 0;
   let skipped = 0;
-  let waiting = 0; // WATCH workflows only: writing steps left for the person's own Approve click
+  let waiting = 0; // writing steps left for the person's own Approve click (a schedule without "allow writing"); only present when > 0
   const watch = isWatchPlan(results);
   const states = await loadStepStates(who.supabase, who.user.id, runId);
-  const counted = () => ({ ...(skipped ? { skipped } : {}), ...(watch ? { watch: true, ...(waiting ? { waiting } : {}) } : {}) });
+  const counted = () => ({ ...(skipped ? { skipped } : {}), ...(watch ? { watch: true } : {}), ...(waiting ? { waiting } : {}) });
   for (let index = 0; index < Math.min(results.length, 20); index += 1) {
     const step = results[index];
     if (!isApprovable(step)) continue;
-    if (!allowWrites && isWriteStep(step)) waiting += 1; // counted only so a watch run can tell the person something is waiting for their Approve
+    if (!allowWrites && isWriteStep(step)) waiting += 1; // counted so a scheduled run can tell the person something is waiting for their Approve
     if (!allowWrites && isWriteStep(step)) continue; // a scheduled run only writes when the person ticked "allow writing" for that schedule
     const action = AUTO_ACTIONS.find(([matches]) => matches(step))?.[1];
     if (!action) continue;

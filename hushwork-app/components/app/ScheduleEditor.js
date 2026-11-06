@@ -8,6 +8,7 @@ import { saveSchedule, deleteSchedule, syncScheduleFromStart } from "@/lib/actio
 import { parseWhen } from "@/lib/schedule-text";
 import { FREQUENCIES, WEEKDAYS, describeSchedule } from "@/lib/schedule";
 import { niceTime } from "@/lib/connectors/time-format";
+import { scheduleLine } from "@/lib/ai-cost";
 
 // The Schedule panel under a workflow on the Workflows page: say WHEN it should run by itself (every hour, day, weekday or week, at a time
 // of the person's own day) and whether a scheduled run may also WRITE (add a row, create a task). Writing is off unless this box is ticked,
@@ -25,7 +26,7 @@ async function call(action, input, fallback) {
   }
 }
 
-export default function ScheduleEditor({ workflowId, schedule, tableMissing, clockReady, startWhen = "" }) {
+export default function ScheduleEditor({ workflowId, schedule, tableMissing, clockReady, startWhen = "", aiPerRun = 0 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [frequency, setFrequency] = useState(schedule?.frequency ?? "weekdays");
@@ -66,6 +67,7 @@ export default function ScheduleEditor({ workflowId, schedule, tableMissing, clo
       {describeSchedule(schedule)}{!schedule.enabled && " (paused)"}.
       {schedule.enabled && schedule.nextRunAt && <> Next run: {niceTime(Date.parse(schedule.nextRunAt), { offset: schedule.tzOffset, suffix: "" })}.</>}
       {schedule.lastRunAt && <> Last run: {niceTime(Date.parse(schedule.lastRunAt), { offset: schedule.tzOffset, suffix: "" })}, {schedule.lastStatus === "ok" ? "it worked" : schedule.lastStatus === "stopped" ? "it stopped at a step that needs attention" : schedule.lastStatus === "failed" ? "it did not work" : "no answer yet"}.</>}
+      {schedule.enabled && scheduleLine(aiPerRun, schedule.frequency) && <> {scheduleLine(aiPerRun, schedule.frequency)}</>}
     </p>
   );
 

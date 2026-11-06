@@ -113,3 +113,56 @@ test("trouble notices: sent once when a schedule goes from fine (or never run) t
   }
   assert.ok(log.updates.some((entry) => entry.values.last_status === "failed"), "the outcome was still written down");
 });
+
+// ---- the nudge for a step left waiting ----------------------------------------------------------------------------------------------------------
+// NOW is 09:30 in India (tz_offset 330), so no quiet hours are involved here; the nudge keeps its own limits (schedule-notify.test.js).
+async function nudgesFor(outcome, extra = {}) {
+  const { admin } = pretend({ rows: [due({ last_status: "ok", ...extra })] });
+  const nudges = [];
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    await runDueSchedules({ admin, now: NOW, nudge: async (n) => nudges.push(n), run: async () => { if (outcome === "crash") throw new Error("boom"); return outcome; } });
+  } finally {
+    console.error = quiet;
+  }
+  return nudges;
+}
+
+test("nudge: a plain (non-watch) scheduled run, an agent included, that finished ok with writing steps skipped asks for ONE 'waiting' nudge", async () => {
+  const nudges = await nudgesFor({ ok: true, runId: "r1", auto: { done: 1, stoppedAt: 0, waiting: 2 } });
+  assert.deepEqual(nudges, [{ userId: "u1", workflowId: "w1", runId: "r1", tzOffset: 330, now: NOW, reason: "waiting" }]);
+});
+
+test("nudge: nothing waiting (or the schedule allows writing) means no nudge", async () => {
+  for (const auto of [{ done: 2, stoppedAt: 0 }, { done: 2, stoppedAt: 0, waiting: 0 }, {}, null]) {
+    assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto }), [], JSON.stringify(auto));
+  }
+  assert.deepEqual(await nudgesFor({ ok: true, runId: null, auto: { done: 1, stoppedAt: 0, waiting: 1 } }), [], "no run to point at, no nudge");
+});
+
+test("nudge: a run that stopped, failed or crashed asks for no nudge (the trouble notice covers those)", async () => {
+  assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto: { done: 0, stoppedAt: 2, waiting: 1 } }), [], "stopped");
+  assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto: { done: 0, stoppedAt: 2, waiting: 1, watch: true } }), [], "a watch that stopped");
+  assert.deepEqual(await nudgesFor({ ok: false }), [], "failed");
+  assert.deepEqual(await nudgesFor("crash"), [], "crashed");
+});
+
+test("nudge: watch runs are unchanged: something new and a step waiting -> 'watch'; a quiet watch run tells nobody, even with a step counted as waiting", async () => {
+  assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto: { done: 1, stoppedAt: 0, watch: true, waiting: 1 } }), [{ userId: "u1", workflowId: "w1", runId: "r1", tzOffset: 330, now: NOW, reason: "watch" }]);
+  assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto: { done: 1, stoppedAt: 0, watch: true, quiet: true } }), []);
+  assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto: { done: 1, stoppedAt: 0, watch: true, quiet: true, waiting: 1 } }), []);
+  assert.deepEqual(await nudgesFor({ ok: true, runId: "r1", auto: { done: 2, stoppedAt: 0, watch: true } }), [], "a watch with nothing waiting");
+});
+
+test("nudge: a crashing nudge never fails the run", async () => {
+  const { admin } = pretend({ rows: [due()] });
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const summary = await runDueSchedules({ admin, now: NOW, run: async () => ({ ok: true, runId: "r1", auto: { done: 1, stoppedAt: 0, waiting: 1 } }), nudge: async () => { throw new Error("mail is down"); } });
+    assert.equal(summary.ran, 1);
+  } finally {
+    console.error = quiet;
+  }
+});

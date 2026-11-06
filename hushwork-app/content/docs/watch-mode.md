@@ -33,7 +33,7 @@ On the **Runs** page, quiet checks are hidden from the list. One line counts the
 These rules are fixed:
 
 - **Quiet hours: 8 pm to 8 am** in your own time. A watch that comes due at night is skipped. It costs nothing and sends nothing, and its next time moves on.
-- **At most 3 speak-ups a day**, counted from your own midnight.
+- **At most 3 speak-ups a day**, counted from your own midnight. Emails about a step waiting in your other schedules count toward the same 3.
 
 ## The one plain email
 

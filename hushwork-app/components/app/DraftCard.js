@@ -13,6 +13,7 @@ import { useRunMode } from "./RunMode";
 import ScheduleEditor from "./ScheduleEditor";
 import { LIMITS } from "@/lib/validate";
 import { isScheduledStart } from "@/lib/watch-rules";
+import { aiStepsPerRun, perRunLine } from "@/lib/ai-cost";
 
 // One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Run" lists its steps and waits for approval on each one that acts on an app.
 // Opening it puts its request and steps back into the composer; it does not start anything.
@@ -114,6 +115,8 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling, agen
     });
   }
 
+  const aiPerRun = aiStepsPerRun(draft.plan);
+  const waiting = draft.waiting?.waiting ?? 0;
   const steps = `${draft.plan.length} ${draft.plan.length === 1 ? "step" : "steps"}`;
   const savedText = useSavedTime(draft.updatedAt);
 
@@ -185,7 +188,17 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling, agen
           )}
         </div>
       )}
-      {mode === "view" && openBase && scheduling && <ScheduleEditor workflowId={draft.id} startWhen={startWhen} schedule={draft.schedule ?? null} tableMissing={scheduling.tableMissing} clockReady={scheduling.clockReady} />}
+      {mode === "view" && openBase && agent && (aiPerRun > 0 || waiting > 0) && (
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-sm text-mute">
+          {aiPerRun > 0 && <span className="flex items-center gap-1.5"><Icon name="Sparkles" size={14} className="shrink-0" />{perRunLine(aiPerRun)}</span>}
+          {waiting > 0 && (
+            <Link href={`/app/runs?run=${draft.waiting.runId}`} className="inline-flex min-h-6 items-center gap-1.5 rounded-md font-medium text-accent-text hover:underline">
+              <Icon name="ShieldCheck" size={14} className="shrink-0" />{waiting === 1 ? "1 step is waiting for your Approve" : `${waiting} steps are waiting for your Approve`}
+            </Link>
+          )}
+        </p>
+      )}
+      {mode === "view" && openBase && scheduling && <ScheduleEditor workflowId={draft.id} startWhen={startWhen} aiPerRun={aiPerRun} schedule={draft.schedule ?? null} tableMissing={scheduling.tableMissing} clockReady={scheduling.clockReady} />}
       {mode === "view" && openBase && agent && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">{writes === 1 ? "1 step sends something, adds a row or creates a task: it" : `${writes} steps send things, add rows or create tasks: they`} wait{writes === 1 ? "s" : ""} for your Approve on the Runs page.</p>}
       {mode === "view" && openBase && !agent && auto && writes > 0 && <p className="mt-2 px-1 text-sm text-mute">Auto will also write by itself: {writes} {writes === 1 ? "step sends something, adds a row or creates a task" : "steps send things, add rows or create tasks"}.</p>}
       {mode === "view" && error && <p role="alert" className="mt-2 flex items-start gap-2 px-1 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}

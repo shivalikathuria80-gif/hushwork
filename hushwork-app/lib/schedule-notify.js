@@ -31,15 +31,30 @@ export async function notifyScheduleProblem({ admin, userId, workflowId, status,
   }
 }
 
-// ---- WATCH MODE: the one thing Hushwork does by itself ------------------------------------------------------------------------------------------
-// After a watch run found something new and left a step waiting for the person's Approve, Hushwork may send ONE short plain email to the person
-// THEMSELF (never anyone else) saying to open the Runs page. Rules (lib/watch-rules.js): never between 20:00 and 08:00 their time, at most 3 a day
-// per person. The words never include anything from the run (no step text, no findings) and never a link that approves anything.
+// ---- THE NUDGE: the one thing Hushwork does by itself -------------------------------------------------------------------------------------------
+// After a scheduled run left a step waiting for the person's Approve, Hushwork may send ONE short plain email to the person THEMSELF (never anyone
+// else) saying to open the Runs page. `reason` says why: "watch" (a watch workflow found something new) or "waiting" (any other scheduled run, an
+// agent included, skipped its writing steps because the schedule does not allow writing). Rules (lib/watch-rules.js), the same for both: never
+// between 20:00 and 08:00 their time, at most 3 a day per person in all. The words never include anything from the run (no step text, no findings)
+// and never a link that approves anything.
 // To count the day, each email leaves a small "Told you" record (spoke: true); the number sent today is the number of those records since the
 // person's local midnight. Nothing sent means nothing recorded. It never throws; it returns "sent" or the reason it did not send.
-export const watchText = (name, siteUrl) => `Hushwork noticed something in "${String(name).slice(0, 80)}". Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`;
+const NUDGE = {
+  watch: {
+    title: "Hushwork noticed something",
+    text: (name, siteUrl) => `Hushwork noticed something in "${name}". Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
+    record: "Hushwork emailed you once to say it noticed something. Nothing was approved or sent for you.",
+  },
+  waiting: {
+    title: "Hushwork: a step is waiting for you",
+    text: (name, siteUrl) => `Your scheduled workflow "${name}" ran and has a step waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
+    record: "Hushwork emailed you once to say a step is waiting for you. Nothing was approved or sent for you.",
+  },
+};
+const nudgeOf = (reason) => NUDGE[reason] ?? NUDGE.watch;
+export const watchText = (name, siteUrl, reason = "watch") => nudgeOf(reason).text(String(name).slice(0, 80), siteUrl);
 
-export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, now = Date.now(), send = runActionTool, key = getComposioKey(), siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "" }) {
+export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, reason = "watch", now = Date.now(), send = runActionTool, key = getComposioKey(), siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "" }) {
   try {
     if (!key) return "off";
     if (inQuietHours(now, tzOffset)) return "quiet_hours";
@@ -56,16 +71,16 @@ export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, 
     if (target.error) return "no_address";
     const { data: workflows } = await admin.from("workflows").select("name").eq("user_id", userId).eq("id", workflowId).limit(1);
     const name = workflows?.[0]?.name ?? "a workflow";
-    const result = await send({ key, userId, action, values: { target: target.value, title: "Hushwork noticed something", details: watchText(name, siteUrl.replace(/\/$/, "")) } });
+    const result = await send({ key, userId, action, values: { target: target.value, title: nudgeOf(reason).title, details: watchText(name, siteUrl.replace(/\/$/, ""), reason) } });
     if (!result.ok) return "not_sent";
     const { error: recordError } = await admin.from("runs").insert({
       user_id: userId, workflow_id: workflowId, workflow_name: name, mode: "live", status: "done",
-      results: [{ icon: "Mail", title: "Told you", detail: "", status: "done", spoke: true, outcome: "Hushwork emailed you once to say it noticed something. Nothing was approved or sent for you.", from: runId, fromStep: 0 }],
+      results: [{ icon: "Mail", title: "Told you", detail: "", status: "done", spoke: true, outcome: nudgeOf(reason).record, from: runId, fromStep: 0 }],
     });
     if (recordError) console.error("saving the watch record failed:", recordError.code);
     return "sent";
   } catch {
-    console.error("a watch notice could not be sent");
+    console.error("a nudge could not be sent");
     return "error";
   }
 }

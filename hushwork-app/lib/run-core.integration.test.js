@@ -72,7 +72,7 @@ test("a scheduled run that is NOT allowed to write skips the email, and nothing 
   const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
   try {
     const result = await startPracticeRun({ id: workflow, auto: true, allowWrites: false }, who);
-    assert.deepEqual(result.auto, { done: 0, stoppedAt: 0 });
+    assert.deepEqual(result.auto, { done: 0, stoppedAt: 0, waiting: 1 }, "the skipped email is counted as waiting, so the schedule can tell the person");
     assert.equal(livePosts(composio).length, 0);
   } finally { composio.restore(); }
 });

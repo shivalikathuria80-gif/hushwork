@@ -14,8 +14,10 @@ import { inQuietHours, isWatchPlan } from "./watch-rules.js";
 // WATCH MODE (lib/watch-rules.js) adds two things, and changes nothing for other schedules:
 //   - a due WATCH schedule in the person's quiet hours (20:00 to 08:00 their time) is still claimed, so its next time moves on, but it is NOT run: no AI
 //     cost, no email. It is counted as `skipped`.
-//   - after a watch run that found something new and left a step waiting for the person's Approve, `nudge` is called (it sends ONE plain email, if the
-//     person is allowed one now). A watch run that ended quietly ("nothing new") is `ok` and tells nobody anything.
+//   - after a watch run that found something new and left a step waiting for the person's Approve, `nudge` is called with reason "watch" (it sends ONE
+//     plain email, if the person is allowed one now). A watch run that ended quietly ("nothing new") is `ok` and tells nobody anything.
+// ANY OTHER scheduled run (a plain schedule or an agent) that finished ok but skipped writing steps (the schedule does not "allow writing") calls
+// `nudge` with reason "waiting", so the draft does not sit unseen on the Runs page. Same email rules: never at night, at most 3 a day in all.
 const toSchedule = (row) => ({ frequency: row.frequency, hour: row.hour, minute: row.minute, weekday: row.weekday, tzOffset: row.tz_offset });
 
 // Is this schedule's workflow a watch workflow? Read from its saved Start step; a problem reading it counts as "no".
@@ -76,12 +78,13 @@ export async function runDueSchedules({ admin, run, notify = async () => {}, nud
         console.error("a failure notice crashed");
       }
     }
-    // Watch mode: something new and a step waiting for the person -> ask `nudge` to tell them (it decides whether it may; a crash here changes nothing).
-    if (status === "ok" && auto?.watch === true && auto.quiet !== true && auto.waiting > 0 && runId) {
+    // A step waiting for the person's Approve (a watch that found something new, or any scheduled run whose writing steps were skipped) -> ask
+    // `nudge` to tell them (it decides whether it may; a crash here changes nothing). A quiet watch run is left out on purpose.
+    if (status === "ok" && auto?.quiet !== true && auto?.waiting > 0 && runId) {
       try {
-        await nudge({ userId: row.user_id, workflowId: row.workflow_id, runId, tzOffset: row.tz_offset, now });
+        await nudge({ userId: row.user_id, workflowId: row.workflow_id, runId, tzOffset: row.tz_offset, now, reason: auto.watch === true ? "watch" : "waiting" });
       } catch {
-        console.error("a watch nudge crashed");
+        console.error("a nudge crashed");
       }
     }
     if (status === "ok") summary.ran += 1;
