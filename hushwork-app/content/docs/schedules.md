@@ -41,6 +41,15 @@ A scheduled run works like Auto mode, as you:
 
 Skipped writing steps stay marked **Waiting** on the **Runs** page. Open the run, read the exact words and press **Approve** when you are ready. See [Runs and Approve](/docs/runs-and-approvals).
 
+## When you get an email
+
+When a scheduled run finishes and a writing step is waiting for you, you get **one short email**: "Your scheduled workflow ... ran and has a step waiting for you", with a link to the Runs page. It names the workflow only. It holds none of your results and no button that approves anything.
+
+- Never between 20:00 and 08:00 your time. A run at night still happens; you just get no email for it.
+- At most 3 a day, together with the emails from [Watch mode](/docs/watch-mode).
+- No email when nothing is waiting, for example when **Let it write by itself** is ticked.
+- It needs **Gmail (send)** connected.
+
 ## When a schedule has trouble
 
 If a step fails, or Hushwork is not sure a step finished, the run stops. You get **one email** saying the workflow "stopped at a step that needs you" or "could not run", with a link to the Runs page. It names the workflow only and holds none of your results.

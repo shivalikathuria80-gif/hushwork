@@ -21,6 +21,7 @@ To add, change or pause a schedule later, use the schedule panel on the agent's 
 - It reads, looks things up and asks the AI by itself.
 - A step that sends an email, adds a row or creates a task waits for your **Approve** on the Runs page, exactly like a Manual run. You read the exact words first.
 - A scheduled agent only reads by itself until you tick **Let it write by itself** on its schedule.
+- When a scheduled run leaves a step waiting, you get one short email saying so, with a link to the Runs page. Never at night, at most 3 a day. See [Schedules](/docs/schedules).
 
 See [Runs and Approve](/docs/runs-and-approvals) for how approving works.
 

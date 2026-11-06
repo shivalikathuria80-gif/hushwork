@@ -65,7 +65,11 @@ A schedule that is days overdue runs **once**, then waits for its next normal ti
 ## Emails Hushwork sends by itself (`lib/schedule-notify.js`)
 
 - **Problem notice** (`notifyScheduleProblem`): sent once when a schedule changes from fine (or never run) to stopped or failed. It goes to the person's own address through their own Gmail (send) connection at Composio. It holds only the workflow name and a link to the Runs page, nothing from the run. Without a Composio key or connection nothing is sent and nothing breaks.
-- **Watch nudge** (`notifyWatch`): see below.
+- **Nudge** (`notifyWatch`): one plain email when a scheduled run ended `ok` and left a writing step waiting for Approve. `runDueSchedules` passes a `reason`:
+  - `"watch"`: a watch run found something new. Subject "Hushwork noticed something", body: `Hushwork noticed something in "<name>". Open the Runs page to read it and approve only what you want: <site>/app/runs`
+  - `"waiting"`: any other scheduled run (a plain schedule or an agent) skipped its writing steps because `allow_writes` is off. Subject "Hushwork: a step is waiting for you", body: `Your scheduled workflow "<name>" ran and has a step waiting for you. Open the Runs page to read it and approve only what you want: <site>/app/runs`
+
+  Both follow the watch rules below: never in quiet hours, at most 3 per person per local day in all (both kinds count together), no run details, no link that approves anything. A run that stopped or failed gets the problem notice instead, and a run with nothing waiting sends nothing. A plain schedule that runs in quiet hours still runs; its nudge is just not sent.
 
 ## Watch mode (`lib/watch-rules.js`)
 
@@ -74,14 +78,14 @@ A watch workflow is a scheduled workflow whose Start step is `watch`. It stays s
 | Rule | Value |
 | --- | --- |
 | Quiet hours | 20:00 to 08:00 in the person's own time (`QUIET_FROM`, `QUIET_UNTIL`) |
-| Daily cap | 3 nudges per person per local day (`DAILY_CAP`) |
+| Daily cap | 3 nudges per person per local day (`DAILY_CAP`), watch and "waiting" nudges together |
 | Quiet marker | An Ask the AI answer that starts with `NOTHING NEW` (any capitals, `^nothing new\b`) |
 | `{last}` | In an Ask the AI task, replaced by what that same step answered in the previous run (first 900 characters, handed to the AI as data). No earlier answer is not an error: the AI is told it is the first check. |
 
 How it flows:
 
 1. The check's AI step answers. If the answer starts with NOTHING NEW, `lib/run-core.js` ends the run there, saves a small "Nothing new" record, and the Runs page folds such runs into one quiet line.
-2. If something is new and a writing step is left waiting for Approve, `runDueSchedules` calls the nudge. `notifyWatch` stays silent in quiet hours, when 3 nudges are already counted today, or with no Composio key. Otherwise it sends one email with a link to `/app/runs` (no link that approves anything) and saves a "Told you" record so the day's count is right.
+2. If something is new and a writing step is left waiting for Approve, `runDueSchedules` calls the nudge with `reason: "watch"`. `notifyWatch` stays silent in quiet hours, when 3 nudges are already counted today, or with no Composio key. Otherwise it sends one email with a link to `/app/runs` (no link that approves anything) and saves a "Told you" record so the day's count is right.
 3. A watch schedule that comes due **in quiet hours** is still claimed (so its next time moves on) but **not run**: no AI cost, no email. It counts as `skipped`. Ordinary schedules still run at night. Which kind it is comes from the saved first step (`isWatchPlan`).
 
 Each check uses one AI step and a person gets 15 AI steps a day, so the ready-made watchers run daily or on weekdays.

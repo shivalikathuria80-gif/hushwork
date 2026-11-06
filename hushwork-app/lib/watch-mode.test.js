@@ -276,20 +276,21 @@ test("runner: a quiet run is 'ok' (nothing wrong), tells nobody anything, and th
   }
 });
 
-test("runner: the nudge is asked for only after a watch run that found something and left a step waiting; never for a quiet, plain, stopped or failed run", async () => {
+test("runner: a watch nudge is asked for only after a watch run that found something and left a step waiting; never for a quiet, stopped or failed run", async () => {
   const cases = [
     ["found something, one step waiting", WATCH_PLAN, { done: 1, stoppedAt: 0, watch: true, waiting: 1 }, true],
     ["found something, nothing waiting (the person allowed writing)", WATCH_PLAN, { done: 2, stoppedAt: 0, watch: true }, false],
     ["quiet", WATCH_PLAN, { done: 1, stoppedAt: 0, watch: true, quiet: true }, false],
     ["stopped at a step (the problem notice covers that)", WATCH_PLAN, { done: 0, stoppedAt: 2, watch: true, waiting: 1 }, false],
-    ["not a watch workflow", PLAIN_PLAN, { done: 1, stoppedAt: 0, waiting: 1 }, false],
+    ["not a watch workflow, a step waiting (it gets the 'waiting' nudge, see schedule-runner.test.js)", PLAIN_PLAN, { done: 1, stoppedAt: 0, waiting: 1 }, "waiting"],
+    ["not a watch workflow, nothing waiting", PLAIN_PLAN, { done: 1, stoppedAt: 0 }, false],
   ];
   for (const [name, plan, auto, expected] of cases) {
     const { admin } = pretendRunner({ rows: [due({ last_status: "ok" })], plans: { w1: plan } });
     const nudges = [];
     await runDueSchedules({ admin, run: okRun(auto), nudge: async (n) => nudges.push(n), now: DAYTIME });
-    assert.equal(nudges.length === 1, expected, name);
-    if (expected) assert.deepEqual(nudges[0], { userId: "u1", workflowId: "w1", runId: "r1", tzOffset: 330, now: DAYTIME });
+    assert.equal(nudges.length === 1, Boolean(expected), name);
+    if (expected) assert.deepEqual(nudges[0], { userId: "u1", workflowId: "w1", runId: "r1", tzOffset: 330, now: DAYTIME, reason: expected === true ? "watch" : expected });
   }
   const { admin } = pretendRunner({ rows: [due()] });
   const quietLog = console.error;
@@ -412,12 +413,14 @@ test("the nudge: 'off' without a Composio key (nothing is even looked up), no re
 
 test("the nudge is the only thing watch mode does by itself, and it is wired in with no new door: source checks", () => {
   const notify = fs.readFileSync(new URL("./schedule-notify.js", import.meta.url), "utf8");
-  const watchPart = notify.slice(notify.indexOf("// ---- WATCH MODE"), notify.indexOf("// ---- THE HUSHWORK AGENT")).replace(/\/\/.*$/gm, "");
+  const watchPart = notify.slice(notify.indexOf("// ---- THE NUDGE"), notify.indexOf("// ---- THE HUSHWORK AGENT")).replace(/\/\/.*$/gm, "");
   assert.ok(watchPart.includes('findAction("gmail_send")') && watchPart.includes("found?.user?.email"), "to the person's own address, through Gmail (send)");
   assert.ok(!/\bfetch\(|webhook|oauth/i.test(watchPart), "no webhook, no raw request");
   assert.equal(watchPart.match(/details:/g).length, 1, "the email body is built in one place");
   assert.ok(watchPart.includes("details: watchText(name"), "and only from the workflow's name and the site address");
-  assert.ok(!/step|answer|outcome|detail\b/.test(watchPart.replace(/details: watchText\(name[^)]*\)\.replace[^)]*\)/, "").replace(/detail: ""/, "").replace(/outcome: "[^"]*"/, "")), "no step text or findings are read into the email");
+  const fixedWords = watchPart.slice(watchPart.indexOf("const NUDGE = {"), watchPart.indexOf("\n};\n", watchPart.indexOf("const NUDGE = {")) + 4); // the two fixed wordings: only the name and site go in
+  assert.ok(!/\$\{(?!name\}|siteUrl\})/.test(fixedWords), "the fixed wordings take only the workflow's name and the site address");
+  assert.ok(!/step|answer|outcome|detail\b/.test(watchPart.replace(fixedWords, "").replace(/details: watchText\(name[^)]*\)\.replace[^)]*\)[^)]*\)/, "").replace(/detail: ""/, "").replace(/outcome: nudgeOf\(reason\)\.record/, "")), "no step text or findings are read into the email");
   assert.ok(watchPart.indexOf("if (!key) return \"off\"") < watchPart.indexOf("getUserById"), "off means nothing is looked up");
   const tick = fs.readFileSync(new URL("./schedule-tick.js", import.meta.url), "utf8");
   assert.ok(tick.includes("nudge: (watch) => notifyWatch({ admin, ...watch })"), "the clock hands the runner the nudge");
