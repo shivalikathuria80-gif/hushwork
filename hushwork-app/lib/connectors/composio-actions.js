@@ -114,8 +114,11 @@ export const COMPOSIO_ACTIONS = [
   {
     id: "calendar_event", app: "gcalwrite", name: "Add a Google Calendar event", tool: "GOOGLECALENDAR_CREATE_EVENT", needsTarget: true,
     target: { pattern: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):[0-5]\d$/, hint: "Write when it starts as year-month-day hour:minute, for example 2026-11-05 15:00 (24-hour clock, in your calendar's own time zone)." },
-    candidates: { start_datetime: ["start_datetime", "start_time"], summary: ["summary", "title"], description: ["description"] },
-    meaning: (v) => ({ start_datetime: `${v.target.replace(" ", "T")}:00`, summary: v.title, description: v.details }),
+    // The start time is the calendar's own clock time, so the calendar's time zone is read first (`zoneTool`, the app's own lookup) and sent with it.
+    // Without it Google reads the time as UTC (09:00 became 14:30 in India).
+    zoneTool: "GOOGLECALENDAR_LIST_CALENDARS",
+    candidates: { start_datetime: ["start_datetime", "start_time"], timezone: ["timezone", "time_zone"], summary: ["summary", "title"], description: ["description"] },
+    meaning: (v) => ({ start_datetime: `${v.target.replace(" ", "T")}:00`, timezone: v.timezone ?? "", summary: v.title, description: v.details }),
     done: (v) => `Added a calendar event at ${v.target}`,
     labels: { target: "Starts", title: "Event", details: "Notes" },
   },

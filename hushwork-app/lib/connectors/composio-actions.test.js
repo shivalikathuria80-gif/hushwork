@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { COMPOSIO_ACTIONS, buildArguments, checkTarget, findAction, readToolInputs, actionsForApp, parseRows, parseOutline, outlineToMarkdown } from "./composio-actions.js";
 import { COMPOSIO_APPS, findComposioApp } from "./composio-apps.js";
-import { runActionTool, allowedTools, ensureAuthConfig, findCreated, COMPOSIO_FAILED } from "./composio.js";
+import { runActionTool, allowedTools, ensureAuthConfig, findCreated, calendarZone, NO_ZONE, COMPOSIO_FAILED } from "./composio.js";
 
 const sentence = (result) => ({ ok: result.ok, error: result.error });
 const json = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
@@ -134,6 +134,9 @@ test("a calendar event and a Notion page: the start time and the page id are che
   assert.deepEqual(buildArguments(event, { target: "2026-11-05 15:00", title: "Dentist", details: "Bring the card" }, inputs).arguments, { start_datetime: "2026-11-05T15:00:00", summary: "Dentist", description: "Bring the card" });
   assert.deepEqual(buildArguments(event, { target: "2026-11-05 15:00", title: "Dentist", details: "" }, inputs).arguments, { start_datetime: "2026-11-05T15:00:00", summary: "Dentist" });
   assert.ok(buildArguments(event, { target: "2026-11-05 15:00", title: "x", details: "" }, readToolInputs({ input_parameters: { start_datetime: { required: true }, summary: {}, timezone: { required: true } } })).error, "an input we do not fill in is required: nothing is sent");
+  const zoned = readToolInputs({ input_parameters: { start_datetime: { required: true }, summary: {}, timezone: {} } });
+  assert.deepEqual(buildArguments(event, { target: "2026-11-05 15:00", title: "Dentist", details: "", timezone: "Asia/Kolkata" }, zoned).arguments, { start_datetime: "2026-11-05T15:00:00", timezone: "Asia/Kolkata", summary: "Dentist" }, "the calendar's time zone goes with the start time");
+  assert.equal(event.zoneTool, "GOOGLECALENDAR_LIST_CALENDARS", "read with the app's own lookup, already allowed on its sign-in");
 
   const page = findAction("notion_page");
   for (const good of ["0123456789abcdef0123456789abcdef", "01234567-89ab-cdef-0123-456789abcdef"]) assert.deepEqual(checkTarget(page, good), { value: good }, good);
@@ -488,4 +491,26 @@ test("Gmail search: nothing found says so; a tool that needs something we do not
   const refused = await runMailSearch({ key: "ak_k", userId: "u1", app, query: "x", fetchImpl: old.fetchImpl });
   assert.equal(refused.ok, false);
   assert.match(refused.error, /press Disconnect for Gmail \(send\) and Connect once more/);
+});
+
+test("a calendar event: the calendar's own time zone is read first and sent with the start time; with no time zone, nothing is added", async () => {
+  const event = findAction("calendar_event");
+  const calendars = { calendars: [{ id: "team@group.calendar.google.com", accessRole: "reader", timeZone: "Europe/London" }, { id: "me@x.co", accessRole: "owner", primary: true, timeZone: "Asia/Kolkata" }] };
+  assert.equal(calendarZone(calendars), "Asia/Kolkata", "the primary calendar wins");
+  assert.equal(calendarZone({ items: [{ accessRole: "owner", timeZone: "America/New_York" }] }), "America/New_York");
+  assert.equal(calendarZone({ calendars: [{ primary: true, timeZone: "Asia/Kolkata\nbcc" }] }), "", "only a plain zone name is kept");
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    calls.push([init.method, path, init.body ? JSON.parse(init.body) : null]);
+    const body = path.endsWith("/tools/GOOGLECALENDAR_CREATE_EVENT") ? { input_parameters: { start_datetime: { required: true }, timezone: {}, summary: {} } }
+      : path.endsWith("/execute/GOOGLECALENDAR_LIST_CALENDARS") ? { successful: true, data: calendars } : { successful: true, data: {} };
+    return { ok: true, status: 200, json: async () => body };
+  };
+  const done = await runActionTool({ key: "k", userId: "u", action: event, values: { target: "2026-11-09 09:00", title: "Test", details: "" }, fetchImpl });
+  assert.equal(done.ok, true);
+  assert.deepEqual(calls.at(-1)[2].arguments, { start_datetime: "2026-11-09T09:00:00", timezone: "Asia/Kolkata", summary: "Test" });
+  calls.length = 0;
+  const noZone = async (url, init) => ({ ok: true, status: 200, json: async () => ({ successful: true, data: { calendars: [] } }) });
+  assert.deepEqual(await runActionTool({ key: "k", userId: "u", action: event, values: { target: "2026-11-09 09:00", title: "Test", details: "" }, fetchImpl: noZone }), { ok: false, error: NO_ZONE });
 });

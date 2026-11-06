@@ -326,7 +326,32 @@ export async function runMailSearch({ key, userId, app, query, fetchImpl }) {
 // really takes; the request is built only from those (buildArguments), and if the tool needs something we do not fill in, or has no home
 // for something we want to say, NOTHING is sent. Returns { ok: true, text, link?, note? } (what the app answered as short plain text; `link` = the address of a
 // file it made, only ever a docs.google.com or drive.google.com one; `note` = set when a two-call action made the file but the second call failed) or { ok: false, error }.
-export async function runActionTool({ key, userId, action, values, fetchImpl }) {
+// The time zone of the person's main calendar in a calendar-list answer (found by shape: the entry marked primary, else the first one they own),
+// or "" when there is none. Only a plain IANA name ("Asia/Kolkata", "UTC") is kept.
+const ZONE = /^(?:UTC|[A-Za-z]+(?:\/[A-Za-z0-9_+-]+){1,2})$/;
+export function calendarZone(data) {
+  const found = [];
+  const walk = (value) => {
+    if (Array.isArray(value)) value.forEach(walk);
+    else if (value && typeof value === "object") {
+      if (typeof value.timeZone === "string" && ZONE.test(value.timeZone)) found.push(value);
+      Object.values(value).forEach(walk);
+    }
+  };
+  walk(data);
+  return (found.find((one) => one.primary === true) ?? found.find((one) => one.accessRole === "owner"))?.timeZone ?? "";
+}
+export const NO_ZONE = "Hushwork could not read your calendar's time zone, so it did not add the event (it would have landed at the wrong time). Try again in a minute.";
+
+export async function runActionTool({ key, userId, action, values: given, fetchImpl }) {
+  let values = given;
+  if (action.zoneTool) {
+    const listed = await executeTool({ key, userId, tool: action.zoneTool, args: {}, fetchImpl });
+    if (!listed.ok) return { ok: false, error: listed.error, said: listed.said };
+    const zone = calendarZone(listed.data);
+    if (!zone) return { ok: false, error: NO_ZONE };
+    values = { ...given, timezone: zone };
+  }
   const described = await call(key, "GET", `/tools/${action.tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
   if (described.error) return { ok: false, error: described.error, status: described.status, said: described.said };
   const built = buildArguments(action, values, readToolInputs(described.body));
