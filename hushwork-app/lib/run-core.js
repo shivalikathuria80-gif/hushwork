@@ -677,6 +677,9 @@ export async function approveActionStep(input, who) {
   const target = resolveTarget(action, checked.value, checked.value === MY_EMAIL ? await accountEmail(who) : "");
   if (target.error) return { error: target.error };
   if (isExampleTarget(action, target.value)) return { error: EXAMPLE_NOTICE };
+  // A calendar event whose start day is already over (an AI plan copying an example date, an old template) is never added in the past.
+  // A day of slack, because the start is in the calendar's own time zone, not the server's.
+  if (action.id === "calendar_event" && target.value.slice(0, 10) < new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)) return { error: `This event would start on ${target.value}, which has already passed, so it was not added. Change the start time in the step.` };
   const gate = await writeGate(supabase, user.id, run, input);
   if (gate) return gate;
 

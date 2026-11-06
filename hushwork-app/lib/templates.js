@@ -348,7 +348,7 @@ export const TEMPLATES = [
     schedule: { frequency: "weekdays", weekday: 1, hour: 9, minute: 30 },
     steps: [
       step("trigger", { how: "schedule", when: "Every weekday at 9:30" }),
-      step("ai", { task: "Who has not replied? For each one waiting: who, subject, days waiting, and a one-line nudge. Up to 6 lines.", uses: "app", address: "gmailsearch:in:sent newer_than:14d older_than:2d" }),
+      step("ai", { task: "Who has not replied? For each one waiting: who, subject, days waiting, and a one-line nudge. Up to 6 lines.", uses: "app", address: "gmailsearch:in:sent -to:me newer_than:14d older_than:2d" }),
       step("action", { action: "gmail_send", target: "{myEmail}", title: "Follow-ups to send", details: "{answer}" }),
     ],
   },
@@ -359,7 +359,7 @@ export const TEMPLATES = [
     schedule: { frequency: "weekly", weekday: 1, hour: 10, minute: 0 },
     steps: [
       step("trigger", { how: "schedule", when: "Every Monday at 10:00" }),
-      step("ai", { task: "Pick up to 3 quiet conversations worth reviving: who, subject, and a friendly one-line check-in for each.", uses: "app", address: "gmailsearch:in:sent newer_than:90d older_than:30d" }),
+      step("ai", { task: "Pick up to 3 quiet conversations worth reviving: who, subject, and a friendly one-line check-in for each.", uses: "app", address: "gmailsearch:in:sent -to:me newer_than:90d older_than:30d" }),
       step("action", { action: "gmail_send", target: "{myEmail}", title: "Leads worth reviving", details: "{answer}" }),
     ],
   },

@@ -359,3 +359,14 @@ test("an Ask the AI step with {answers} gets the answers of the steps BEFORE it 
     assert.ok(!asked.includes("{answers}"));
   } finally { composio.restore(); }
 });
+
+test("a calendar event whose start day has already passed is never added (an AI plan can copy an example date)", async () => {
+  const plan = finishSteps({ steps: [trigger, { icon: "Calendar", title: "Add an event", detail: "Review", block: "action", choice: "calendar_event", a: "2020-01-05 15:00", b: "Review" }] });
+  const { workflow, who } = setup({ plan });
+  const composio = fakeComposio({});
+  try {
+    const result = await startPracticeRun({ id: workflow, auto: true }, who);
+    assert.match(result.auto.reason, /already passed, so it was not added/);
+    assert.equal(livePosts(composio).length, 0, "nothing was sent to the calendar");
+  } finally { composio.restore(); }
+});
