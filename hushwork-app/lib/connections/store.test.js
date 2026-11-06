@@ -150,3 +150,21 @@ test("two requests renewing at once: when the renewal fails because the other re
   const refused = async () => ({ ok: false, status: 400, json: async () => ({}) });
   assert.equal(await loadAccess({ supabase: db2, userId: "u1", provider: "linear", key, app, now: () => 5_000_000, fetchImpl: refused }), null);
 });
+
+test("a sign-in the app says is over (invalid_grant) is removed, so Connections shows Connect again; any other refusal keeps it", async () => {
+  const setup = async () => {
+    const db = pretendDatabase();
+    await saveConnection({ supabase: db, provider: "google", key, tokens: { accessToken: "OLD", refreshToken: "R1", expiresAt: 1000 } });
+    db.rows[0].user_id = "u1";
+    return db;
+  };
+  const answer = (status, body) => async () => ({ ok: false, status, json: async () => body });
+  const over = await setup();
+  assert.equal(await loadAccess({ supabase: over, userId: "u1", provider: "google", key, app, now: () => 5_000_000, fetchImpl: answer(400, { error: "invalid_grant" }) }), null);
+  assert.equal(over.rows.length, 0, "the dead sign-in is gone");
+  for (const [status, body] of [[401, { error: "invalid_client" }], [400, { error: "invalid_request" }], [500, {}]]) {
+    const kept = await setup();
+    assert.equal(await loadAccess({ supabase: kept, userId: "u1", provider: "google", key, app, now: () => 5_000_000, fetchImpl: answer(status, body) }), null);
+    assert.equal(kept.rows.length, 1, `a ${status} ${body.error ?? ""} answer keeps the row`);
+  }
+});
