@@ -54,7 +54,7 @@ Two clocks never run one schedule twice (claiming, below).
 
 ## Claiming and running (`lib/schedule-runner.js`)
 
-`runDueSchedules` loads enabled schedules whose `next_run_at` has passed (oldest first, **at most 20 per call**). For each:
+`runDueSchedules` loads enabled schedules whose `next_run_at` has passed (oldest first, **at most 20 per call**). No new schedule is started once the call has run for 45 seconds (`TICK_BUDGET_MS` in `lib/schedule-tick.js`): the rest are left unclaimed, still due, for the next call a minute later, and counted as `deferred` in the answer. The Agent's looks (`runDueAgents`) follow the same deadline. For each:
 
 1. **Claim**: update `next_run_at` to the next time, but only `where next_run_at` still equals the old value. If nothing was updated, someone else took it and it counts as `skipped`.
 2. **Run** `startPracticeRun` as the owner with `auto: true`. Writing steps are skipped unless the schedule's `allow_writes` is true ("Let it write by itself"). Every normal limit and approval rule still applies.

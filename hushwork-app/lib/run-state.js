@@ -24,14 +24,17 @@ export function statesFromRows(rows, runId) {
 }
 
 // Every step state of one run, or null when the database could not be asked (the caller must then NOT assume "not tried" for a write).
-export async function loadStepStates(supabase, userId, runId) {
+// `since` is when the practice run was saved (its created_at). Every record under a run is saved after the run itself, so the search starts there:
+// without it the database checks EVERY saved record the person has, oldest first, which gets slower with each run a schedule adds.
+export async function loadStepStates(supabase, userId, runId, since = "") {
   if (checkId(runId).error) return null;
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("runs").select("results, created_at")
       .eq("user_id", userId).eq("mode", "live")
-      .contains("results", JSON.stringify([{ from: runId }])) // JSON TEXT on purpose: handed an array, the database client would write it as a Postgres list and match nothing
-      .order("created_at", { ascending: true }).limit(200);
+      .contains("results", JSON.stringify([{ from: runId }])); // JSON TEXT on purpose: handed an array, the database client would write it as a Postgres list and match nothing
+    if (typeof since === "string" && since) query = query.gte("created_at", since);
+    const { data, error } = await query.order("created_at", { ascending: true }).limit(200);
     if (error || !Array.isArray(data)) return null;
     return statesFromRows(data, runId);
   } catch {
@@ -41,7 +44,7 @@ export async function loadStepStates(supabase, userId, runId) {
 
 // The state of ONE step: { status: "done" | "failed" | "pending" | null } or { error: true } when it could not be checked.
 export async function stepStatus(supabase, userId, run) {
-  const states = await loadStepStates(supabase, userId, run?.id);
+  const states = await loadStepStates(supabase, userId, run?.id, run?.created_at);
   if (!states) return { error: true };
   return { status: states.get(run.stepIndex)?.status ?? null };
 }

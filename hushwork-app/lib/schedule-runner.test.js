@@ -166,3 +166,17 @@ test("nudge: a crashing nudge never fails the run", async () => {
     console.error = quiet;
   }
 });
+
+test("past the call's deadline no new schedule is claimed or run: the rest stay due for the next call and are counted as deferred", async () => {
+  const rows = [due({ id: "s1" }), due({ id: "s2" }), due({ id: "s3" })];
+  const { admin, log } = pretend({ rows });
+  let time = 0;
+  const ran = [];
+  // each run takes 20 seconds of the clock; the deadline is 30 seconds in
+  const run = async (input) => { ran.push(input.id); time += 20_000; return { ok: true, runId: "r", auto: { done: 1, stoppedAt: 0 } }; };
+  const summary = await runDueSchedules({ admin, run, now: NOW, deadline: 30_000, clock: () => time });
+  assert.deepEqual(summary, { ok: true, due: 3, ran: 2, stopped: 0, failed: 0, skipped: 0, deferred: 1 });
+  assert.equal(ran.length, 2);
+  const claims = log.updates.filter((update) => update.values.next_run_at);
+  assert.deepEqual(claims.map((claim) => claim.filters.find(([, name]) => name === "id")[2]), ["s1", "s2"], "the third was never claimed, so it is still due");
+});

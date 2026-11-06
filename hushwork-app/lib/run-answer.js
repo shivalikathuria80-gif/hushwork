@@ -61,6 +61,7 @@ export async function findLastAnswer(supabase, userId, run, stepIndex) {
       .from("runs").select("results")
       .eq("user_id", userId).eq("workflow_id", run.workflow_id).eq("mode", "live")
       .contains("results", JSON.stringify([{ from: previous.id, fromStep: stepIndex }])) // JSON TEXT on purpose (see loadStepStates in lib/run-state.js)
+      .gte("created_at", String(previous.created_at)) // its records come after it
       .order("created_at", { ascending: false }).limit(10);
     if (liveError || !Array.isArray(data)) return "";
     for (const row of data) {

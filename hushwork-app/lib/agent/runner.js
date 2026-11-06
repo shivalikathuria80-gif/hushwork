@@ -7,7 +7,8 @@ import { nextCheckAt } from "./brain.js";
 //      at most 3 emails a day and never at night.
 // At most `limit` agents per call (a look reads several apps and asks the AI), so one clock call stays short; the rest are taken next minute.
 // `check` and `nudge` are handed in, so tests never touch real services.
-export async function runDueAgents({ admin, check, nudge = async () => {}, now = Date.now(), limit = 3 }) {
+// `deadline` / `clock`: as in lib/schedule-runner.js, no new look starts after the deadline; the agent stays due for the next call.
+export async function runDueAgents({ admin, check, nudge = async () => {}, now = Date.now(), limit = 3, deadline = Infinity, clock = Date.now }) {
   const { data: due, error } = await admin
     .from("agent_state").select("user_id, tz_offset, next_check_at")
     .eq("enabled", true).lte("next_check_at", new Date(now).toISOString())
@@ -15,6 +16,7 @@ export async function runDueAgents({ admin, check, nudge = async () => {}, now =
   if (error) return { ok: false, looked: 0 }; // for example the table is not set up yet: schedules still run
   const summary = { ok: true, looked: 0, told: 0, failed: 0 };
   for (const row of due) {
+    if (clock() >= deadline) break; // not claimed, so still due next minute
     const claimed = await admin
       .from("agent_state").update({ next_check_at: new Date(nextCheckAt(now, row.tz_offset)).toISOString() })
       .eq("user_id", row.user_id).eq("next_check_at", row.next_check_at).select("user_id");

@@ -585,7 +585,7 @@ test("{last} skips checks that said NOTHING NEW and uses the newest real finding
   practice("p2", 2); live("p2", "NOTHING NEW", 2);
   practice("p3", 3); live("p3", "nothing new, all quiet", 3);
   practice("p4", 4);
-  const supabase = { from: (table) => { let list = rows.slice(); const q = { select: () => q, eq: (c, v) => { list = list.filter((r) => r[c] === v); return q; }, contains: (c, json) => { const need = JSON.parse(json); list = list.filter((r) => need.every((n) => r.results.some((h) => Object.entries(n).every(([k, v]) => h[k] === v)))); return q; }, order: (c, { ascending = true } = {}) => { list.sort((a, b) => (a[c] < b[c] ? -1 : 1) * (ascending ? 1 : -1)); return q; }, limit: async () => ({ data: list, error: null }) }; return q; } };
+  const supabase = { from: (table) => { let list = rows.slice(); const q = { select: () => q, eq: (c, v) => { list = list.filter((r) => r[c] === v); return q; }, contains: (c, json) => { const need = JSON.parse(json); list = list.filter((r) => need.every((n) => r.results.some((h) => Object.entries(n).every(([k, v]) => h[k] === v)))); return q; }, gte: (c, v) => { list = list.filter((r) => String(r[c]) >= String(v)); return q; }, order: (c, { ascending = true } = {}) => { list.sort((a, b) => (a[c] < b[c] ? -1 : 1) * (ascending ? 1 : -1)); return q; }, limit: async () => ({ data: list, error: null }) }; return q; } };
   assert.equal(await findLastAnswer(supabase, "u", { id: "p4", workflow_id: "w", created_at: "2026-10-26T09:04:00Z" }, 1), "Invoice 104 is overdue.");
   assert.equal(await findLastAnswer(supabase, "u", { id: "p1", workflow_id: "w", created_at: "2026-10-26T09:01:00Z" }, 1), "", "the very first check has no last time");
 });

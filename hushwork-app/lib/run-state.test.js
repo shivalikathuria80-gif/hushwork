@@ -46,3 +46,14 @@ test("the question is asked for this person's live records, with the run id hand
   assert.deepEqual(await stepStatus({ from: () => q }, "u1", { id: RUN, stepIndex: 7 }), { status: null });
   assert.deepEqual(seen.slice(0, 3), [["user_id", "u1"], ["mode", "live"], ["results", JSON.stringify([{ from: RUN }])]]);
 });
+
+test("the search starts at the run's own time: records are always saved after their run, so older rows are never scanned", async () => {
+  const seen = [];
+  const q = { select: () => q, eq: () => q, contains: () => q, gte: (n, v) => { seen.push([n, v]); return q; }, order: () => q, limit: async () => ({ data: [row(1, "done")], error: null }) };
+  const since = "2026-10-24T08:00:00.000Z";
+  assert.deepEqual(await stepStatus({ from: () => q }, "u1", { id: RUN, stepIndex: 1, created_at: since }), { status: "done" });
+  assert.deepEqual(seen, [["created_at", since]]);
+  seen.length = 0;
+  await loadStepStates({ from: () => q }, "u1", RUN); // no time known: asked as before, with no lower bound
+  assert.deepEqual(seen, []);
+});

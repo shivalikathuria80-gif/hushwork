@@ -66,7 +66,7 @@ export async function runAutomatically(runId, results, who, { allowWrites = true
   let skipped = 0;
   let waiting = 0; // writing steps left for the person's own Approve click (a schedule without "allow writing"); only present when > 0
   const watch = isWatchPlan(results);
-  const states = await loadStepStates(who.supabase, who.user.id, runId);
+  const states = await loadStepStates(who.supabase, who.user.id, runId, typeof run?.created_at === "string" ? run.created_at : "");
   const counted = () => ({ ...(skipped ? { skipped } : {}), ...(watch ? { watch: true } : {}), ...(waiting ? { waiting } : {}) });
   for (let index = 0; index < Math.min(results.length, 20); index += 1) {
     const step = results[index];
@@ -128,14 +128,14 @@ export async function resumeRun(input, who) {
   const { user, supabase } = who;
   const id = checkId(input?.runId);
   if (id.error) return { error: "That run no longer exists." };
-  const { data: rows, error } = await supabase.from("runs").select("user_id, workflow_id, workflow_name, mode, results").eq("id", id.value).eq("user_id", user.id);
+  const { data: rows, error } = await supabase.from("runs").select("user_id, workflow_id, workflow_name, mode, results, created_at").eq("id", id.value).eq("user_id", user.id);
   if (error) {
     console.error("loading a run to resume failed:", error.code);
     return { error: "Could not load that run. Check your connection and try again." };
   }
   const row = rows?.[0];
   if (!row || row.mode !== "practice") return { error: "That run no longer exists." };
-  const auto = await runAutomatically(id.value, readSavedResults(row.results), who, { allowWrites: true, run: { id: id.value, user_id: user.id, workflow_id: row.workflow_id, workflow_name: row.workflow_name } });
+  const auto = await runAutomatically(id.value, readSavedResults(row.results), who, { allowWrites: true, run: { id: id.value, user_id: user.id, workflow_id: row.workflow_id, workflow_name: row.workflow_name, created_at: row.created_at } });
   revalidatePath("/app", "layout");
   return { ok: true, auto };
 }
@@ -163,7 +163,7 @@ export async function startPracticeRun(input, who) {
   const { data, error } = await supabase
     .from("runs")
     .insert({ ...ownerOf(supabase, user.id), workflow_id: workflow.id, workflow_name: workflow.name, mode: "practice", status: run.status, results: run.results })
-    .select("id");
+    .select("id, created_at");
   if (error) {
     console.error("startPracticeRun save failed:", error.code);
     return { error: NO_TABLE.has(error.code) ? SETUP_MESSAGE : "The run finished but could not be saved. Try again." };
@@ -171,7 +171,7 @@ export async function startPracticeRun(input, who) {
   revalidatePath("/app", "layout");
   const runId = String(data?.[0]?.id ?? "");
   // Only an explicit true switches Auto on; anything else is the normal, ask-first Manual mode.
-  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results, who, { allowWrites: input?.allowWrites !== false, run: { id: runId, user_id: user.id, workflow_id: workflow.id, workflow_name: workflow.name } }) };
+  if (input?.auto === true && runId) return { ok: true, runId, auto: await runAutomatically(runId, run.results, who, { allowWrites: input?.allowWrites !== false, run: { id: runId, user_id: user.id, workflow_id: workflow.id, workflow_name: workflow.name, created_at: data?.[0]?.created_at } }) };
   return { ok: true, runId };
 }
 
