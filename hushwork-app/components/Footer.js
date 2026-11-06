@@ -91,7 +91,7 @@ export default function Footer() {
         ))}
       </div>
       <div className="mx-auto mt-12 flex max-w-6xl items-center justify-between border-t border-line pt-4 text-mute">
-        <span>© 2026 Hushwork</span>
+        <span>2026 Hushwork</span>
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex h-11 items-center gap-2 rounded-xl px-2 transition-colors duration-120 ease-standard hover:text-ink">
           Back to top<Icon name="ArrowUp" size={14} />
         </button>
