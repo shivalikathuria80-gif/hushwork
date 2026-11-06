@@ -30,7 +30,7 @@ import { getComposioKey } from "@/lib/connectors/composio-env";
 import { findComposioApp, parseAppAddress } from "@/lib/connectors/composio-apps";
 import { COMPOSIO_FAILED, runActionTool, runChannelMessages, runReadTool } from "@/lib/connectors/composio";
 import { EXAMPLE_NOTICE, MY_EMAIL, checkTarget, findAction, isExampleTarget, resolveTarget } from "@/lib/connectors/composio-actions";
-import { fetchLinearIssues } from "@/lib/connectors/linear";
+import { fetchLinearIssues, issueLine } from "@/lib/connectors/linear";
 import { GOOGLE_SOON, googleOpenFor } from "@/lib/connectors/google-gate";
 import { makeLimiter } from "@/lib/ai/limits";
 import { takeDbSlot } from "@/lib/db-limits";
@@ -356,9 +356,9 @@ export async function approveLinearLookup(input, who) {
   const answer = await fetchLinearIssues({ authorization });
   if (!answer.ok) return { error: answer.error };
 
-  const list = answer.issues.map((issue) => `- ${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n");
+  const list = answer.issues.map((issue) => `- ${issueLine(issue)}`).join("\n");
   const outcome = answer.issues.length
-    ? await withSummary({ supabase, userId: user.id, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why, and say which one to do first." })
+    ? await withSummary({ supabase, userId: user.id, appName: "Linear", header: `You have ${answer.issues.length} open ${answer.issues.length === 1 ? "task" : "tasks"}:`, list, note: step.fields.what, goal: "The person asked Linear for their open tasks. Summarise them: how many there are, which look most important or urgent and why (use the due dates and priorities when they are given), and say which one to do first." })
     : "Asked Linear. You have no open tasks.";
   return saveLiveRun(supabase, run, { ...step, status: "done", outcome: outcome.slice(0, 4000) });
 }
@@ -407,11 +407,11 @@ export async function approveAiStep(input, who) {
     const authorization = await linearAuthorization(supabase, user.id);
     if (!authorization) return { error: LINEAR_OFF };
     tools.linear_open_tasks = {
-      description: "Lists the person's open Linear tasks (up to 10) with their status.",
+      description: "Lists the person's open Linear tasks (up to 10) with their status, due date and priority.",
       run: async () => {
         const answer = await fetchLinearIssues({ authorization });
         if (!answer.ok) return failed(answer.error);
-        return answer.issues.length ? answer.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n") : "There are no open tasks.";
+        return answer.issues.length ? answer.issues.map(issueLine).join("\n") : "There are no open tasks.";
       },
     };
   } else if (uses === "calendar") {

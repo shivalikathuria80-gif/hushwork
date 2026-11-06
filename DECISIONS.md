@@ -421,7 +421,7 @@ Last updated: 2026-10-24
 - **Status:** ✅ Approved (second ChatGPT + Gemini round, see `docs/ideas.md`)
 - **Decision:** Writing `{answers}` in an Ask the AI step's job hands that step the answers of the Ask the AI steps BEFORE it (never its own old answer or a later step's). They arrive as `<data>` after the task with angle brackets neutralised, never as part of the person's request, so text that came from an email or a Slack channel cannot act as an instruction. With no earlier answer the step stops and says to approve the earlier steps first. This unlocks "compare" and "combine" jobs, which Hushwork could not do. New bundle **Freelancer safety net**: Scope Creep Alarm, Week Balancer, Meeting-Day Rescue Brief.
 - **Reason:** Both outside AIs proposed jobs that need one step to see what another found. The honest fix was to give Hushwork that ability once, safely, instead of faking it in each workflow.
-- **Limits worth knowing:** one Ask the AI step still looks in ONE place; Linear gives no due dates; Slack needs the channel typed in the step.
+- **Limits worth knowing:** one Ask the AI step still looks in ONE place; Linear gives no due dates (since 2026-11-06 it does: `dueDate` and `priority` are read); Slack needs the channel typed in the step.
 - **Where:** `lib/run-core.js` (`approveAiStep`), `lib/run-answer.js` (`findAnswers`, `before`), `lib/ai/agent.js` (`context`), `lib/skills/bundles.js`; tests in `lib/ai/agent.test.js`, `lib/run-core.integration.test.js`
 
 ### D-047: Approval-gated Google files (Sheet, Slides, Doc, Drive folder) and a Gmail draft, through Composio

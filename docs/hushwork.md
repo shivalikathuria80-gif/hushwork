@@ -59,9 +59,9 @@ An agent is a workflow underneath, so its name opens it in the Builder, and it u
 The Hushwork Agent (D-053) is not a workflow and has no steps. It is a single helper per person that you turn on once from the **Your Hushwork Agent** card on the Workspace.
 
 - **When it looks:** at 9:00, 13:00 and 17:00 your time (`CHECK_HOURS` in `lib/agent/brain.js`). The minute clock (`lib/schedule-tick.js`) calls `runDueAgents` in `lib/agent/runner.js`, which claims each due person so nobody is looked at twice, then calls `checkAgent`. **Look now** takes an extra look.
-- **What it reads** (`lib/agent/check.js`): Google Calendar for the next 7 days, the sender and subject of your newest emails (never the body), your open Linear tasks, and up to 3 Composio apps such as Stripe invoices, GitHub or Todoist.
+- **What it reads** (`lib/agent/check.js`): Google Calendar for the next 7 days, the sender and subject of your newest emails (never the body), your open Linear tasks (with due date and priority), and up to 3 Composio apps such as Stripe invoices, GitHub or Todoist.
 - **What it writes:** only up to 3 notes on your Workspace, each with a title, a why and a ready request. The AI is told to use only facts from your apps and not to repeat notes you already saw.
-- **Do this** puts the note's request into the Workspace box. From there it is a normal Workspace plan, and every writing step still waits for Approve. **Dismiss** hides the note.
+- **Do this** puts the note's request into the Workspace box. From there it is a normal Workspace plan, and every writing step still waits for Approve. **Make it an agent** sends the note's request to `createAgent` (`lib/actions/agents.js`, then `lib/agents/create.js`): it is saved as an agent on the Agents page and run once, with writes waiting for Approve on the Runs page. **Dismiss** hides the note.
 - **Email:** only when it finds something new, so at most 3 a day and never at night. The email only says to open your workspace.
 - **Cost:** each look is one of your 15 AI steps a day.
 - **Setup:** `supabase/agent.sql` (the `agent_state` table).
@@ -75,6 +75,7 @@ The Hushwork Agent (D-053) is not a workflow and has no steps. It is a single he
 ## How they connect
 
 ```
+Hushwork Agent note --"Make it an agent"--> agent (a workflow, kind='agent'), run once
 Hushwork Agent note --"Do this"--> Workspace box --> plan preview --"Open in the Builder"--> Builder --Save--> workflow
 Agents page sentence ------------------------------> agent (a workflow, kind='agent') --click its name--> Builder
 Template / Skill / Workflows page ----------------------------------------------------------------------> Builder

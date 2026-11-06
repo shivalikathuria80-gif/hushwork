@@ -6,7 +6,7 @@ import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { googleAuthorization, linearAuthorization } from "@/lib/run-core";
 import { fetchUpcomingEvents } from "@/lib/connectors/google-calendar";
 import { fetchInbox } from "@/lib/connectors/google-gmail";
-import { fetchLinearIssues } from "@/lib/connectors/linear";
+import { fetchLinearIssues, issueLine } from "@/lib/connectors/linear";
 import { getComposioKey } from "@/lib/connectors/composio-env";
 import { listConnected, runReadTool } from "@/lib/connectors/composio";
 import { findComposioApp } from "@/lib/connectors/composio-apps";
@@ -34,7 +34,7 @@ async function gatherData(supabase, userId) {
   const linear = await linearAuthorization(supabase, userId).catch(() => null);
   if (linear) {
     const issues = await fetchLinearIssues({ authorization: linear }).catch(() => null);
-    if (issues?.ok) parts.push({ name: "Linear, open tasks", text: issues.issues.length ? issues.issues.map((issue) => `${issue.id} ${issue.title}${issue.state ? ` (${issue.state})` : ""}`).join("\n") : "No open tasks." });
+    if (issues?.ok) parts.push({ name: "Linear, open tasks (status, due date, priority)", text: issues.issues.length ? issues.issues.map(issueLine).join("\n") : "No open tasks." });
   }
   const key = getComposioKey();
   if (key) {
