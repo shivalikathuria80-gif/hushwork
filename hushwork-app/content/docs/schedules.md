@@ -33,7 +33,7 @@ The panel shows **Next run** and **Last run**, with "it worked", "it stopped at 
 
 A scheduled run works like Auto mode, as you:
 
-- **Reading steps** (looking in an app, asking the AI) run by themselves. The usual daily limits still apply.
+- **Reading steps** (looking in an app, asking the AI) run by themselves. The usual daily limits still apply: you have 15 AI steps a day in all. When a schedule is on and its workflow uses the AI, the panel says about how many, for example "About 2 AI steps a day on weekdays". An hourly schedule uses more than 15, so later runs that day cannot use the AI.
 - **Writing steps** (send an email, create a task, add a row) are **skipped** unless you ticked **Let it write by itself**. A new schedule has it off.
 - If it is ticked, those steps happen while you are away, with no Approve click.
 
