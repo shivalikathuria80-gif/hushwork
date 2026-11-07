@@ -20,7 +20,7 @@ Connector tools: `list_agents`, `create_agent`, `run_agent`, `list_runs`, `get_r
 
 1. Install the plugin:
    - **Claude Code:** `/plugin marketplace add shivalikathuria80-gif/hushwork`, then `/plugin install hushwork@hushwork`.
-   - **Claude desktop (Cowork):** upload `hushwork.plugin` from this folder.
+   - **Claude desktop (Cowork):** upload [`hushwork.plugin`](https://github.com/shivalikathuria80-gif/hushwork/raw/main/dist/hushwork.plugin) (kept in the repo's `dist/` folder).
    - **claude.ai:** Settings, Connectors, Add custom connector, and paste `https://hushwork.in/api/mcp`.
 2. Press **Connect** (in Claude Code: `/mcp`, pick hushwork, Authenticate). Hushwork opens; sign in and press **Allow**.
 
@@ -40,4 +40,4 @@ That's it. To disconnect, open Hushwork **Settings, Chatbot plugin** and press *
 
 ## Rebuild `hushwork.plugin`
 
-From this folder, run: `rm -f hushwork.plugin && zip -r -X hushwork.plugin .claude-plugin .mcp.json skills README.md`
+From this folder, run: `rm -f ../../dist/hushwork.plugin && zip -r -X ../../dist/hushwork.plugin .claude-plugin .mcp.json skills README.md`. The zip lives outside this folder because the Claude directory only accepts plain text files and the icon inside a plugin.
