@@ -134,7 +134,7 @@ export default function Builder({ initial, connections }) {
       return result?.text ? ` ${result.text}` : "";
     } catch (problem) {
       unstable_rethrow(problem);
-      return " The workflow was saved, but its schedule could not be checked. Set it on the Workflows page.";
+      return " The workflow was saved, but its schedule could not be checked. Set it on the home page.";
     }
   }
 

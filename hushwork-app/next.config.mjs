@@ -34,6 +34,13 @@ const nextConfig = {
       ],
     };
   },
+  // Workflows and Skills were folded into the home page and the Templates page (2026-11): old links and bookmarks still land somewhere useful.
+  async redirects() {
+    return [
+      { source: "/app/workflows", destination: "/app#drafts", permanent: false },
+      { source: "/app/skills", destination: "/app/templates#packs", permanent: false },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: SAFETY_HEADERS }];
   },

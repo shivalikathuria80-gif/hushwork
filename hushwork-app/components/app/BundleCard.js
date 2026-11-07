@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "../icons";
 import EnableBundle from "./EnableBundle";
 
-// One Skill Bundle on the Skills page: what it is, which apps it needs (and whether they are connected), exactly what each skill can read and write, and the ready-made
+// One Skill Bundle on the Templates page (Packs): what it is, which apps it needs (and whether they are connected), exactly what each skill can read and write, and the ready-made
 // workflows. A server component with plain props, so the page and a preview can both use it. `states` maps an app id to true, false, null (could not be checked) or "unavailable".
 const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-medium text-ink";
 const ACCESS = {

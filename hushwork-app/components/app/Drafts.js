@@ -46,9 +46,9 @@ const toSchedule = (row) => ({
   allowWrites: row.allow_writes === true, enabled: row.enabled !== false, nextRunAt: text(row.next_run_at), lastRunAt: text(row.last_run_at), lastStatus: text(row.last_status),
 });
 
-// `openBase` (the Workflows page sets it) makes each draft open in the Builder instead of in the workspace's box.
+// `openBase` (the home page sets it) makes each draft open in the Builder instead of in the workspace's box.
 // `agents` (the Agents page sets it) lists only agents (workflows made from one sentence, see lib/agents/create.js); otherwise agents are
-// left out, so the Workflows page and the workspace show only what the person built. Before supabase/agents.sql is run there is no `kind`
+// left out, so the home page and the workspace show only what the person built. Before supabase/agents.sql is run there is no `kind`
 // column: the workflow lists then show everything as before, and the Agents page says which setup step is missing.
 export default async function Drafts({ openBase, agents = false }) {
   const user = await requireUser(); // outside try/catch on purpose: a signed-out visitor is redirected
@@ -76,7 +76,7 @@ export default async function Drafts({ openBase, agents = false }) {
     } else {
       drafts = data.map(toDraft);
       if (openBase) {
-        // Each workflow's schedule (the Workflows page only). A missing table is not an error: the panel says what is missing.
+        // Each workflow's schedule (the home page only). A missing table is not an error: the panel says what is missing.
         scheduling.clockReady = clockReady();
         const { data: rows, error: scheduleError } = await supabase
           .from("schedules")

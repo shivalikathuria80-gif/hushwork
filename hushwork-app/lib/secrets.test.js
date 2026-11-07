@@ -476,6 +476,6 @@ test("Skill Bundles add no new power: turning one on only saves drafts, uses the
   assert.ok(actions.startsWith('"use server";') && actions.includes("await requireUser()") && !/supabase\/admin|createAdminClient/.test(actions), "the buttons are Server Actions for a signed-in person, with their own client");
   const bundles = files.find((file) => file.name === "lib/skills/bundles.js").text;
   assert.ok(!/from\("|fetch\(|process\.env/.test(bundles), "the registry is plain data: no database, no web calls, no settings");
-  const page = files.find((file) => file.name === "app/app/skills/page.js").text;
+  const page = files.find((file) => file.name === "app/app/templates/page.js").text;
   assert.ok(page.includes("<Suspense") && page.includes("requireUser()"), "the page reads the session inside Suspense");
 });

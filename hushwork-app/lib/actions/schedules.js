@@ -7,7 +7,7 @@ import { checkId } from "@/lib/validate";
 import { checkSchedule, nextRun } from "@/lib/schedule";
 import { syncStartSchedule } from "@/lib/schedule-sync";
 
-// The Schedule panel on the Workflows page. A person chooses WHEN one of their own workflows runs by itself; the clock that actually runs
+// The Schedule panel under each workflow on the home page. A person chooses WHEN one of their own workflows runs by itself; the clock that actually runs
 // it is lib/schedule-tick.js. Same four habits as the other actions: requireUser first, validate, talk to the database (user_id is filled in
 // by the database and the privacy rules keep every row the caller's own), return a SMALL object. Raw database errors are never returned.
 //
@@ -46,7 +46,7 @@ export async function saveSchedule(input) {
     console.error("saving a schedule failed:", error.code);
     return { error: NO_TABLE.has(error.code) ? SETUP : FAILED };
   }
-  revalidatePath("/app/workflows");
+  revalidatePath("/app");
   revalidatePath("/app/agents");
   return { ok: true, nextRunAt };
 }
@@ -62,7 +62,7 @@ export async function deleteSchedule(input) {
     console.error("deleting a schedule failed:", error.code);
     return { error: "Could not remove the schedule. Try again." };
   }
-  revalidatePath("/app/workflows");
+  revalidatePath("/app");
   revalidatePath("/app/agents");
   return { ok: true };
 }
@@ -78,7 +78,7 @@ export async function syncScheduleFromStart(input) {
   const { data: rows, error } = await supabase.from("workflows").select("plan").eq("id", id.value).eq("user_id", user.id);
   if (error || !rows?.[0]) return { error: "That workflow no longer exists." };
   const result = await syncStartSchedule({ supabase, userId: user.id, workflowId: id.value, plan: rows[0].plan, tzOffset: input?.tzOffset });
-  if (result.text) { revalidatePath("/app/workflows"); revalidatePath("/app/agents"); }
+  if (result.text) { revalidatePath("/app"); revalidatePath("/app/agents"); }
   return result;
 }
 

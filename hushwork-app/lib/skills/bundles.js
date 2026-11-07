@@ -5,7 +5,7 @@
 //   so a skill adds no new power: reading skills only read, and a writing skill still waits for the Approve click on the Runs page like any other step.
 //
 //   A BUNDLE is a named package of skills for one kind of work, with the app connections it needs and a few ready-made WORKFLOWS built only from its own skills.
-//   Turning a bundle on (the Skills page) saves those workflows as drafts in the person's own list. It never connects an app, never makes a schedule and never runs anything.
+//   Turning a bundle on (Packs on the Templates page) saves those workflows as drafts in the person's own list. It never connects an app, never makes a schedule and never runs anything.
 //
 // To add a skill or a bundle: add an entry below. bundles.test.js checks the rules (every step is valid, a writing skill is always behind an approval step, the
 // connections listed are exactly the ones the skills need, every skill is used).
@@ -145,7 +145,7 @@ export const SKILLS = [
 
 // ---- the bundles -----------------------------------------------------------------------------------------------------------------------------------------
 // A workflow's `flow` is a list of skill ids, in order; an entry may be [skillId, { field: value }] to change the skill's words for this workflow only.
-// `start` is the Start step. `schedule` is only a suggestion, shown on the Skills page: enabling a bundle never creates a schedule.
+// `start` is the Start step. `schedule` is only a suggestion, shown in Packs on the Templates page: enabling a bundle never creates a schedule.
 export const BUNDLES = [
   {
     id: "finance-ops", name: "Finance and operations", icon: "CreditCard",

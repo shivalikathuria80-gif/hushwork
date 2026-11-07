@@ -8,7 +8,7 @@ import AgentPanel from "@/components/app/AgentPanel";
 import ChatbotCard from "@/components/app/ChatbotCard";
 import ChatbotPlugin from "@/components/ChatbotPlugin";
 
-export const metadata = { title: "Workspace - Hushwork", robots: { index: false, follow: false } };
+export const metadata = { title: "Home - Hushwork", robots: { index: false, follow: false } };
 
 // The page shell is built ahead of time (nothing in it reads the session), so it appears instantly. Two parts then
 // stream in from the server: AiWorkspace (is AI planning on?) and the drafts list (it reads the session and the
@@ -28,14 +28,14 @@ export default function AppPage() {
         <Suspense
           fallback={
             <Workspace ai={{ enabled: false, limit: 0, pending: true }} plugin={<ChatbotPlugin place="app" />}>
-              <section id="drafts" className="mt-10"><DraftsFallback /></section>
+              <section id="drafts" className="mt-10 scroll-mt-20"><DraftsFallback title="Your workflows" /></section>
             </Workspace>
           }
         >
           <AiWorkspace top={<Suspense fallback={null}><AgentPanel /></Suspense>} plugin={<Suspense fallback={<ChatbotPlugin place="app" />}><ChatbotCard /></Suspense>}>
-            <section id="drafts" className="mt-10">
-              <Suspense fallback={<DraftsFallback />}>
-                <Drafts />
+            <section id="drafts" className="mt-10 scroll-mt-20">
+              <Suspense fallback={<DraftsFallback title="Your workflows" />}>
+                <Drafts openBase="/app/builder?draft=" />
               </Suspense>
             </section>
           </AiWorkspace>

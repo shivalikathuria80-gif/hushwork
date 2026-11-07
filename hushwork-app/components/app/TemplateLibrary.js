@@ -70,7 +70,7 @@ export default function TemplateLibrary({ items }) {
                 <span className="mt-3 block font-medium">{template.title}</span>
                 <span className="mt-1 block text-sm text-mute">{template.body}</span>
                 {template.schedule && (
-                  <span className="mt-3 flex items-start gap-1.5 text-sm"><Icon name="Clock" size={16} className="mt-0.5 shrink-0 text-mute" /><span><span className="font-medium">Suggested schedule:</span> {template.schedule}. Set it on the Workflows page after you save.</span></span>
+                  <span className="mt-3 flex items-start gap-1.5 text-sm"><Icon name="Clock" size={16} className="mt-0.5 shrink-0 text-mute" /><span><span className="font-medium">Suggested schedule:</span> {template.schedule}. Set it on the home page after you save.</span></span>
                 )}
                 <span className="mt-3 flex flex-wrap gap-1.5" aria-label="Kinds of step">
                   {template.kinds.map((label) => <span key={label} className="rounded-md border border-line bg-raised px-2 text-xs">{label}</span>)}

@@ -11,7 +11,7 @@ Short plain-words meanings for the words you meet in Hushwork.
 - **Block** - one kind of step you can add in the Builder, such as Start or Ask the AI.
 - **Template** - a ready-made workflow you can open in the Builder and change.
 - **Skill** - one ready-made step you can add from the Skills list in the Builder.
-- **Bundle** - a package of ready-made workflows on the Skills page. Turning one on saves its workflows. Nothing runs and nothing connects until you do it.
+- **Bundle** - a package of ready-made workflows in Packs on the Templates page. Turning one on saves its workflows. Nothing runs and nothing connects until you do it.
 - **Start** - the first step. It says what starts the workflow, such as a schedule or "When I ask".
 - **Schedule** - a time rule such as "Every weekday at 17:30". Hushwork then runs the workflow by itself at that time.
 - **Watch** - a scheduled check that stays quiet unless something is new. It is made with the Start choice **Keep watching**.

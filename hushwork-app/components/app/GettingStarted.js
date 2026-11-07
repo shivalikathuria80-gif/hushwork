@@ -22,7 +22,7 @@ export default async function GettingStarted() {
 
   const steps = [
     { done: workflows > 0, title: "Say what you want", text: "Type a chore in the box below, or tap an example. You get a plan; nothing runs yet.", href: "#task", link: "Go to the box" },
-    { done: runs > 0, title: "Practice it", text: "Open your draft in the Builder and press Run. A practice run only looks; it sends and creates nothing.", href: "/app/workflows", link: "Open my drafts" },
+    { done: runs > 0, title: "Practice it", text: "Press Run on your workflow below. A practice run only looks; it sends and creates nothing.", href: "#drafts", link: "Go to my workflows" },
     { done: liveRuns > 0, title: "Approve one step", text: "On the Runs page, read the exact words of a step and press Approve. Nothing is sent or created before that.", href: "/app/runs", link: "Open Runs" },
   ];
   const next = steps.findIndex((step) => !step.done);

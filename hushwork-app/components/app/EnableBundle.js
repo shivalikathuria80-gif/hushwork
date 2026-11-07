@@ -44,7 +44,7 @@ export default function EnableBundle({ bundleId, name, enabled, disabled = false
         <Btn size="sm" icon="Plus" loading={pending} disabled={disabled} onClick={toggle} aria-label={`Turn on ${name}`}>Turn on</Btn>
       )}
       {message && (
-        <p role="status" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleCheck" className="mt-0.5 shrink-0 text-success" /><span>{message} <Link href="/app/workflows" className="font-medium text-accent-text hover:underline">Open Workflows</Link></span></p>
+        <p role="status" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleCheck" className="mt-0.5 shrink-0 text-success" /><span>{message} <Link href="/app#drafts" className="font-medium text-accent-text hover:underline">See them on your home page</Link></span></p>
       )}
       {error && <p role="alert" className="mt-2 flex items-start gap-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{error}</p>}
     </div>

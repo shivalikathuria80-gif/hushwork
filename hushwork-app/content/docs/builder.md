@@ -10,7 +10,7 @@ Every way of starting ends in the same Builder:
 - A template: press **Open in the Builder** on a template card.
 - A skill: pick one from the **Skills** list on the left.
 - A saved workflow: click its name on the **Workflows** page.
-- Or press **New in the Builder** on the Workflows page to start empty.
+- Or press **New in the Builder** on the home page to start empty.
 
 ## The screen
 
