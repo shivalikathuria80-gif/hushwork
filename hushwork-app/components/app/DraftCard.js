@@ -14,6 +14,8 @@ import ScheduleEditor from "./ScheduleEditor";
 import { LIMITS } from "@/lib/validate";
 import { isScheduledStart } from "@/lib/watch-rules";
 import { aiStepsPerRun, perRunLine } from "@/lib/ai-cost";
+import ShareButton from "../agents/ShareButton";
+import { sharedPath } from "@/lib/shared-agent";
 
 // One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Run" lists its steps and waits for approval on each one that acts on an app.
 // Opening it puts its request and steps back into the composer; it does not start anything.
@@ -181,6 +183,8 @@ export default function DraftCard({ draft, onDeleted, openBase, scheduling, agen
           ) : (
             <>
               {openBase && agent && <Btn size="sm" icon="Play" loading={pending} onClick={practice} aria-label={`Run now: ${draft.name}`}>Run now</Btn>}
+              {/* Share: a link to /agents/try with this agent's sentence only (never its steps, schedule or results). */}
+              {openBase && agent && draft.prompt && <ShareButton path={sharedPath(draft.prompt)} title={draft.name} label="Share" size="sm" variant="ghost" />}
               {openBase && !agent && <Btn variant={auto ? "primary" : "secondary"} size="sm" icon={auto ? "Zap" : "Play"} loading={pending} onClick={practice} aria-label={auto ? `Run automatically: ${draft.name}` : `Run: ${draft.name}`}>{auto ? "Run automatically" : "Run"}</Btn>}
               <button type="button" ref={renameRef} aria-label={`Rename ${noun}: ${draft.name}`} onClick={startRename} className={iconButton}><Icon name="Pencil" size={18} /></button>
               <button type="button" ref={deleteRef} aria-label={`Delete ${noun}: ${draft.name}`} onClick={() => { setError(""); setMode("delete"); }} className={iconButton}><Icon name="Trash" size={18} /></button>

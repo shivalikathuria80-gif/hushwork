@@ -6,10 +6,12 @@ import { Btn, EASE, Logo } from "./ui";
 import { Icon } from "./icons";
 import { useTheme } from "./useTheme";
 
-const LINKS = [["How it works", "#how"], ["Automations", "#auto"], ["Features", "#features"], ["Chatbot plugin", "#plugin"], ["Try it", "#agent"]];
+// "Agents" is its own public page (/agents); the rest are sections of the landing page. Off the landing page (`base` is "/") they lead back to it.
+const LINKS = [["How it works", "#how"], ["Agents", "/agents"], ["Automations", "#auto"], ["Chatbot plugin", "#plugin"], ["Try it", "#agent"]];
+const at = (base, href) => (href.startsWith("#") ? `${base}${href}` : href);
 const linkClass = "rounded-xl px-3 py-2 text-sm text-ink transition-colors duration-120 ease-standard hover:bg-raised active:bg-line";
 
-export default function Nav() {
+export default function Nav({ base = "" }) {
   const [dark, toggleTheme] = useTheme();
   const [open, setOpen] = useState(false);
 
@@ -19,9 +21,9 @@ export default function Nav() {
     <header className="fixed inset-x-0 top-3 z-50 px-3" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
       {/* Glass (see .hw-glass in globals.css): page content scrolls underneath this bar, so the blur has a job. Text on it is --ink. */}
       <nav aria-label="Main" className="hw-glass mx-auto flex h-14 max-w-5xl items-center gap-2 rounded-2xl px-4">
-        <Logo />
+        <Logo href={base ? "/" : "#top"} />
         <div className="mx-auto hidden items-center gap-1 md:flex">
-          {LINKS.map(([label, href]) => <a key={label} href={href} className={linkClass}>{label}</a>)}
+          {LINKS.map(([label, href]) => <a key={label} href={at(base, href)} className={linkClass}>{label}</a>)}
         </div>
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <button
@@ -49,7 +51,7 @@ export default function Nav() {
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2, ease: EASE }}
           >
             {LINKS.map(([label, href]) => (
-              <a key={label} href={href} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-3 text-ink transition-colors duration-120 ease-standard hover:bg-raised active:bg-line">{label}</a>
+              <a key={label} href={at(base, href)} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-3 text-ink transition-colors duration-120 ease-standard hover:bg-raised active:bg-line">{label}</a>
             ))}
             <Btn href="/login#create" onClick={() => setOpen(false)} className="mt-2 w-full">Sign up free</Btn>
             <Btn href="/login" variant="secondary" onClick={() => setOpen(false)} className="mt-2 w-full">Log in</Btn>

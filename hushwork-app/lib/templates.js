@@ -375,6 +375,20 @@ export const TEMPLATES = [
       step("action", { action: "gmail_send", target: "{myEmail}", title: "Due in the next 48 hours", details: "{answer}" }),
     ],
   },
+  // ---- Week at risk: Linear due dates (step 2) and the calendar (step 3) meet in step 4, which reads both through {answers} ----
+  {
+    id: "weekrisk", pack: "everyday", icon: "Bell", title: "Week at risk", needs: "Linear, Google, Gmail (send)",
+    body: "Every Friday afternoon the AI reads your Linear tasks due in the coming week and your calendar for the same days, then emails YOU the tasks most likely to slip because their day is full of meetings, with one way to make room for each. It cannot change any task or event. You press Approve before the email is sent.",
+    request: "Every Friday at 3pm, compare my Linear tasks due next week with my calendar and email me which ones are at risk of slipping and how to make room. Ask me before it is sent.",
+    schedule: { frequency: "weekly", weekday: 5, hour: 15, minute: 0 },
+    steps: [
+      step("trigger", { how: "schedule", when: "Every Friday at 15:00" }),
+      step("ai", { task: "List tasks due in the next 7 days: task, due day, priority. Start with: Due. If none, say: Nothing due.", uses: "linear", address: "" }),
+      step("ai", { task: "For each of the next 7 days: date and hours of meetings. Start with: Meetings. One short line a day.", uses: "calendar", address: "" }),
+      step("ai", { task: "From {answers}: up to 3 tasks due on a busy day, why at risk, one way to make room. Else: Week looks fine.", uses: "nothing", address: "" }),
+      step("action", { action: "gmail_send", target: "{myEmail}", title: "Your week at risk", details: "{answer}" }),
+    ],
+  },
 ];
 
 // The checked steps of a template (every step rebuilt by the same rules as everything else), or null for an unknown id.
