@@ -12,8 +12,8 @@ import { TEMPLATES } from "@/lib/templates";
 const FillContext = createContext(() => {});
 export const useFillComposer = () => useContext(FillContext);
 
-// Only the templates that can really do something (they say what they need). The rest are on the Templates page.
-const WORKING = TEMPLATES.filter((template) => template.needs);
+// Six templates that can really do something (they say what they need). The rest are on the Templates page.
+const WORKING = TEMPLATES.filter((template) => template.needs).slice(0, 6);
 
 // Sentences a new person can tap to fill the empty box. Each is a chore Hushwork can really plan, and says which connections it needs.
 const EXAMPLES = [
@@ -25,7 +25,8 @@ const EXAMPLES = [
 // `ai` is { enabled, limit } from the server (AiWorkspace.js): is AI planning available, and how many AI plans a person gets a day.
 // It never holds the key.
 // `top` (optional) is shown above the request box, inside the same context, so the agent's "Do this" can fill the box.
-export default function Workspace({ children, ai, top = null }) {
+// `plugin` (optional) is the chatbot plugin box, shown right under the examples.
+export default function Workspace({ children, ai, top = null, plugin = null }) {
   const [seed, setSeed] = useState(null);
   const composer = useRef(null); // gives us the composer's guard: "are there unsaved step edits? ask first"
   // Every call gets a higher id, so clicking the same draft twice still counts as a new request.
@@ -57,6 +58,8 @@ export default function Workspace({ children, ai, top = null }) {
           ))}
         </ul>
       </section>
+
+      {plugin && <section aria-label="Chatbot plugin" className="mt-10">{plugin}</section>}
 
       <section aria-labelledby="working-heading" className="mt-10">
         <h2 id="working-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Or start from one that works</h2>
