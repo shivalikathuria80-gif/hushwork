@@ -8,6 +8,7 @@ import MemorySettings from "@/components/app/MemorySettings";
 import PluginTokens from "@/components/app/PluginTokens";
 import PluginConnections from "@/components/app/PluginConnections";
 import { OAUTH_SETUP } from "@/lib/plugin/oauth";
+import { PLUGIN_ADDRESS } from "@/lib/plugin/address";
 import { NO_TABLE, TOKEN_SETUP } from "@/lib/plugin/tokens";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,6 +33,23 @@ export default function SettingsPage() {
             <a href="/api/export" download className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-field bg-surface px-4 text-sm font-medium shadow-sm hover:bg-raised">Download my data</a>
           </div>
           <div className="mt-4 border-t border-line pt-4"><DeleteAccount /></div>
+        </div>
+      </section>
+
+      <section id="plugin-settings" aria-labelledby="plugin-heading" className="mt-8 scroll-mt-20">
+        <h2 id="plugin-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Chatbot plugin</h2>
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <p className="mb-3 text-sm text-mute">Use Hushwork from Claude or another AI chatbot. To connect, add <code className="rounded bg-raised px-1.5 py-0.5 text-[13px] text-ink">{PLUGIN_ADDRESS}</code> as a custom connector in the chatbot and press Connect. The steps are also on your <Link href="/app">home page</Link>.</p>
+          <h3 className="text-[15px] font-semibold">Connected chatbots</h3>
+          <p className="mb-2 text-sm text-mute">Chatbots you connected with their own Connect button. Disconnect one to cut it off at once.</p>
+          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
+            <Connections />
+          </Suspense>
+          <h3 className="mt-5 border-t border-line pt-4 text-[15px] font-semibold">API tokens</h3>
+          <p className="mb-2 text-sm text-mute">For a chatbot or app without a Connect button: make a token and paste it where it asks. Remove a token to cut that chatbot off at once.</p>
+          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
+            <Tokens />
+          </Suspense>
         </div>
       </section>
 
@@ -62,23 +80,6 @@ export default function SettingsPage() {
           </Suspense>
         </div>
       </section>
-
-      <section aria-labelledby="plugin-heading" className="mt-8">
-        <h2 id="plugin-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Chatbot plugin</h2>
-        <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <p className="mb-3 text-sm text-mute">Use Hushwork from Claude or another AI chatbot: list and run your agents, read runs and the Hushwork Agent&rsquo;s notes, and approve waiting steps. Anything that sends or creates still waits for your yes.</p>
-          <h3 className="text-[15px] font-semibold">Connected chatbots</h3>
-          <p className="mb-2 text-sm text-mute">Chatbots you connected with their own Connect button. Disconnect one to cut it off at once.</p>
-          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
-            <Connections />
-          </Suspense>
-          <h3 className="mt-5 border-t border-line pt-4 text-[15px] font-semibold">API tokens</h3>
-          <p className="mb-2 text-sm text-mute">For a chatbot or app without a Connect button: make a token and paste it where it asks. Remove a token to cut that chatbot off at once.</p>
-          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
-            <Tokens />
-          </Suspense>
-        </div>
-      </section>
     </main>
   );
 }
@@ -101,8 +102,7 @@ async function Tokens() {
     if (!NO_TABLE.has(error.code)) console.error("Loading tokens failed:", error.code);
     return <p className="text-[15px]">{NO_TABLE.has(error.code) ? TOKEN_SETUP : "Could not load your tokens. Try again in a minute."}</p>;
   }
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://hushwork.in").replace(/\/$/, "");
-  return <PluginTokens endpoint={`${site}/api/mcp`} tokens={data.map((row) => ({ id: String(row.id), name: String(row.name), prefix: String(row.prefix), createdAt: row.created_at, lastUsedAt: row.last_used_at }))} />;
+  return <PluginTokens endpoint={PLUGIN_ADDRESS} tokens={data.map((row) => ({ id: String(row.id), name: String(row.name), prefix: String(row.prefix), createdAt: row.created_at, lastUsedAt: row.last_used_at }))} />;
 }
 
 async function Connections() {

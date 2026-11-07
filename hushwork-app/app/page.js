@@ -3,6 +3,7 @@ import Hero from "@/components/Hero";
 import HowItWorks from "@/components/HowItWorks";
 import Automations from "@/components/Automations";
 import Features from "@/components/Features";
+import ChatbotSection from "@/components/ChatbotSection";
 import SignUpCta from "@/components/SignUpCta";
 import Footer from "@/components/Footer";
 
@@ -16,6 +17,7 @@ export default function Home() {
       <main id="main">
         <Hero />
         <HowItWorks />
+        <ChatbotSection />
         <Automations />
         <Features />
         <SignUpCta />

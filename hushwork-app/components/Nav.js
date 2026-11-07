@@ -6,7 +6,7 @@ import { Btn, EASE, Logo } from "./ui";
 import { Icon } from "./icons";
 import { useTheme } from "./useTheme";
 
-const LINKS = [["How it works", "#how"], ["Automations", "#auto"], ["Features", "#features"], ["Try it", "#agent"]];
+const LINKS = [["How it works", "#how"], ["Automations", "#auto"], ["Features", "#features"], ["Chatbot plugin", "#plugin"], ["Try it", "#agent"]];
 const linkClass = "rounded-xl px-3 py-2 text-sm text-ink transition-colors duration-120 ease-standard hover:bg-raised active:bg-line";
 
 export default function Nav() {

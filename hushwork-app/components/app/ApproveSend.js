@@ -48,7 +48,7 @@ const COPY = {
   },
   action: {
     action: approveActionStep,
-    intro: "This step does something in another app you connected through Composio (sends a Slack message, creates a GitHub issue or adds a Todoist task). If you approve, Hushwork does exactly the one thing written below and nothing else. It can be approved only once per run.",
+    intro: "This step does one thing in an app you connected through Composio. If you approve, Hushwork does exactly what is written below, once, and nothing else.",
     button: "Approve and send it",
     icon: "Send",
   },

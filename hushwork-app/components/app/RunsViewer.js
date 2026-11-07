@@ -1,12 +1,10 @@
-import { Fragment } from "react";
 import Link from "next/link";
-import { Btn, StepRow } from "../ui";
+import { Btn } from "../ui";
 import { Icon } from "../icons";
 import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import ResumeRun from "./ResumeRun";
-import StepStudioCard from "./StepStudioCard";
 import { summarizeRun } from "@/lib/studio/run-summary";
 import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { requireUser } from "@/lib/auth";
@@ -22,20 +20,36 @@ import { quietLine, quietRunIds } from "@/lib/watch-rules";
 // A PRACTICE run walks the steps and writes down what each would do; nothing leaves the app. A "Real" run is the record of
 // one web address really asked after an Approve click. It reads the session and the database, so the page wraps it in <Suspense>.
 
-const chip = "rounded-md border border-line-strong bg-surface px-2 text-xs font-medium text-ink";
-const chipWaiting = "rounded-md border border-accent bg-accent-subtle px-2 text-xs font-medium text-accent-text";
 const text = (value) => (typeof value === "string" ? value : "");
 const heading = "text-xl font-semibold leading-[1.35] tracking-tight";
 
-// The small marker at the right of a step in a practice run: words as well as an icon, so it never relies on colour alone.
-function markFor(state) {
-  if (state === "done") return <span className="flex items-center gap-1 text-xs text-success"><Icon name="Check" size={14} />Done</span>;
-  if (state === "stopped") return <span className="flex items-center gap-1 text-xs text-error"><Icon name="CircleAlert" size={14} />Stopped</span>;
-  if (state === "unsure") return <span className="flex items-center gap-1 text-xs text-error"><Icon name="CircleAlert" size={14} />Not sure</span>;
-  if (state === "waiting") return <span className="text-xs text-mute">Waiting</span>;
-  if (state === "plan-only") return <span className="text-xs text-mute" title="This step only describes what would happen. It does nothing when run.">Plan only</span>;
-  return null;
+// One status word for a run or a step, always with a coloured dot AND words, so it never relies on colour alone.
+// tone: "good" (done), "you" (waiting for you), "bad" (stopped or unsure), "quiet" (nothing to do).
+const DOT = { good: "bg-success", you: "bg-accent", bad: "bg-error", quiet: "bg-line-strong" };
+function Pill({ tone, children }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-line-strong bg-surface px-2.5 py-0.5 text-xs font-medium text-ink">
+      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${DOT[tone] ?? DOT.quiet}`} />{children}
+    </span>
+  );
 }
+
+// The run's headline in short, plain words (runOutcome in lib/run-engine.js has the long sentence).
+const RUN_WORDS = {
+  completed: ["good", "Done"], partial: ["good", "Partly done"], waiting: ["you", "Needs your OK"],
+  stopped: ["bad", "Stopped"], unsure: ["bad", "Check this"], practice: ["quiet", "Preview only"],
+};
+function RunPill({ outcome }) {
+  const [tone, words] = RUN_WORDS[outcome.key] ?? ["quiet", outcome.label];
+  return <Pill tone={tone}>{words}</Pill>;
+}
+const needsYou = (outcome) => outcome.key === "waiting" || outcome.key === "stopped" || outcome.key === "unsure";
+
+// A step's state in words.
+const STEP_WORDS = {
+  done: ["good", "Done"], waiting: ["you", "Needs your OK"], stopped: ["bad", "Stopped"], unsure: ["bad", "Not sure it ran"],
+  "plan-only": ["quiet", "Plan only"], nothing: null, // a trigger or a note: nothing to say
+};
 
 // The words a real run saved, laid out so they are easy to read: blank lines keep their gaps, lines that start with "- " become bullet
 // points, "Next step:" stands out, and the app's own list is set apart in a quieter style. Plain text only (React never treats it as HTML).
@@ -150,7 +164,6 @@ export default async function RunsViewer({ searchParams }) {
     if (status === "pending") return { key: "unsure", label: "Not sure it finished", notRun: [], text: "" };
     return { key: "completed", label: "Completed", notRun: [], text: "" };
   };
-  const chipFor = (outcome) => (outcome.key === "completed" ? chip : chipWaiting);
   const runIds = new Set(runs.filter((run) => !run.live).map((run) => run.id));
   // WATCH MODE: a check that found "nothing new" is not listed (it would bury the runs that matter). All of them are folded into one quiet line.
   const quiet = quietRunIds(runs);
@@ -202,48 +215,75 @@ export default async function RunsViewer({ searchParams }) {
   const needsAnswers = approvals.some(({ step }) => isActionStep(step) && String(step.fields?.details).includes(ANSWERS_TAG));
   const answers = needsAnswers ? await findAnswers(await createClient(), user.id, { id: selected.id, workflow_id: selected.workflowId, created_at: selected.createdAt }) : [];
   const paused = await isPaused(await createClient());
-  return (
-    <div className="mt-8 md:flex">
-      <div className="md:w-72 md:shrink-0 md:border-r md:border-line md:pr-6">
-        <h2 className={heading}>Your runs</h2>
-        {quiet.size > 0 && <p className="mt-2 text-sm text-mute">{quietLine(quiet.size)}</p>}
-        <ul className="mt-3 space-y-1">
-          {shown.map((run) => (
-            <li key={run.id}>
-              <Link
-                href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
-                className={`block rounded-xl px-4 py-3 hover:bg-raised ${run.id === selected.id ? "bg-accent-subtle" : ""}`}
-              >
-                <span className="flex flex-wrap items-center gap-2"><b className="font-medium">{run.name}</b><span className={chipFor(outcomeOf(run))}>{outcomeOf(run).label}</span></span>
-                <span className="mt-1 block text-sm text-mute"><RunTime iso={run.createdAt} /> · {run.results.length} {run.results.length === 1 ? "step" : "steps"}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
 
-      <section aria-labelledby="run-heading" className="mt-10 min-w-0 flex-1 md:mt-0 md:pl-8">
+  // What each approval card needs, keyed by step number, so the card sits right under the step it belongs to.
+  const approvalFor = new Map(approvals.map(({ step, index }) => [index, {
+    kind: isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isActionStep(step) ? "action" : isSheetsRow(step) ? "sheets" : "request",
+    connected: isAiStep(step) ? aiOn : isLinearLookup(step) || isLinearCreate(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true,
+    message: isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer, answers, user.email) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step),
+  }]));
+  const firstApproval = approvals[0]?.index;
+  const liveLine = selectedOutcome.key === "stopped" ? "A step stopped before it could finish. The reason is below." : selectedOutcome.key === "unsure" ? "This was started, but Hushwork never saw it finish. Look in the app first." : liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.";
+  // The list, split in two: runs that need you (an approval, a stop, or a step Hushwork lost track of) and everything else.
+  const withOutcome = shown.map((run) => ({ run, outcome: outcomeOf(run) }));
+  const groups = [
+    ["Needs you", withOutcome.filter(({ outcome }) => needsYou(outcome))],
+    ["Earlier", withOutcome.filter(({ outcome }) => !needsYou(outcome))],
+  ].filter(([, items]) => items.length > 0);
+
+  return (
+    <div className="mt-6 md:flex md:gap-8">
+      <nav aria-label="Your runs" className="md:w-72 md:shrink-0">
+        {quiet.size > 0 && <p className="mb-3 text-sm text-mute">{quietLine(quiet.size)}</p>}
+        {groups.map(([title, items]) => (
+          <div key={title} className="mb-5">
+            <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-mute">{title} <span className="font-normal">({items.length})</span></h2>
+            <ul className="mt-2 space-y-1">
+              {items.map(({ run, outcome }) => (
+                <li key={run.id}>
+                  <Link
+                    href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
+                    className={`block rounded-xl border px-3 py-2.5 transition-colors duration-120 ease-standard ${run.id === selected.id ? "border-accent bg-accent-subtle" : "border-transparent hover:bg-raised"} text-ink no-underline`}
+                  >
+                    <span className="flex items-start justify-between gap-2"><b className="min-w-0 break-words text-[15px] font-medium">{run.name}</b><RunPill outcome={outcome} /></span>
+                    <span className="mt-0.5 block text-sm text-mute"><RunTime iso={run.createdAt} /></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <section aria-labelledby="run-heading" className="mt-6 min-w-0 flex-1 md:mt-0">
         {paused && <p role="status" className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{PAUSED_MESSAGE}</p>}
-        <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-raised p-3">
-          <span className={chipFor(selectedOutcome)}>{selectedOutcome.label}</span>
-          <p className="text-sm">
-            {selected.live
-              ? (selectedOutcome.key === "stopped" ? "A step stopped before it could finish. The reason is below." : selectedOutcome.key === "unsure" ? "This was started, but Hushwork never saw it finish. Look in the app first." : liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.")
-              : selectedOutcome.text}
-          </p>
+
+        <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 id="run-heading" className={heading}>{selected.name}</h2>
+              <p className="mt-0.5 text-sm text-mute">{selected.live ? <>Ran <RunTime iso={selected.createdAt} /></> : <>Started <RunTime iso={selected.createdAt} /> · {selected.results.length} {selected.results.length === 1 ? "step" : "steps"}</>}</p>
+            </div>
+            <RunPill outcome={selectedOutcome} />
+          </div>
+          <p className="mt-3 text-[15px]">{selected.live ? liveLine : summary.line || selectedOutcome.text}</p>
+          {!selected.live && summary.line && selectedOutcome.notRun.length > 0 && <p className="mt-1 text-sm text-mute">{selectedOutcome.notRun.length} {selectedOutcome.notRun.length === 1 ? "step only describes" : "steps only describe"} what would happen, so {selectedOutcome.notRun.length === 1 ? "it does" : "they do"} nothing by itself.</p>}
+          {approvals.length > 0 && (
+            <a href={`#step-${firstApproval + 1}`} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover md:min-h-9">
+              <Icon name="ShieldCheck" />{approvals.length === 1 ? "1 step is waiting for your OK" : `${approvals.length} steps are waiting for your OK`}<Icon name="ArrowDown" />
+            </a>
+          )}
+          {selected.live && selected.results[0]?.from && runs.some((run) => run.id === selected.results[0].from) && (
+            <p className="mt-3 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the whole run</Link> to approve the next step.</p>
+          )}
         </div>
-        {summary.line && (
-          <p id="run-summary" className="mt-3 flex items-start gap-2 text-[15px] font-medium">
-            <Icon name={summary.state === "done" ? "CircleCheck" : summary.state === "waiting" ? "Info" : "CircleAlert"} className={`mt-0.5 shrink-0 ${summary.state === "done" ? "text-success" : summary.state === "waiting" ? "text-info" : "text-error"}`} />
-            <span>{summary.line}</span>
-          </p>
-        )}
+
         {!selected.live && (agent === "new" || agent === "scheduled") && (
           <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-accent-subtle px-3 py-2 text-sm">
             <Icon name="Bot" className="mt-0.5 shrink-0 text-accent-text" />
             <span>
               Your agent is saved and just ran once. {agent === "scheduled" ? "It will also run on the schedule you described. " : ""}
-              Any step that sends, adds or creates something waits below for your Approve. <Link href="/app/agents" className="font-medium text-accent-text hover:underline">See your agents</Link>
+              Any step that sends, adds or creates something waits below for your OK. <Link href="/app/agents" className="font-medium text-accent-text hover:underline">See your agents</Link>
             </span>
           </p>
         )}
@@ -253,21 +293,13 @@ export default async function RunsViewer({ searchParams }) {
             {auto === "done"
               ? (doneAt.size === 0
                 ? "Auto mode ran, but it had nothing it could carry out for real, so nothing was sent, written or changed. The steps below say why."
-                : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} for you, without asking. The results are under each step below.${selectedOutcome.notRun.length ? ` ${selectedOutcome.notRun.length} only ${selectedOutcome.notRun.length === 1 ? "describes" : "describe"} what would happen (see the note above).` : ""}`)
-              : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} and then stopped at a step that needs attention. Press Approve on that step to see why.`}
+                : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} for you, without asking. The results are under each step below.`)
+              : `Auto mode did ${doneAt.size} ${doneAt.size === 1 ? "step" : "steps"} and then stopped at a step that needs attention. Its reason is under that step.`}
           </p>
         )}
-        <h2 id="run-heading" className={`${heading} mt-5`}>{selected.name}</h2>
-        <p className="mt-1 text-[15px] text-mute">{selected.live ? <>Ran <RunTime iso={selected.createdAt} /></> : <>Started <RunTime iso={selected.createdAt} /> · {selected.results.length} {selected.results.length === 1 ? "step" : "steps"}</>}</p>
-        {/* key={selected.id}: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
-        {/* key: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
-        {selected.live && selected.results[0]?.from && runs.some((run) => run.id === selected.results[0].from) && (
-          <p className="mt-2 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the run</Link> to approve the next step.</p>
-        )}
-        <div className="mt-2"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
-        <h3 className="mt-6 text-sm font-medium">{selected.live ? "Result" : "Steps"}</h3>
+
         {selected.live ? (
-          <ol className="mt-2 space-y-4">
+          <ol className="mt-6 space-y-4">
             {selected.results.map((step, index) => (
               <li key={index}>
                 <p className="flex items-center gap-2 text-sm font-medium"><Icon name={step.icon} fallback="Check" size={16} className="text-accent-text" />{step.title}</p>
@@ -276,54 +308,49 @@ export default async function RunsViewer({ searchParams }) {
             ))}
           </ol>
         ) : (
-          <ol className="mt-1 space-y-1">
-            {selected.results.map((step, index) => (
-              <Fragment key={index}>
-                <StepRow
-                  icon={step.icon} title={step.title} sub={step.detail}
-                  right={markFor(stepState(step, index, doneAt, stoppedAt, unknownAt))}
-                />
-                {step.kind && step.kind !== "trigger" && (
-                  <li className="list-none pb-1">
-                    <StepStudioCard
-                      step={step}
-                      evidence={doneAt.has(index) ? { state: "verified", text: "It ran, and its result was saved (shown below)." } : unknownAt.has(index) ? { state: "unknown", text: "" } : stoppedAt.has(index) ? { state: "failed", text: stoppedAt.get(index).outcome } : { state: "planned", text: "" }}
-                    />
-                  </li>
-                )}
-                {unknownAt.has(index) && !doneAt.has(index) && (
-                  <li className="list-none pb-3 pt-1">
-                    <p role="alert" className="flex items-start gap-2 rounded-xl bg-raised px-3 py-2 pl-2.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">Not sure if this happened.</b> It was started, but Hushwork never saw whether it finished (the connection may have dropped). Look in the app first. It is not sent again by itself.</span></p>
-                  </li>
-                )}
-                {stoppedAt.has(index) && !doneAt.has(index) && !unknownAt.has(index) && (
-                  <li className="list-none pb-3 pt-1">
-                    <p role="alert" className="flex items-start gap-2 rounded-xl bg-raised px-3 py-2 pl-2.5 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">It stopped here.</b> {stoppedAt.get(index).outcome} You can fix that and press Approve on this step to try again.</span></p>
-                  </li>
-                )}
-                {doneAt.has(index) && (
-                  <li className="list-none pb-3 pt-1">
-                    <p className="flex items-center gap-2 pl-1 text-sm font-medium text-success"><Icon name="CircleCheck" size={16} />Done. Result:</p>
-                    <div className="mt-2 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-5"><ResultText text={doneAt.get(index).outcome} /></div>
-                  </li>
-                )}
-              </Fragment>
-            ))}
+          <ol className="mt-6">
+            {selected.results.map((step, index) => {
+              const state = stepState(step, index, doneAt, stoppedAt, unknownAt);
+              const [tone, words] = STEP_WORDS[state] ?? [];
+              const approval = approvalFor.get(index);
+              const last = index === selected.results.length - 1;
+              return (
+                <li key={index} id={`step-${index + 1}`} className="relative scroll-mt-20 pb-5 pl-12">
+                  {!last && <span aria-hidden="true" className="absolute bottom-0 left-[17px] top-10 w-px bg-line" />}
+                  <span aria-hidden="true" className={`absolute left-0 top-0 grid h-9 w-9 place-items-center rounded-full border text-sm font-semibold ${state === "done" ? "border-success text-success" : state === "waiting" ? "border-accent bg-accent-subtle text-accent-text" : state === "stopped" || state === "unsure" ? "border-error text-error" : "border-line bg-surface text-mute"}`}>
+                    {state === "done" ? <Icon name="Check" size={16} /> : index + 1}
+                  </span>
+                  <div className="flex flex-wrap items-start justify-between gap-2 pt-1">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 font-medium"><span className="sr-only">Step {index + 1}: </span><Icon name={step.icon} fallback="Workflow" size={16} className="shrink-0 text-accent-text" />{step.title}</p>
+                      {step.detail && <p className="mt-0.5 text-sm text-mute">{step.detail}</p>}
+                    </div>
+                    {words && <Pill tone={tone}>{words}</Pill>}
+                  </div>
+                  {unknownAt.has(index) && !doneAt.has(index) && (
+                    <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">Not sure if this happened.</b> It was started, but Hushwork never saw whether it finished (the connection may have dropped). Look in the app first. It is not sent again by itself.</span></p>
+                  )}
+                  {stoppedAt.has(index) && !doneAt.has(index) && !unknownAt.has(index) && (
+                    <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">It stopped here.</b> {stoppedAt.get(index).outcome} Fix that, then approve this step again below.</span></p>
+                  )}
+                  {doneAt.has(index) && (
+                    <div className="mt-3 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-5"><ResultText text={doneAt.get(index).outcome} /></div>
+                  )}
+                  {approval && (
+                    <div className="mt-3">
+                      <ApproveSend runId={selected.id} index={index} unknown={unknownAt.has(index)} kind={approval.kind} connected={approval.connected} message={approval.message} />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         )}
         {!selected.live && [...stoppedAt.keys()].some((step) => !doneAt.has(step) && !unknownAt.has(step)) && (
-          <div className="mt-4"><ResumeRun key={selected.id} runId={selected.id} /></div>
+          <div className="mt-2"><ResumeRun key={selected.id} runId={selected.id} /></div>
         )}
-        {approvals.map(({ step, index }) => (
-          <div key={index} className="mt-6">
-            <ApproveSend
-              runId={selected.id} index={index} unknown={unknownAt.has(index)}
-              kind={isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isActionStep(step) ? "action" : isSheetsRow(step) ? "sheets" : "request"}
-              connected={isAiStep(step) ? aiOn : isLinearLookup(step) || isLinearCreate(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true}
-              message={isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer, answers, user.email) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step)}
-            />
-          </div>
-        ))}
+        {/* key: every run gets a fresh button, so an open "are you sure?" never carries over to the next run */}
+        <div className="mt-8 border-t border-line pt-4"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
       </section>
     </div>
   );
