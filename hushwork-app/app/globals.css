@@ -175,3 +175,22 @@
 .hw-pulse-dot { animation: hw-pulse-dot 1.8s var(--ease) infinite; }
 [data-motion="paused"] .hw-ping, [data-motion="paused"] .hw-pulse-dot { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .hw-ping, .hw-pulse-dot { animation: none; } }
+
+/* "Your week" (components/app/WeekFx.js): a light running round a card's border, and a slow sheen across the big number. */
+@property --hw-beam { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.hw-beam::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: conic-gradient(from var(--hw-beam), transparent 0deg 290deg, color-mix(in oklab, var(--accent) 70%, transparent) 330deg, var(--accent-text) 345deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+  animation: hw-beam 7s linear infinite;
+}
+@keyframes hw-beam { to { --hw-beam: 360deg; } }
+.hw-shimmer-text {
+  background: linear-gradient(100deg, var(--ink) 0%, var(--ink) 40%, var(--accent-text) 50%, var(--ink) 60%, var(--ink) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: hw-shimmer 5s var(--ease) infinite;
+}
+@keyframes hw-shimmer { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
+[data-motion="paused"] .hw-beam::before, [data-motion="paused"] .hw-shimmer-text { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .hw-beam::before, .hw-shimmer-text { animation: none !important; } .hw-shimmer-text { background-position: 0 0; } }
