@@ -5,6 +5,7 @@ import RunTime from "./RunTime";
 import ApproveSend from "./ApproveSend";
 import DeleteRun from "./DeleteRun";
 import ResumeRun from "./ResumeRun";
+import { CountUp, Reveal, RevealItem, RunsKeys, StepDot, StepLine, StepProgress } from "./RunMotion";
 import { summarizeRun } from "@/lib/studio/run-summary";
 import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { requireUser } from "@/lib/auth";
@@ -226,39 +227,56 @@ export default async function RunsViewer({ searchParams }) {
   const liveLine = selectedOutcome.key === "stopped" ? "A step stopped before it could finish. The reason is below." : selectedOutcome.key === "unsure" ? "This was started, but Hushwork never saw it finish. Look in the app first." : liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.";
   // The list, split in two: runs that need you (an approval, a stop, or a step Hushwork lost track of) and everything else.
   const withOutcome = shown.map((run) => ({ run, outcome: outcomeOf(run) }));
+  // For the progress bar: steps that do something (not a trigger or a note), and how many of them are done.
+  const counted = selected.live ? [] : selected.results.map((step, index) => stepState(step, index, doneAt, stoppedAt, unknownAt)).filter((state) => state !== "nothing");
+  const doneCount = counted.filter((state) => state === "done").length;
+  const mood = selectedOutcome.key === "completed" ? "good" : selectedOutcome.key === "stopped" ? "bad" : "";
+  const needCount = withOutcome.filter(({ outcome }) => needsYou(outcome)).length;
+  const doneRuns = withOutcome.filter(({ outcome }) => outcome.key === "completed" || outcome.key === "partial").length;
   const groups = [
     ["Needs you", withOutcome.filter(({ outcome }) => needsYou(outcome))],
     ["Earlier", withOutcome.filter(({ outcome }) => !needsYou(outcome))],
   ].filter(([, items]) => items.length > 0);
 
   return (
+    <>
+    <RunsKeys ids={withOutcome.map(({ run }) => run.id)} current={selected.id} mood={mood} />
+    <Reveal as="dl" className="mt-6 grid grid-cols-3 gap-3">
+      {[["Needs you", needCount, "you"], ["Done", doneRuns, "good"], ["Shown", withOutcome.length, "quiet"]].map(([label, value, tone]) => (
+        <RevealItem key={label} className="rounded-2xl border border-line bg-surface/85 px-4 py-3 shadow-sm backdrop-blur-sm">
+          <dt className="flex items-center gap-1.5 text-xs font-medium text-mute"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${DOT[tone]} ${tone === "you" && value > 0 ? "hw-pulse-dot" : ""}`} />{label}</dt>
+          <dd className="mt-1 text-2xl font-semibold tracking-tight"><CountUp value={value} /></dd>
+        </RevealItem>
+      ))}
+    </Reveal>
     <div className="mt-6 md:flex md:gap-8">
-      <nav aria-label="Your runs" className="md:w-72 md:shrink-0">
+      <nav aria-label="Your runs" data-runs-list className="md:w-72 md:shrink-0">
         {quiet.size > 0 && <p className="mb-3 text-sm text-mute">{quietLine(quiet.size)}</p>}
         {groups.map(([title, items]) => (
           <div key={title} className="mb-5">
             <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-mute">{title} <span className="font-normal">({items.length})</span></h2>
-            <ul className="mt-2 space-y-1">
+            <Reveal as="ul" className="mt-2 space-y-1">
               {items.map(({ run, outcome }) => (
-                <li key={run.id}>
+                <RevealItem as="li" key={run.id}>
                   <Link
-                    href={`/app/runs?run=${run.id}`} aria-current={run.id === selected.id ? "true" : undefined}
-                    className={`block rounded-xl border px-3 py-2.5 transition-colors duration-120 ease-standard ${run.id === selected.id ? "border-accent bg-accent-subtle" : "border-transparent hover:bg-raised"} text-ink no-underline`}
+                    href={`/app/runs?run=${run.id}`} scroll={false} data-run-id={run.id} aria-current={run.id === selected.id ? "true" : undefined}
+                    className={`block rounded-xl border px-3 py-2.5 transition-[background-color,border-color,transform] duration-120 ease-standard ${run.id === selected.id ? "border-accent bg-accent-subtle shadow-sm" : "border-transparent hover:translate-x-0.5 hover:bg-raised"} text-ink no-underline`}
                   >
                     <span className="flex items-start justify-between gap-2"><b className="min-w-0 break-words text-[15px] font-medium">{run.name}</b><RunPill outcome={outcome} /></span>
                     <span className="mt-0.5 block text-sm text-mute"><RunTime iso={run.createdAt} /></span>
                   </Link>
-                </li>
+                </RevealItem>
               ))}
-            </ul>
+            </Reveal>
           </div>
         ))}
+        <p className="mt-2 hidden px-1 text-xs text-mute md:block">Tip: press <kbd className="rounded border border-line bg-raised px-1 font-mono">J</kbd> and <kbd className="rounded border border-line bg-raised px-1 font-mono">K</kbd> to move between runs.</p>
       </nav>
 
       <section aria-labelledby="run-heading" className="mt-6 min-w-0 flex-1 md:mt-0">
         {paused && <p role="status" className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{PAUSED_MESSAGE}</p>}
 
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <RevealItem key={`head-${selected.id}`} initial="hidden" animate="shown" className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 id="run-heading" className={heading}>{selected.name}</h2>
@@ -268,6 +286,7 @@ export default async function RunsViewer({ searchParams }) {
           </div>
           <p className="mt-3 text-[15px]">{selected.live ? liveLine : summary.line || selectedOutcome.text}</p>
           {!selected.live && summary.line && selectedOutcome.notRun.length > 0 && <p className="mt-1 text-sm text-mute">{selectedOutcome.notRun.length} {selectedOutcome.notRun.length === 1 ? "step only describes" : "steps only describe"} what would happen, so {selectedOutcome.notRun.length === 1 ? "it does" : "they do"} nothing by itself.</p>}
+          {!selected.live && counted.length > 0 && <StepProgress done={doneCount} total={counted.length} tone={selectedOutcome.key === "waiting" ? "you" : selectedOutcome.key === "stopped" || selectedOutcome.key === "unsure" ? "bad" : "good"} />}
           {approvals.length > 0 && (
             <a href={`#step-${firstApproval + 1}`} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover md:min-h-9">
               <Icon name="ShieldCheck" />{approvals.length === 1 ? "1 step is waiting for your OK" : `${approvals.length} steps are waiting for your OK`}<Icon name="ArrowDown" />
@@ -276,7 +295,7 @@ export default async function RunsViewer({ searchParams }) {
           {selected.live && selected.results[0]?.from && runs.some((run) => run.id === selected.results[0].from) && (
             <p className="mt-3 text-sm"><Link href={`/app/runs?run=${selected.results[0].from}`} className="font-medium text-accent-text hover:underline">Back to the whole run</Link> to approve the next step.</p>
           )}
-        </div>
+        </RevealItem>
 
         {!selected.live && (agent === "new" || agent === "scheduled") && (
           <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-accent-subtle px-3 py-2 text-sm">
@@ -299,27 +318,27 @@ export default async function RunsViewer({ searchParams }) {
         )}
 
         {selected.live ? (
-          <ol className="mt-6 space-y-4">
+          <Reveal as="ol" key={`live-${selected.id}`} delay={0.1} className="mt-6 space-y-4">
             {selected.results.map((step, index) => (
-              <li key={index}>
+              <RevealItem as="li" key={index}>
                 <p className="flex items-center gap-2 text-sm font-medium"><Icon name={step.icon} fallback="Check" size={16} className="text-accent-text" />{step.title}</p>
                 <div className="mt-2 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-5"><ResultText text={step.outcome} /></div>
-              </li>
+              </RevealItem>
             ))}
-          </ol>
+          </Reveal>
         ) : (
-          <ol className="mt-6">
+          <Reveal as="ol" key={`steps-${selected.id}`} delay={0.1} className="mt-6">
             {selected.results.map((step, index) => {
               const state = stepState(step, index, doneAt, stoppedAt, unknownAt);
               const [tone, words] = STEP_WORDS[state] ?? [];
               const approval = approvalFor.get(index);
               const last = index === selected.results.length - 1;
               return (
-                <li key={index} id={`step-${index + 1}`} className="relative scroll-mt-20 pb-5 pl-12">
-                  {!last && <span aria-hidden="true" className="absolute bottom-0 left-[17px] top-10 w-px bg-line" />}
-                  <span aria-hidden="true" className={`absolute left-0 top-0 grid h-9 w-9 place-items-center rounded-full border text-sm font-semibold ${state === "done" ? "border-success text-success" : state === "waiting" ? "border-accent bg-accent-subtle text-accent-text" : state === "stopped" || state === "unsure" ? "border-error text-error" : "border-line bg-surface text-mute"}`}>
+                <RevealItem as="li" key={index} id={`step-${index + 1}`} className="relative scroll-mt-20 pb-5 pl-12">
+                  {!last && <StepLine className={`absolute bottom-0 left-[17px] top-10 w-px ${state === "done" ? "bg-success/60" : "bg-line"}`} />}
+                  <StepDot state={state} number={index + 1} className={`absolute left-0 top-0 grid h-9 w-9 place-items-center rounded-full border text-sm font-semibold ${state === "done" ? "border-success bg-surface text-success" : state === "waiting" ? "border-accent bg-accent-subtle text-accent-text" : state === "stopped" || state === "unsure" ? "border-error bg-surface text-error" : "border-line bg-surface text-mute"}`}>
                     {state === "done" ? <Icon name="Check" size={16} /> : index + 1}
-                  </span>
+                  </StepDot>
                   <div className="flex flex-wrap items-start justify-between gap-2 pt-1">
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 font-medium"><span className="sr-only">Step {index + 1}: </span><Icon name={step.icon} fallback="Workflow" size={16} className="shrink-0 text-accent-text" />{step.title}</p>
@@ -341,10 +360,10 @@ export default async function RunsViewer({ searchParams }) {
                       <ApproveSend runId={selected.id} index={index} unknown={unknownAt.has(index)} kind={approval.kind} connected={approval.connected} message={approval.message} />
                     </div>
                   )}
-                </li>
+                </RevealItem>
               );
             })}
-          </ol>
+          </Reveal>
         )}
         {!selected.live && [...stoppedAt.keys()].some((step) => !doneAt.has(step) && !unknownAt.has(step)) && (
           <div className="mt-2"><ResumeRun key={selected.id} runId={selected.id} /></div>
@@ -353,5 +372,6 @@ export default async function RunsViewer({ searchParams }) {
         <div className="mt-8 border-t border-line pt-4"><DeleteRun key={selected.id} id={selected.id} name={selected.name} /></div>
       </section>
     </div>
+    </>
   );
 }

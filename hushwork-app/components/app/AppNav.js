@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
+import { motion } from "motion/react";
 import { usePathname, unstable_rethrow } from "next/navigation";
 import { Btn, Logo } from "../ui";
 import { Icon } from "../icons";
@@ -19,10 +20,12 @@ function NavLink({ href, icon, children, onNavigate, exact = false }) {
   return (
     <Link
       href={href} onClick={onNavigate} aria-current={active ? "page" : undefined}
-      className={`flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors duration-120 ease-standard ${active ? "bg-accent-subtle font-medium text-ink" : "text-mute hover:bg-raised hover:text-ink active:bg-line"}`}
+      className={`group relative flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors duration-120 ease-standard ${active ? "font-medium text-ink" : "text-mute hover:bg-raised hover:text-ink active:bg-line"}`}
     >
+      {/* The highlight slides from the old page's link to the new one. */}
+      {active && <motion.span layoutId="app-nav-active" aria-hidden="true" className="absolute inset-0 -z-10 rounded-xl bg-accent-subtle" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
       {active && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-text" />}
-      <Icon name={icon} size={18} />{children}
+      <span className="transition-transform duration-200 ease-standard group-hover:scale-110"><Icon name={icon} size={18} /></span>{children}
     </Link>
   );
 }

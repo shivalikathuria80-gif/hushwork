@@ -167,3 +167,11 @@
 @keyframes hw-scroll-dot { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(10px); opacity: 0; } 100% { opacity: 0; } }
 .hw-scroll-dot { animation: hw-scroll-dot 1.6s var(--ease) infinite; }
 [data-motion="paused"] .hw-scroll-dot { animation-play-state: paused; }
+
+/* The signed-in app: a ring pulsing round a step that waits for you, and a dot that breathes beside "Needs you". */
+@keyframes hw-ping { 0% { transform: scale(1); opacity: 0.7; } 80%, 100% { transform: scale(1.55); opacity: 0; } }
+.hw-ping { animation: hw-ping 1.8s var(--ease) infinite; }
+@keyframes hw-pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
+.hw-pulse-dot { animation: hw-pulse-dot 1.8s var(--ease) infinite; }
+[data-motion="paused"] .hw-ping, [data-motion="paused"] .hw-pulse-dot { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .hw-ping, .hw-pulse-dot { animation: none; } }

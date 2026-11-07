@@ -13,6 +13,7 @@ import { previewPlan } from "@/lib/actions/plan";
 import { LIMITS, checkSteps, sameSteps } from "@/lib/validate";
 import { planToSteps, stepsToPlan } from "@/lib/steps";
 import { onlyNameMoved } from "@/lib/update-plan";
+import { pulse } from "./AppScene";
 
 const SAVE_FAILED = "Could not save your draft. Check your connection and try again.";
 const STEPS_FAILED = "Could not save your changes. Check your connection and try again.";
@@ -73,6 +74,8 @@ const asPlan = stepsToPlan;
 export default function Composer({ seed, ai = { enabled: false, limit: 0 }, ref }) {
   const [text, setText] = useState("");
   const [phase, setPhase] = useState("idle"); // idle -> writing (waiting for the AI) -> ready
+  // The 3D backdrop (AppScene.js) spins up while the AI writes and rolls out a green ring when the plan is ready.
+  useEffect(() => { pulse(phase === "writing" ? "think" : phase === "ready" ? "good" : "rest"); }, [phase]);
   const [plan, setPlan] = useState([]); // steps as [icon, title, detail]
   const [view, setView] = useState({ source: "keyword" }); // what the plan on screen is: { source: "ai" | "keyword" | "saved", generated, notice?, canRetry?, retryAfter?, sent? }
   const [retryReady, setRetryReady] = useState(true);

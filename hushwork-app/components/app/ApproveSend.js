@@ -6,6 +6,7 @@ import { Btn } from "../ui";
 import { Icon } from "../icons";
 import Link from "next/link";
 import { approveWebCall, approveLinearLookup, approveCalendarLookup, approveGmailLookup, approveDriveLookup, approveLinearCreate, approveAppLookup, approveActionStep, approveSheetsRow, approveAiStep } from "@/lib/actions/runs";
+import { pulse } from "./AppScene";
 
 // The one place a workflow really does something. It shows exactly what will happen and does it only when you press the
 // button. `message` is for reading; the server builds the real thing again from the saved run.
@@ -91,8 +92,8 @@ export default function ApproveSend({ runId, index, message, kind = "request", c
         unstable_rethrow(problem);
         result = { error: "Could not send. Check your connection and try again." };
       }
-      if (result.error) setError(result.error);
-      else router.refresh(); // the result now shows right under the step on this same page
+      if (result.error) { setError(result.error); pulse("bad"); }
+      else { pulse("good"); router.refresh(); } // the result now shows right under the step on this same page
       if (!result.error && result.note) setError(result.note);
     });
   }
