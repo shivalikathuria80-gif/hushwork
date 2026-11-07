@@ -31,8 +31,11 @@ export default function Hero() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex h-[640px] justify-center overflow-hidden">
         <div className="hw-float mt-16 h-[360px] w-[620px] max-w-full rounded-full bg-accent/14 blur-[110px] dark:bg-accent/30" />
       </div>
-      {/* The 3D dot sea (three.js, loaded after the page is idle). */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[760px] overflow-hidden"><HeroScene /></div>
+      {/* The 3D dot sea (three.js, loaded after the page is idle). It stays pinned to the screen for the whole hero,
+          story included, and reacts to the story as it plays (storyState). */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+        <div className="sticky top-0 h-dvh overflow-hidden"><HeroScene /></div>
+      </div>
       <div className="mx-auto grid max-w-6xl items-start gap-12 px-5 pb-12 pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,500px)] lg:gap-12">
         <div className="lg:pt-8">
           <h1 className="text-[length:clamp(2.25rem,4vw,3rem)] font-semibold leading-[1.05] tracking-[-0.03em]">
@@ -49,10 +52,15 @@ export default function Hero() {
         </div>
         <div className="hw-rise" style={after(0.25)}><AgentBox /></div>
       </div>
-      {/* The story film plays in this stage; the rotating cards ride along its lower edge, in front of it. */}
-      <div className="relative">
-        <StoryScene className="bottom-[60px]" />
-        <div className="relative pt-[400px] md:pt-[380px]"><WorkflowBand /></div>
+      {/* The story film. The track is tall so the stage stays pinned while you scroll, and the scroll plays the film.
+          With reduce motion on, the track collapses and the finished frame just sits in the page. */}
+      <div data-story-track className="relative h-[300vh] motion-reduce:h-auto">
+        <div className="sticky top-0 flex h-dvh flex-col justify-center overflow-hidden pt-16 md:pt-10 motion-reduce:static motion-reduce:h-auto">
+          <div className="relative">
+            <StoryScene className="bottom-[60px]" />
+            <div className="relative pt-[340px] md:pt-[380px]"><WorkflowBand /></div>
+          </div>
+        </div>
       </div>
     </section>
   );

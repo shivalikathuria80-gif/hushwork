@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useMotionPause } from "./MotionProvider";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
+import { storyState } from "./storyState";
 
 // The hero's 3D backdrop: a field of violet dots rolling like a slow sea. It leans toward the pointer and
-// flattens out as you scroll past the hero.
+// flattens out as you scroll past the hero. It also follows the story film below it (storyState): rough, fast and
+// reddish while the chores pile up, calm for the mind map, and green ripples rolling out when the tick lands.
 // Kept cheap on purpose:
 // - three.js is loaded only in the browser, after the page is idle (it never delays the headline).
 // - Drawing stops when the hero is off screen, when the tab is hidden, and when motion is paused.
@@ -16,6 +18,11 @@ import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 const VERTEX = /* glsl */ `
   uniform float uTime;
   uniform float uScroll;
+  uniform float uChaos;
+  uniform float uCalm;
+  uniform float uDone;
+  uniform float uRipple;
+  varying float vRing;
   uniform vec2 uPointer;
   uniform float uSize;
   uniform float uHalf;
@@ -25,8 +32,14 @@ const VERTEX = /* glsl */ `
   void main() {
     vec3 p = position;
     float t = uTime * 0.35;
-    float calm = 1.0 - uScroll * 0.75;
+    float calm = (1.0 - uScroll * 0.4) * (1.0 + uChaos * 0.9) * (1.0 - uCalm * 0.45);
     float wave = sin(p.x * 0.55 + t) * 0.55 + sin(p.z * 0.8 + t * 1.3) * 0.35 + sin((p.x + p.z) * 0.35 - t * 0.8) * 0.45;
+    // Chaos: a fast, choppy layer on top.
+    wave += sin(p.x * 2.1 + uTime * 2.6) * sin(p.z * 1.7 - uTime * 2.1) * 0.45 * uChaos;
+    // Done: rings rolling out from the middle.
+    float rd = length(p.xz - vec2(0.0, -3.0));
+    vRing = exp(-pow(rd - uRipple, 2.0) * 0.5) * uDone;
+    p.y += vRing * 1.3;
     // A soft bump that follows the pointer.
     float d = distance(p.xz, uPointer);
     float bump = exp(-d * d * 0.18) * 1.1;
@@ -47,12 +60,18 @@ const FRAGMENT = /* glsl */ `
   uniform float uAlpha;
   varying float vLift;
   varying float vFade;
+  varying float vRing;
+  uniform float uChaos;
+  uniform vec3 uGreen;
   void main() {
     vec2 c = gl_PointCoord - 0.5;
     float r = length(c);
     if (r > 0.5) discard;
     float soft = smoothstep(0.5, 0.1, r);
-    gl_FragColor = vec4(mix(uLow, uHigh, vLift), soft * vFade * uAlpha * (0.35 + vLift * 0.65));
+    vec3 col = mix(uLow, uHigh, vLift);
+    col = mix(col, vec3(0.97, 0.44, 0.44), uChaos * 0.5 * vLift);
+    col = mix(col, uGreen, clamp(vRing * 1.4, 0.0, 1.0));
+    gl_FragColor = vec4(col, soft * vFade * uAlpha * (0.35 + vLift * 0.65 + vRing));
   }
 `;
 
@@ -115,6 +134,11 @@ export default function HeroScene() {
       const uniforms = {
         uTime: { value: 0 },
         uScroll: { value: 0 },
+        uChaos: { value: 0 },
+        uCalm: { value: 0 },
+        uDone: { value: 0 },
+        uRipple: { value: 0 },
+        uGreen: { value: new THREE.Color("#4ade80") },
         uPointer: { value: new THREE.Vector2(0, -2) },
         uHalf: { value: width / 2 - 1 },
         uSize: { value: (small ? 4.2 : 4.4) * renderer.getPixelRatio() },
@@ -153,8 +177,8 @@ export default function HeroScene() {
         target.set(((e.clientX - r.left) / r.width - 0.5) * 18, -((e.clientY - r.top) / r.height) * 12 + 2);
       };
       const onScroll = () => {
-        const r = host.getBoundingClientRect();
-        uniforms.uScroll.value = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height)));
+        // How far the visitor is through the first screen (the host itself is pinned, so use the page).
+        uniforms.uScroll.value = Math.min(1, Math.max(0, window.scrollY / Math.max(1, window.innerHeight)));
       };
 
       let running = false;
@@ -167,6 +191,11 @@ export default function HeroScene() {
         last = now;
         uniforms.uTime.value += dt;
         uniforms.uPointer.value.lerp(target, 0.06);
+        const k = Math.min(1, dt * 4);
+        uniforms.uChaos.value += (storyState.chaos - uniforms.uChaos.value) * k;
+        uniforms.uCalm.value += (storyState.calm - uniforms.uCalm.value) * k;
+        uniforms.uDone.value += (storyState.done - uniforms.uDone.value) * k;
+        uniforms.uRipple.value = storyState.done > 0.05 ? (uniforms.uRipple.value + dt * 8) % 22 : 0;
         camera.position.y = 3.2 + uniforms.uScroll.value * 1.5;
         camera.lookAt(0, -1.6, -2);
         renderer.render(scene, camera);
