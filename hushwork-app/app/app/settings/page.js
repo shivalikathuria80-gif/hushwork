@@ -6,6 +6,8 @@ import { aiStatus } from "@/lib/ai-status";
 import DeleteAccount from "@/components/app/DeleteAccount";
 import MemorySettings from "@/components/app/MemorySettings";
 import PluginTokens from "@/components/app/PluginTokens";
+import PluginConnections from "@/components/app/PluginConnections";
+import { OAUTH_SETUP } from "@/lib/plugin/oauth";
 import { NO_TABLE, TOKEN_SETUP } from "@/lib/plugin/tokens";
 import { createClient } from "@/lib/supabase/server";
 
@@ -64,7 +66,14 @@ export default function SettingsPage() {
       <section aria-labelledby="plugin-heading" className="mt-8">
         <h2 id="plugin-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Chatbot plugin</h2>
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <p className="mb-3 text-sm text-mute">Use Hushwork from Claude or another AI chatbot: list and run your agents, read runs and the Hushwork Agent&rsquo;s notes, and approve waiting steps. Make a token, then paste it when the Hushwork plugin asks. Anything that sends or creates still waits for your yes. Remove a token to cut that chatbot off at once.</p>
+          <p className="mb-3 text-sm text-mute">Use Hushwork from Claude or another AI chatbot: list and run your agents, read runs and the Hushwork Agent&rsquo;s notes, and approve waiting steps. Anything that sends or creates still waits for your yes.</p>
+          <h3 className="text-[15px] font-semibold">Connected chatbots</h3>
+          <p className="mb-2 text-sm text-mute">Chatbots you connected with their own Connect button. Disconnect one to cut it off at once.</p>
+          <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
+            <Connections />
+          </Suspense>
+          <h3 className="mt-5 border-t border-line pt-4 text-[15px] font-semibold">API tokens</h3>
+          <p className="mb-2 text-sm text-mute">For a chatbot or app without a Connect button: make a token and paste it where it asks. Remove a token to cut that chatbot off at once.</p>
           <Suspense fallback={<span aria-hidden="true" className="block h-12 w-full rounded-md bg-raised" />}>
             <Tokens />
           </Suspense>
@@ -94,6 +103,16 @@ async function Tokens() {
   }
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://hushwork.in").replace(/\/$/, "");
   return <PluginTokens endpoint={`${site}/api/mcp`} tokens={data.map((row) => ({ id: String(row.id), name: String(row.name), prefix: String(row.prefix), createdAt: row.created_at, lastUsedAt: row.last_used_at }))} />;
+}
+
+async function Connections() {
+  const user = await requireUser();
+  const { data, error } = await (await createClient()).from("oauth_grants").select("id, client_name, created_at, last_used_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20);
+  if (error) {
+    if (!NO_TABLE.has(error.code)) console.error("Loading chatbot connections failed:", error.code);
+    return <p className="text-[15px]">{NO_TABLE.has(error.code) ? OAUTH_SETUP : "Could not load your connected chatbots. Try again in a minute."}</p>;
+  }
+  return <PluginConnections connections={data.map((row) => ({ id: String(row.id), name: String(row.client_name), createdAt: row.created_at, lastUsedAt: row.last_used_at }))} />;
 }
 
 async function AccountEmail() {

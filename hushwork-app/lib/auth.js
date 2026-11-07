@@ -24,3 +24,8 @@ export async function requireUser() {
   if (!user) redirect("/login");
   return user;
 }
+
+// Who is signed in, or null, without sending anyone away (the chatbot Allow page sends a signed-out visitor to /login with a way back).
+export async function currentUser() {
+  return getUser();
+}

@@ -7,5 +7,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/login"],
+  matcher: ["/app/:path*", "/login", "/oauth/:path*"], // /oauth: the chatbot Allow page needs a fresh sign-in pass too
 };

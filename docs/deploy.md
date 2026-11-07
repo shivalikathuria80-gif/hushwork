@@ -140,14 +140,15 @@ The Skills page lets a person turn on a Skill Bundle (a package of ready-made wo
 
 The whole pre-launch list is in `launch.md`.
 
-## 12f. The chatbot plugin (optional, two pastes)
+## 12f. The chatbot plugin (optional, three pastes)
 
-The Hushwork plugin (`plugins/hushwork/`) lets a person use Hushwork from Claude or another chatbot through `/api/mcp`, with a personal API token made on the Settings page.
+The Hushwork plugin (`plugins/hushwork/`) lets a person use Hushwork from Claude or another chatbot through `/api/mcp`. Claude connects with a Connect button (OAuth); other chatbots can use a personal API token made on the Settings page.
 
 1. Paste `supabase/api-tokens.sql` into Supabase (SQL Editor, New query, paste, Run).
 2. Paste `supabase/usage-tokens.sql` the same way (it needs `usage.sql` from section 12 first). It makes the AI and sending limits count for chatbot requests too.
-3. The endpoint uses the all-access key that the clock already uses (section 7). Nothing else to add on Vercel.
-4. Until step 1 is done, Settings says one setup step is missing and `/api/mcp` refuses every token.
+3. Paste `supabase/oauth.sql` the same way (it needs step 1 first). It turns on the Connect button. If `NEXT_PUBLIC_SITE_URL` is set on Vercel it must be the public address (`https://hushwork.in`), because the OAuth addresses are built from it.
+4. The endpoint uses the all-access key that the clock already uses (section 7). Nothing else to add on Vercel.
+5. Until step 1 is done, Settings says one setup step is missing and `/api/mcp` refuses every token. Until step 3 is done, Connect ends on an error page.
 
 How it works, the tools and the safety rules: [reference/plugin.md](reference/plugin.md).
 

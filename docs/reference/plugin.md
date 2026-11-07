@@ -7,13 +7,14 @@ Up: [Reference](README.md)
 ## The pieces
 
 - **The endpoint** `POST /api/mcp`: a small, stateless MCP server (Streamable HTTP, JSON answers, no sessions, no streams). GET and DELETE answer 405.
-- **API tokens**: made on Settings, under Chatbot plugin. A token is `hw_` plus 43 random characters (32 bytes), shown once. Only its SHA-256 hash is saved (`api_tokens`). Each person can keep up to 5, and removing one cuts it off at once.
-- **The plugin package** `plugins/hushwork/`: the manifest, `.mcp.json` (the endpoint address plus `Authorization: Bearer <token>` from the plugin's settings), four skills, and `hushwork.plugin` (the same folder zipped, for uploading to the Claude desktop app). The repository root has `.claude-plugin/marketplace.json`, so Claude Code can add the repository as a marketplace.
+- **OAuth sign-in** (the Connect button in Claude): the 401 from `/api/mcp` points at `/.well-known/oauth-protected-resource/api/mcp`, which names Hushwork as its own authorization server (`/.well-known/oauth-authorization-server`). A chatbot registers itself at `POST /api/oauth/register` (Dynamic Client Registration, no secret unless it asks for one), sends the person to `/oauth/authorize` (sign in if needed, then Allow or Cancel), and swaps the one-time code at `POST /api/oauth/token`. PKCE S256 is required. A code lasts 10 minutes and works once. An access token (`hwa_`) lasts an hour; a refresh token (`hwr_`) is swapped for a new pair on each use, and the old one stops working. Only SHA-256 hashes are saved (`oauth_codes`, `oauth_grants`). Settings lists connected chatbots, and Disconnect deletes the grant, which ends both tokens at once. A chatbot or return address that is not registered is shown as an error on the page and never redirected to.
+- **API tokens**, for chatbots without OAuth: made on Settings, under Chatbot plugin. A token is `hw_` plus 43 random characters (32 bytes), shown once. Only its SHA-256 hash is saved (`api_tokens`). Each person can keep up to 5, and removing one cuts it off at once.
+- **The plugin package** `plugins/hushwork/`: the manifest, `.mcp.json` (just the endpoint address: Claude signs in with OAuth), four skills, and `hushwork.plugin` (the same folder zipped, for uploading to the Claude desktop app). The repository root has `.claude-plugin/marketplace.json`, so Claude Code can add the repository as a marketplace.
 
 ## How a request is handled
 
 1. Any request with an `Origin` header that is not Hushwork's own gets 403, so a web page can't drive the endpoint.
-2. The Bearer token is read, hashed, and looked up with the all-access client. If it is unknown, the answer is 401.
+2. The Bearer token is read, hashed, and looked up with the all-access client: an `hwa_` token in `oauth_grants` (and only before it expires), an `hw_` token in `api_tokens`. If it is missing or unknown, the answer is 401 with `WWW-Authenticate: Bearer resource_metadata="..."`.
 3. In-memory limits stop runaway loops: 60 calls a minute and 2000 a day per person.
 4. Every tool runs as that one person, through `createTokenClient(userId)`. That is the all-access client, marked with the person's id, the same way scheduled runs work. Every query names the person. Rows the tools write say whose they are, and `take_usage_for` counts the AI and sending limits for that person.
 
@@ -48,6 +49,9 @@ Up: [Reference](README.md)
 - `hushwork-app/lib/run-core.js`: `approveStep`, `rejectStep`
 - `hushwork-app/lib/supabase/admin.js`: `createTokenClient`
 - `hushwork-app/lib/db-limits.js`: `take_usage_for` for token clients
-- `supabase/api-tokens.sql`, `supabase/usage-tokens.sql`
+- `hushwork-app/lib/plugin/oauth.js`: the OAuth logic (metadata, registration, authorize checks, codes, tokens, refresh); `oauth-server.js` gives it the all-access client; `http.js` the CORS answers
+- `hushwork-app/app/.well-known/*`, `hushwork-app/app/api/oauth/*`, `hushwork-app/app/oauth/authorize/page.js`, `hushwork-app/lib/actions/oauth.js` (Allow and Cancel), `hushwork-app/components/app/PluginConnections.js` (Disconnect)
+- `hushwork-app/lib/next-path.js`: after signing in, only the Allow page is a valid place to return to
+- `supabase/api-tokens.sql`, `supabase/usage-tokens.sql`, `supabase/oauth.sql`
 - `plugins/hushwork/`, `.claude-plugin/marketplace.json`
 - Tests: `hushwork-app/lib/plugin/plugin.test.js`, plus the scan tests in `lib/secrets.test.js` and `lib/sql-rls.test.js`
