@@ -7,6 +7,7 @@ import ChatbotSection from "@/components/ChatbotSection";
 import SignUpCta from "@/components/SignUpCta";
 import Footer from "@/components/Footer";
 import { ScrollProgress, TextReveal } from "@/components/ScrollFx";
+import PageScene from "@/components/PageScene";
 
 export default function Home() {
   return (
@@ -15,10 +16,12 @@ export default function Home() {
         Skip to content
       </a>
       <ScrollProgress />
+      {/* One three.js particle figure behind every section below the hero; it changes shape as you scroll. */}
+      <PageScene />
       <Nav />
       <main id="main">
         <Hero />
-        <section aria-label="What Hushwork does">
+        <section id="reveal" aria-label="What Hushwork does">
           <TextReveal text="Most of your week is small chores. Chasing invoices, summing up calendars, nudging leads. *Hushwork does them quietly, asks before anything leaves, and shows you every step." />
         </section>
         <HowItWorks />

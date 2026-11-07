@@ -96,7 +96,7 @@ const toolItem = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, trans
 
 export default function Features() {
   return (
-    <section id="features" className="border-y border-line bg-raised/50 py-24">
+    <section id="features" className="border-y border-line bg-raised/25 py-24">
       <div className="mx-auto max-w-6xl px-5">
         <Reveal><h2 className="max-w-2xl text-3xl font-semibold tracking-tight md:text-5xl">Workflows that ask first, <span className="text-mute">and show their work</span></h2></Reveal>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
