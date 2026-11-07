@@ -30,7 +30,7 @@ function BandCard({ index, offset }) {
   const opacity = useTransform(k, (v) => (Math.abs(v) >= 1 ? 0 : 1));
   const steps = WORKFLOWS[index % WORKFLOWS.length];
   return (
-    <motion.div style={{ x, rotateY, scale, opacity }} className="absolute left-1/2 top-1/2 -ml-[120px] -mt-[75px] h-[150px] w-[240px] rounded-2xl border border-line bg-surface p-4">
+    <motion.div style={{ x, rotateY, scale, opacity }} className="absolute left-1/2 top-1/2 -ml-[120px] -mt-[75px] h-[150px] w-[240px] rounded-2xl border border-line bg-surface/80 p-4 shadow-lg backdrop-blur-[2px]">
       <div className="relative flex h-full items-center justify-between">
         <span className="absolute left-7 right-7 top-[26px] border-t border-dashed border-field" />
         {steps.map(([icon, label]) => (

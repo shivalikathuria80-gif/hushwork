@@ -163,7 +163,7 @@ export default function HeroScene() {
       let last = performance.now();
       const tick = (now) => {
         frame = requestAnimationFrame(tick);
-        const dt = Math.min(0.05, (now - last) / 1000);
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
         last = now;
         uniforms.uTime.value += dt;
         uniforms.uPointer.value.lerp(target, 0.06);

@@ -3,6 +3,7 @@ import { Btn } from "./ui";
 import AgentBox from "./AgentBox";
 import WorkflowBand from "./WorkflowBand";
 import HeroScene from "./HeroScene";
+import StoryScene from "./StoryScene";
 
 // The headline arrives one word at a time. It is the first thing a visitor reads, so it gets the one rehearsed entrance.
 // The animation is CSS (see .hw-word in globals.css), so this component needs no JavaScript of its own.
@@ -48,7 +49,11 @@ export default function Hero() {
         </div>
         <div className="hw-rise" style={after(0.25)}><AgentBox /></div>
       </div>
-      <WorkflowBand />
+      {/* The story film plays in this stage; the rotating cards ride along its lower edge, in front of it. */}
+      <div className="relative">
+        <StoryScene className="bottom-[60px]" />
+        <div className="relative pt-[400px] md:pt-[380px]"><WorkflowBand /></div>
+      </div>
     </section>
   );
 }
