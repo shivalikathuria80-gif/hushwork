@@ -83,7 +83,7 @@ test("createAgent: a time in the sentence becomes a real schedule that starts wi
   const result = await createAgent({ prompt: "Every Monday at 9:30, sum up my Linear tasks and email them to me", user, supabase, groqKey: null, tzOffset: 330, log: quiet, run });
   assert.equal(result.ok, true);
   assert.match(result.scheduleText, /^Scheduled: Every week on Monday at 09:30/);
-  assert.match(result.scheduleText, /Agents page/, "points to the Agents page, not the Workflows page");
+  assert.match(result.scheduleText, /Agents page/, "points to the Agents page, not the home page");
   const [schedule] = supabase.tables.schedules;
   assert.equal(schedule.workflow_id, result.id);
   assert.equal(schedule.frequency, "weekly");

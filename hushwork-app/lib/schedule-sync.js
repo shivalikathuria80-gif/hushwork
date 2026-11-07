@@ -7,9 +7,9 @@ import { isScheduledStart, isWatchStart } from "./watch-rules.js";
 // saved in the Builder, so what is written there is what runs. It is careful:
 //   - it only reads the saved workflow, never the browser's copy of the plan,
 //   - it creates a schedule only when the words can be read (lib/schedule-text.js) and the workflow has a step that can really run,
-//   - a NEW schedule starts with "may write" OFF (only reading steps run by themselves) until the person ticks it on the Workflows page,
+//   - a NEW schedule starts with "may write" OFF (only reading steps run by themselves) until the person ticks it on the home page,
 //   - an existing schedule keeps its "may write" and "paused" choices, and only its time changes,
-//   - nothing is ever deleted (a workflow that stops saying "on a schedule" keeps whatever schedule it has; remove it on the Workflows page).
+//   - nothing is ever deleted (a workflow that stops saying "on a schedule" keeps whatever schedule it has; remove it on the home page).
 // Returns { text } : one sentence for the Builder to show (empty when the Start step has nothing to do with a schedule).
 export const MAX_SCHEDULES = 10;
 const NO_TABLE = new Set(["42P01", "PGRST205"]);
@@ -28,10 +28,10 @@ export async function syncStartSchedule({ supabase, userId, workflowId, plan, tz
   const { data: rows, error: loadError } = await supabase.from("schedules").select("workflow_id, frequency, hour, minute, weekday, tz_offset, allow_writes, enabled").eq("user_id", userId);
   if (loadError) {
     console.error("loading schedules failed:", loadError.code);
-    return { text: NO_TABLE.has(loadError.code) ? "Scheduling is not set up on this server yet, so nothing is scheduled." : "The workflow was saved, but its schedule could not be saved. Set it on the Workflows page." };
+    return { text: NO_TABLE.has(loadError.code) ? "Scheduling is not set up on this server yet, so nothing is scheduled." : "The workflow was saved, but its schedule could not be saved. Set it on the home page." };
   }
   const existing = rows.find((row) => row.workflow_id === workflowId);
-  if (!existing && rows.length >= MAX_SCHEDULES) return { text: `You already have ${MAX_SCHEDULES} schedules, so this one was not added. Remove one on the Workflows page.` };
+  if (!existing && rows.length >= MAX_SCHEDULES) return { text: `You already have ${MAX_SCHEDULES} schedules, so this one was not added. Remove one on the home page.` };
 
   const checked = checkSchedule({ ...when, tzOffset, allowWrites: existing?.allow_writes === true, enabled: existing ? existing.enabled !== false : true });
   if (checked.error) return { text: `The workflow was saved, but its schedule was not: ${checked.error}` };
@@ -48,9 +48,9 @@ export async function syncStartSchedule({ supabase, userId, workflowId, plan, tz
     : await supabase.from("schedules").insert({ ...(supabase.__hushworkAdmin === true ? { user_id: userId } : {}), workflow_id: workflowId, ...choices });
   if (error) {
     console.error("saving a schedule from the Start step failed:", error.code);
-    return { text: NO_TABLE.has(error.code) ? "Scheduling is not set up on this server yet, so nothing is scheduled." : "The workflow was saved, but its schedule could not be saved. Set it on the Workflows page." };
+    return { text: NO_TABLE.has(error.code) ? "Scheduling is not set up on this server yet, so nothing is scheduled." : "The workflow was saved, but its schedule could not be saved. Set it on the home page." };
   }
-  const tail = !s.enabled ? " It is paused: press Resume on the Workflows page." : s.allowWrites ? " It may write by itself." : " It only reads by itself: tick \"Let it write by itself\" on the Workflows page if it should send or create things.";
+  const tail = !s.enabled ? " It is paused: press Resume on the home page." : s.allowWrites ? " It may write by itself." : " It only reads by itself: tick \"Let it write by itself\" on the home page if it should send or create things.";
   const quiet = isWatchStart(start) ? " It stays quiet unless something is new, and never emails you at night." : "";
   return { text: `Scheduled: ${words}.${quiet}${tail}` };
 }

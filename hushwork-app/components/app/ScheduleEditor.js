@@ -10,7 +10,7 @@ import { FREQUENCIES, WEEKDAYS, describeSchedule } from "@/lib/schedule";
 import { niceTime } from "@/lib/connectors/time-format";
 import { scheduleLine } from "@/lib/ai-cost";
 
-// The Schedule panel under a workflow on the Workflows page: say WHEN it should run by itself (every hour, day, weekday or week, at a time
+// The Schedule panel under a workflow on the home page: say WHEN it should run by itself (every hour, day, weekday or week, at a time
 // of the person's own day) and whether a scheduled run may also WRITE (add a row, create a task). Writing is off unless this box is ticked,
 // because nobody is there to approve it. The clock that actually runs it is explained in docs/deploy.md; `clockReady` says whether the
 // two settings it needs are in place, so the panel can say so honestly instead of promising something that will not happen.

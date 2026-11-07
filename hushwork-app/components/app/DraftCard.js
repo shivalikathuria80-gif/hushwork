@@ -17,7 +17,7 @@ import { aiStepsPerRun, perRunLine } from "@/lib/ai-cost";
 
 // One saved draft: a name you can open, rename or delete. A draft is a saved plan. "Run" lists its steps and waits for approval on each one that acts on an app.
 // Opening it puts its request and steps back into the composer; it does not start anything.
-// On the Workflows page `openBase` is set (for example "/app/builder?draft="): the name is then a link that opens the
+// On the home page `openBase` is set (for example "/app/builder?draft="): the name is then a link that opens the
 // draft in the Builder instead.
 
 const when = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });

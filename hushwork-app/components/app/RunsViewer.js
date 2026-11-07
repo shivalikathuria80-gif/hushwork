@@ -105,7 +105,7 @@ function Notice({ icon, title, children }) {
       <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-subtle text-accent-text"><Icon name={icon} size={18} /></span>
       <p className="mt-3 font-semibold">{title}</p>
       <div className="mt-1 text-sm leading-relaxed text-mute">{children}</div>
-      <Btn href="/app/workflows" size="sm" variant="secondary" className="mt-4">Go to Workflows</Btn>
+      <Btn href="/app#drafts" size="sm" variant="secondary" className="mt-4">Go to your workflows</Btn>
     </div>
   );
 }
@@ -141,7 +141,7 @@ export default async function RunsViewer({ searchParams }) {
   if (runs.length === 0) {
     return (
       <Notice icon="History" title="Nothing has run yet.">
-        Open Workflows and press Run on one of your workflows. Steps that act on your apps wait for your approval, and each run and its results are kept here.
+        On the home page, press Run on one of your workflows. Steps that act on your apps wait for your approval, and each run and its results are kept here.
       </Notice>
     );
   }

@@ -12,7 +12,7 @@ Watch mode never acts alone. It does not send anything for you. Anything that wr
 
 There are two ways:
 
-1. Turn on the **Watch for me** bundle on the **Skills** page. It saves four ready-made workflows: Overdue invoice watch, Unhappy email watch, Client request watch and GitHub watch. See [Skills and bundles](/docs/skills-and-bundles).
+1. Turn on the **Watch for me** pack in **Packs** on the **Templates** page. It saves four ready-made workflows: Overdue invoice watch, Unhappy email watch, Client request watch and GitHub watch. See [Skills and bundles](/docs/skills-and-bundles).
 2. Or, in the Builder, set a Start step to **Keep watching: tell me only when something new shows up** and write the time in **When**, like `Every weekday at 9:00`. Press **Save**. It makes the same kind of real schedule as **On a schedule**. See [Schedules](/docs/schedules).
 
 ## How a check works
@@ -52,7 +52,7 @@ Without Gmail (send) connected, no email is sent. The run just waits on the Runs
 
 ## Try it
 
-1. Turn on **Watch for me** on the Skills page.
+1. Turn on **Watch for me** in Packs on the Templates page.
 2. Open **GitHub watch** in the Builder and press **Save**.
 3. Read the "Scheduled" message. Look at its schedule on **Workflows**.
 

@@ -86,7 +86,7 @@ export async function createAgent({ prompt, user, supabase, groqKey, memory = ""
 
   const offset = Number.isInteger(tzOffset) && Math.abs(tzOffset) <= 14 * 60 ? tzOffset : 0;
   const schedule = await syncStartSchedule({ supabase, userId: user.id, workflowId: id, plan: planned.steps, tzOffset: offset });
-  const scheduleText = schedule.text ? schedule.text.replace(/the Workflows page/g, "its card on the Agents page") : "";
+  const scheduleText = schedule.text ? schedule.text.replace(/the home page/g, "its card on the Agents page") : "";
 
   const started = await run({ id, auto: true, allowWrites: false }, { user, supabase });
   // `waiting`: how many steps write, so the screen can say they wait for the person's Approve on the Runs page.

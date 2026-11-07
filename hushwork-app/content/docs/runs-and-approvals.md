@@ -4,7 +4,7 @@ A run is one go at a workflow: pressing Run makes a practice run, and nothing re
 
 ## Practice run versus real
 
-When you press **Run** on the Workflows page, Hushwork makes a **practice run**. It lists every step and writes down what it would do. Nothing leaves Hushwork.
+When you press **Run** on the home page, Hushwork makes a **practice run**. It lists every step and writes down what it would do. Nothing leaves Hushwork.
 
 A step turns **real** when you press **Approve** on its card. The result is then saved right under the step as its own record.
 

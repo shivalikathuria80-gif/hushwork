@@ -6,7 +6,7 @@ A skill is one small thing Hushwork can do, and a bundle is a package of skills 
 
 A **skill** is one step with plain words about what it reads and what it writes. For example, "Email me the result" sends one email to you. A skill adds no new power: reading skills only read, and writing skills still wait for your Approve.
 
-A **bundle** groups skills, lists the apps it needs, and comes with ready-made workflows. Open the **Skills** page to see what every skill reads and writes, and which apps are connected.
+A **bundle** groups skills, lists the apps it needs, and comes with ready-made workflows. Open **Packs** at the bottom of the **Templates** page to see what every skill reads and writes, and which apps are connected.
 
 ## What "Turn on" does
 

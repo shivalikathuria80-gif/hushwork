@@ -73,13 +73,10 @@ export default function AppNav({ userBadge }) {
       <div id="app-menu" className={`${open ? "flex animate-[hw-fade_200ms_var(--ease)_both]" : "hidden"} hw-glass absolute inset-x-0 top-full max-h-[calc(100dvh-3.5rem)] flex-col gap-6 overflow-y-auto rounded-b-2xl border-t-0 p-3 shadow-lg sm:px-6 lg:static lg:flex lg:max-h-none lg:flex-1 lg:justify-between lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none lg:backdrop-blur-none`}>
         <nav aria-label="Workspace" className="flex flex-col gap-1">
           <Btn href="/app" icon="Plus" onClick={newWorkflow} className="mb-2 w-full">New workflow</Btn>
-          {/* Build: where workflows are made and kept. Run: what they do and where they could act. */}
-          <NavLink href="/app" icon="Sparkles" onNavigate={close} exact>Workspace</NavLink>
+          {/* Make: home (your workflows), agents, templates. Run: what they did and the apps they can use. The Builder opens from a workflow. */}
+          <NavLink href="/app" icon="Sparkles" onNavigate={close} exact>Home</NavLink>
           <NavLink href="/app/agents" icon="Bot" onNavigate={close}>Agents</NavLink>
-          <NavLink href="/app/workflows" icon="Folder" onNavigate={close}>Workflows</NavLink>
-          <NavLink href="/app/builder" icon="Workflow" onNavigate={close}>Builder</NavLink>
           <NavLink href="/app/templates" icon="ListTodo" onNavigate={close}>Templates</NavLink>
-          <NavLink href="/app/skills" icon="ListChecks" onNavigate={close}>Skills</NavLink>
           <div aria-hidden="true" className="my-2 border-t border-line" />
           <NavLink href="/app/runs" icon="History" onNavigate={close}>Runs</NavLink>
           <NavLink href="/app/connections" icon="Plug" onNavigate={close}>Connections</NavLink>
