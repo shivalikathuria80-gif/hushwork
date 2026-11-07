@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { safeNext } from "@/lib/next-path";
 
 // Same extra safety as lib/supabase/server.js: HttpOnly always, Secure only in production builds
 // (a Secure cookie would be refused over plain http://localhost in development).
@@ -43,8 +44,9 @@ export async function updateSession(request) {
   // Redirects must carry any refreshed cookie along, or the new pass would be lost.
   const redirectTo = (newPath) => {
     const target = request.nextUrl.clone();
-    target.pathname = newPath;
-    target.search = "";
+    const mark = newPath.indexOf("?");
+    target.pathname = mark < 0 ? newPath : newPath.slice(0, mark);
+    target.search = mark < 0 ? "" : newPath.slice(mark);
     const response = NextResponse.redirect(target);
     supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
     ["cache-control", "expires", "pragma"].forEach((header) => {
@@ -55,7 +57,7 @@ export async function updateSession(request) {
   };
 
   if (!signedIn && (path === "/app" || path.startsWith("/app/"))) return redirectTo("/login");
-  if (signedIn && path === "/login") return redirectTo("/app");
+  if (signedIn && path === "/login") return redirectTo(safeNext(request.nextUrl.searchParams.get("next")) || "/app"); // a chatbot's Allow page, or the app
 
   // Must return this exact response object, or the cookies written above are dropped.
   return supabaseResponse;

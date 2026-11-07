@@ -1,5 +1,6 @@
 import { createAdminClient, createTokenClient } from "@/lib/supabase/admin";
-import { bearerToken, findTokenOwner } from "@/lib/plugin/tokens";
+import { findTokenOwner, looksLikeToken } from "@/lib/plugin/tokens";
+import { findGrantOwner, looksLikeAccessToken, resourceMetadataUrl, siteOrigin } from "@/lib/plugin/oauth";
 import { handleBody } from "@/lib/plugin/mcp";
 import { makeLimiter } from "@/lib/ai/limits";
 import { getGroqKey } from "@/lib/ai/key";
@@ -9,15 +10,23 @@ import { takeDbSlot } from "@/lib/db-limits";
 import { createAgent } from "@/lib/agents/create";
 import { approveStep, rejectStep, startPracticeRun } from "@/lib/run-core";
 
-// The Hushwork plugin's MCP endpoint: a chatbot (Claude, or any app that speaks MCP) sends JSON-RPC here with the person's own API token
-// ("Authorization: Bearer hw_...", made on the Settings page). The token says WHO it is; nothing in the body can. From there every call goes
+// The Hushwork plugin's MCP endpoint: a chatbot (Claude, or any app that speaks MCP) sends JSON-RPC here with either an OAuth access token
+// ("Bearer hwa_...", from the Connect button and /oauth/authorize, lib/plugin/oauth.js) or the person's own API token ("Bearer hw_...", made on
+// the Settings page). The token says WHO it is; nothing in the body can. From there every call goes
 // through the same code, limits and write gates as the app's own buttons (lib/plugin/tools.js), using the all-access client for that one
 // person (the way scheduled runs work, lib/supabase/admin.js), so every query names the person.
 const json = (body, status, extra = {}) => new Response(body === null ? null : JSON.stringify(body), {
   status, headers: { ...(body === null ? {} : { "content-type": "application/json" }), "cache-control": "no-store", ...extra },
 });
-const CHALLENGE = { "www-authenticate": 'Bearer realm="hushwork", error="invalid_token", error_description="Make a token on the Hushwork Settings page"' };
-const unauthorized = () => json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Hushwork needs your API token. Make one on the Settings page, under Chatbot plugin." } }, 401, CHALLENGE);
+// The 401 points the chatbot at the OAuth details (RFC 9728), which is how Claude finds the Connect flow.
+const unauthorized = (request, sent) => json(
+  { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Sign in to Hushwork: connect from your chatbot, or use an API token from Settings > Chatbot plugin." } },
+  401,
+  { "www-authenticate": `Bearer realm="hushwork", resource_metadata="${resourceMetadataUrl(siteOrigin(request.url))}"${sent ? ', error="invalid_token"' : ""}` },
+);
+
+// "Authorization: Bearer <anything>": the raw token, or "".
+const bearer = (header) => /^Bearer\s+(\S+)\s*$/i.exec(String(header ?? ""))?.[1] ?? "";
 
 // A busy chat is a few calls a minute; these only stop a runaway loop. In memory, per server (the real limits on AI and on sending are
 // the app's own, counted in the database).
@@ -45,12 +54,12 @@ async function accountEmail(admin, userId) {
 
 export async function POST(request) {
   if (badOrigin(request)) return json({ error: "Not allowed from a web page." }, 403);
-  const token = bearerToken(request.headers.get("authorization"));
-  if (!token) return unauthorized();
+  const token = bearer(request.headers.get("authorization"));
+  if (!looksLikeAccessToken(token) && !looksLikeToken(token)) return unauthorized(request, Boolean(token));
   const lookup = createAdminClient();
   if (!lookup) return json({ jsonrpc: "2.0", id: null, error: { code: -32002, message: "This Hushwork server is not set up for the plugin yet (its all-access database key is missing, see docs/deploy.md)." } }, 503);
-  const owner = await findTokenOwner(lookup, token);
-  if (!owner) return unauthorized();
+  const owner = looksLikeAccessToken(token) ? await findGrantOwner(lookup, token) : await findTokenOwner(lookup, token);
+  if (!owner) return unauthorized(request, true);
 
   const now = Date.now();
   const limit = limits();

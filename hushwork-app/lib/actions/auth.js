@@ -7,6 +7,7 @@ import { checkEmail, checkPassword, EMAIL_RULE, PASSWORD_RULE } from "@/lib/vali
 import { allowAuthTry } from "@/lib/auth-limits";
 import { visitorAddress } from "@/lib/visitor";
 import { isLeakedPassword } from "@/lib/leaked-password";
+import { safeNext } from "@/lib/next-path";
 
 // A Server Action is a function that runs only on the server but can be called straight from a <form>.
 // Treat each one as a public door: anyone can send it anything, so it checks its input every time.
@@ -66,7 +67,7 @@ export async function signIn(formData) {
   }
   if (error) return explain(error);
 
-  redirect("/app"); // outside any try/catch on purpose: redirect works by throwing
+  redirect(safeNext(formData.get("next")) || "/app"); // outside any try/catch on purpose: redirect works by throwing. `next` is only ever the chatbot Allow page.
 }
 
 export async function signUp(formData) {
@@ -93,7 +94,7 @@ export async function signUp(formData) {
   if (error) return explain(error);
 
   // A session means the account is ready and we are signed in (this is the case when "Confirm email" is off).
-  if (data.session) redirect("/app");
+  if (data.session) redirect(safeNext(formData.get("next")) || "/app");
 
   // No session and no identities: Supabase hides "this address already has an account" like this.
   if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {

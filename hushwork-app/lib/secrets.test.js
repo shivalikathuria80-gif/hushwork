@@ -403,9 +403,16 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   assert.match(env, /^import "server-only";/m);
   assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example" && name !== "scripts/clock.mjs"), ["lib/schedule-env.js"], "only schedule-env.js reads them (the clock script on your own computer sends the password, it is not server code)");
   const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(adminImporters.sort(), ["app/api/mcp/route.js", "lib/actions/account.js", "lib/schedule-tick.js"], "the all-access client has exactly three users: the clock's handler, Delete my account, and the plugin endpoint (for the token's owner only)");
+  assert.deepEqual(adminImporters.sort(), ["app/api/mcp/route.js", "lib/actions/account.js", "lib/plugin/oauth-server.js", "lib/schedule-tick.js"], "the all-access client has exactly four users: the clock's handler, Delete my account, the plugin endpoint (for the token's owner only), and the chatbot sign-in (OAuth clients and codes are nobody's own rows)");
   const mcp = files.find((file) => file.name === "app/api/mcp/route.js").text;
-  assert.ok(mcp.indexOf("bearerToken(") > 0 && mcp.indexOf("findTokenOwner(") > mcp.indexOf("bearerToken(") && mcp.indexOf("findTokenOwner(") < mcp.indexOf("createTokenClient(owner.userId)") && mcp.indexOf("createTokenClient(owner.userId)") < mcp.indexOf("handleBody("), "the plugin endpoint finds the token's owner before anything runs, and acts only as that person");
+  assert.ok(mcp.indexOf("bearer(request") > 0 && mcp.indexOf("findGrantOwner(") > mcp.indexOf("bearer(request") && mcp.indexOf("findTokenOwner(") > mcp.indexOf("bearer(request") && mcp.indexOf("findTokenOwner(") < mcp.indexOf("createTokenClient(owner.userId)") && mcp.indexOf("createTokenClient(owner.userId)") < mcp.indexOf("handleBody("), "the plugin endpoint finds the token's owner before anything runs, and acts only as that person");
+  assert.ok(mcp.includes("resource_metadata="), "the 401 points a chatbot at the OAuth sign-in");
+  const consent = files.find((file) => file.name === "lib/actions/oauth.js").text;
+  assert.ok(/^"use server"/.test(consent) && consent.indexOf("requireUser()") > 0 && consent.indexOf("userId: user.id") > consent.indexOf("requireUser()") && consent.indexOf("checkAuthorizeRequest(") < consent.indexOf("makeCode("), "a code is only ever made for the signed-in person, after the chatbot's request is checked again");
+  assert.ok(consent.indexOf('if (checked.fatal)') < consent.indexOf("backToClient("), "an unknown chatbot or return address never redirects anywhere outside Hushwork");
+  const oauth = files.find((file) => file.name === "lib/plugin/oauth.js").text;
+  assert.ok(oauth.includes('code_challenge_methods_supported: ["S256"]') && oauth.includes("pkceMatches(form.code_verifier, row.code_challenge)"), "PKCE S256 is required");
+  assert.ok(oauth.includes('.delete().eq("code_hash"') && oauth.includes('.eq("refresh_hash", oldHash)'), "a code works once and a refresh token is swapped only while it is current");
   assert.ok(!/userId:\s*body|body\??\.user/.test(mcp), "the request body never says who it is");
   const tools = files.find((file) => file.name === "lib/plugin/tools.js").text;
   assert.ok(tools.includes("allowWrites: false") && !/allowWrites:\s*true/.test(tools), "a chatbot's run never writes by itself");

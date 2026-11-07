@@ -25,6 +25,8 @@ const subscribeToNothing = () => () => {};
 export default function LoginForm() {
   // /login#create (the "Sign up free" buttons on the home page) opens on Create account. The page is static, so the address is read in the browser.
   const wantsCreate = useSyncExternalStore(subscribeToNothing, () => window.location.hash === "#create", () => false);
+  // /login?next=/oauth/authorize?... (a chatbot asking to connect): after signing in, go back there. The server checks it again (lib/next-path.js).
+  const next = useSyncExternalStore(subscribeToNothing, () => new URLSearchParams(window.location.search).get("next") ?? "", () => "");
   const [chosen, setMode] = useState(null); // what the person picked with the switch, once they touch it
   const mode = chosen ?? (wantsCreate ? "create" : "signin");
   const [email, setEmail] = useState("");
@@ -105,6 +107,7 @@ export default function LoginForm() {
 
           <form action={formAction} onSubmit={() => setShowPassword(false)} noValidate className="mt-6 space-y-4">
             <input type="hidden" name="mode" value={mode} />
+            {next && <input type="hidden" name="next" value={next} />}
 
             <div>
               <label htmlFor="email" className="mb-2 block text-sm font-medium">Email address</label>

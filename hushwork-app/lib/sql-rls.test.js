@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "supabase");
 // The tables that belong to one person each. (waitlist is public-insert-only and usage_counters is reached through a function: both are checked elsewhere.)
-const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens" };
+const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens", "oauth.sql": "oauth_grants" };
 const read = (file) => fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n");
 const noComments = (sql) => sql.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n");
 
@@ -48,14 +48,14 @@ for (const [file, table] of Object.entries(PER_PERSON)) {
   });
 }
 
-test("RLS: every table made in supabase/ is either checked above or is one of the three known exceptions", () => {
+test("RLS: every table made in supabase/ is either checked above or is one of the known exceptions", () => {
   const found = [];
   for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".sql"))) {
     for (const match of noComments(read(file)).matchAll(/create table (?:if not exists )?public\.(\w+)/g)) found.push([file, match[1]]);
   }
   for (const [file, table] of found) {
     if (PER_PERSON[file] === table) continue;
-    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
+    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
     assert.match(noComments(read(file)), new RegExp(`alter table public\\.${table} enable row level security`), `${table}: row level security is on`);
   }
   assert.ok(found.length >= 8);
@@ -97,4 +97,18 @@ test("API tokens: only a hash is kept, the person never reads it back, and the t
   assert.match(usage, /revoke execute on function public\.take_usage_for\(uuid, text, integer, integer\) from public, anon, authenticated;/);
   assert.match(usage, /grant execute on function public\.take_usage_for\(uuid, text, integer, integer\) to service_role;/);
   assert.match(usage, /security definer\s+set search_path = ''/);
+});
+
+test("OAuth: chatbot clients and one-time codes are for the server only, grants are per person, and only hashes are kept", () => {
+  const sql = noComments(read("oauth.sql"));
+  for (const table of ["oauth_clients", "oauth_codes"]) {
+    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security;`));
+    assert.match(sql, new RegExp(`revoke all on public\\.${table} from anon;`));
+    assert.match(sql, new RegExp(`revoke all on public\\.${table} from authenticated;`));
+    assert.ok(!new RegExp(`^grant [^;]*public\\.${table}\\b`, "m").test(sql), `${table}: never granted to anyone`);
+    assert.ok(!new RegExp(`create policy[^;]*on public\\.${table}`).test(sql), `${table}: no policy, so nobody but the server`);
+  }
+  assert.deepEqual(sql.match(/^grant .*;$/gm), ["grant select on public.oauth_grants to authenticated;", "grant delete on public.oauth_grants to authenticated;"], "a person can only read and remove their own connections");
+  for (const column of ["code_hash", "access_hash", "refresh_hash"]) assert.match(sql, new RegExp(`${column} ~ '\\^\\[0-9a-f\\]\\{64\\}\\$'`), `${column} is a sha-256 hash`);
+  assert.match(sql, /code_challenge text not null/, "every code has a PKCE challenge");
 });

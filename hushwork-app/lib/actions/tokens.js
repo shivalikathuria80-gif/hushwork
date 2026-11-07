@@ -45,3 +45,19 @@ export async function deleteApiToken(input) {
   revalidatePath("/app/settings");
   return { ok: true };
 }
+
+// A chatbot connected with the Connect button (OAuth, lib/plugin/oauth.js): removing the grant ends its access and refresh tokens at once.
+export async function disconnectChatbot(input) {
+  const user = await requireUser();
+  const id = checkId(input?.id);
+  if (id.error) return { error: "That connection no longer exists." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("oauth_grants").delete().eq("id", id.value).eq("user_id", user.id).select("id");
+  if (error) {
+    console.error("removing a chatbot connection failed:", error.code);
+    return { error: "Could not disconnect it. Try again." };
+  }
+  if (!data?.length) return { error: "That connection no longer exists." };
+  revalidatePath("/app/settings");
+  return { ok: true };
+}
