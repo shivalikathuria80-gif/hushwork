@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "motion/react";
 import { Btn, EASE, Reveal, StepRow, Switch, rowVariants } from "./ui";
 import { Icon } from "./icons";
+import { Spotlight } from "./ScrollFx";
 
 // Sample data below is illustrative. The samples are real components so visitors can try them.
 const SAMPLE_LOG = [["Zap", "Trigger", "Invoice 14 days overdue", "0.1s"], ["CreditCard", "Check Stripe", "No payment found", "0.8s"], ["PenLine", "Draft reminder", "Polite, firm, your tone", "2.1s"]];
@@ -78,13 +79,15 @@ export function PauseSample({
 
 function FeatureCard({ icon, title, body, children, className = "" }) {
   return (
-    <article className={`flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm ${className}`}>
+    <Spotlight className="h-full rounded-2xl">
+    <article className={`flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm ${className}`}>
       <div className="flex-1 bg-raised/60 p-4 sm:p-5">{children}</div>
       <div className="border-t border-line p-6">
         <h3 className="flex items-center gap-2 text-base font-semibold"><Icon name={icon} className="text-accent-text" />{title}</h3>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-mute">{body}</p>
       </div>
     </article>
+    </Spotlight>
   );
 }
 
@@ -97,14 +100,14 @@ export default function Features() {
       <div className="mx-auto max-w-6xl px-5">
         <Reveal><h2 className="max-w-2xl text-3xl font-semibold tracking-tight md:text-5xl">Workflows that ask first, <span className="text-mute">and show their work</span></h2></Reveal>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
-          <Reveal className="[&>article]:h-full">
+          <Reveal>
             <FeatureCard icon="MessageSquareText" title="Plain-English builder" body="Say what should happen. Hushwork turns it into a workflow you can read, edit and approve. No nodes to wire up, no code to write.">
               <p className="mb-1 px-2 text-sm text-mute">Sample request</p>
               <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm">“Every Friday at 4pm, email each client a summary of what we shipped.”</p>
               <ol className="mt-2 space-y-1">{SAMPLE_PLAN.map(([ic, a, b]) => <StepRow key={a} icon={ic} title={a} sub={b} />)}</ol>
             </FeatureCard>
           </Reveal>
-          <Reveal className="md:col-span-2 [&>article]:h-full" delay={0.08}>
+          <Reveal className="md:col-span-2" delay={0.08}>
             <FeatureCard icon="ShieldCheck" title="Runs you can trust" body="Every run keeps a step-by-step log. Ask for approval before anything is sent, and pause any workflow in one click.">
               <div className="grid gap-4 md:grid-cols-2">
                 <RunLogSample />

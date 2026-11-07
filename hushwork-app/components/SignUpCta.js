@@ -1,10 +1,12 @@
 import { Btn, Reveal } from "@/components/ui";
+import { TiltIn } from "@/components/ScrollFx";
 
 // The last band of the home page: Hushwork is open, so it asks people to make an account (it used to be the waitlist form).
 // The id stays "wait" so older links to hushwork.in/#wait still land here.
 export default function SignUpCta() {
   return (
     <section id="wait" className="px-5 pb-12 md:px-12">
+      <TiltIn tilt={10}>
       <Reveal>
         <div className="on-accent mx-auto max-w-6xl rounded-3xl bg-accent px-6 py-16 text-center text-on-accent md:py-20">
           <h2 className="text-[length:clamp(2rem,5vw,2.75rem)] font-semibold tracking-tight">Get your week back.</h2>
@@ -15,6 +17,7 @@ export default function SignUpCta() {
           </div>
         </div>
       </Reveal>
+      </TiltIn>
     </section>
   );
 }

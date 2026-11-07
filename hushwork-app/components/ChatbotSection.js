@@ -1,6 +1,7 @@
 import { Reveal } from "./ui";
 import { Icon } from "./icons";
 import ChatbotPlugin from "./ChatbotPlugin";
+import { TiltIn } from "./ScrollFx";
 
 const POINTS = [
   ["Bot", "Make an agent by asking", "“Every Monday, sum up my calendar” becomes a scheduled Hushwork agent."],
@@ -26,7 +27,7 @@ export default function ChatbotSection() {
             ))}
           </ul>
         </Reveal>
-        <Reveal delay={0.08}><ChatbotPlugin place="landing" /></Reveal>
+        <Reveal delay={0.08}><TiltIn><ChatbotPlugin place="landing" /></TiltIn></Reveal>
       </div>
     </section>
   );
