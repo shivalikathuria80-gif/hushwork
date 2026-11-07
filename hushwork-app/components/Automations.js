@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { Icon } from "./icons";
 import { EASE } from "./ui";
@@ -64,6 +65,7 @@ export default function Automations() {
           </AnimatePresence>
         </div>
       </div>
+      <Link href="/agents" className="mt-6 inline-flex min-h-11 items-center gap-2 font-medium text-accent-text hover:underline">See every ready-made agent<Icon name="ArrowRight" size={16} /></Link>
     </section>
   );
 }

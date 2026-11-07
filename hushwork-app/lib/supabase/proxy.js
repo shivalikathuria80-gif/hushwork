@@ -56,7 +56,11 @@ export async function updateSession(request) {
     return response;
   };
 
-  if (!signedIn && (path === "/app" || path.startsWith("/app/"))) return redirectTo("/login");
+  if (!signedIn && (path === "/app" || path.startsWith("/app/"))) {
+    // A link to a ready-made agent or a shared agent (from the public /agents pages) comes back to the same place after signing in.
+    const back = safeNext(path + request.nextUrl.search);
+    return redirectTo(back ? `/login?next=${encodeURIComponent(back)}` : "/login");
+  }
   if (signedIn && path === "/login") return redirectTo(safeNext(request.nextUrl.searchParams.get("next")) || "/app"); // a chatbot's Allow page, or the app
 
   // Must return this exact response object, or the cookies written above are dropped.

@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { unstable_rethrow, useRouter } from "next/navigation";
 import { Btn } from "../ui";
 import { Icon } from "../icons";
 import { createAgent } from "@/lib/actions/agents";
 import { LIMITS } from "@/lib/validate";
+import { cleanShared } from "@/lib/shared-agent";
 
 // The box at the top of the Agents page: describe a task in plain English, press Create agent. The server plans it, saves it as an agent,
 // schedules it if the sentence says when, and runs it once (lib/agents/create.js). The person then lands on that run on the Runs page, where
@@ -18,11 +19,15 @@ const EXAMPLES = [
   { text: "Look at my open Linear tasks and tell me which one to do first", needs: "Linear" },
 ];
 const FAILED = "Could not create your agent. Check your connection and try again.";
+const subscribeToNothing = () => () => {};
 
 export default function AgentMaker() {
   const router = useRouter();
   const boxRef = useRef(null);
-  const [text, setText] = useState("");
+  // /app/agents?try=<sentence>: a shared agent (from /agents/try) starts in the box, to read and change. Nothing is made until Create agent.
+  const shared = useSyncExternalStore(subscribeToNothing, () => cleanShared(new URLSearchParams(window.location.search).get("try")), () => "");
+  const [typed, setText] = useState(null); // null until the person types: the shared sentence shows until then
+  const text = typed ?? shared;
   const [error, setError] = useState("");
   const [done, setDone] = useState(null); // { name, lines: [...] } when the agent was saved but its run could not open
   const [pending, startTransition] = useTransition();
