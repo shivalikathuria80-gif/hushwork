@@ -4,7 +4,7 @@ import { useRef } from "react";
 import Image from "next/image";
 import { motion, useMotionValue, useScroll, useTransform } from "motion/react";
 import { Icon } from "./icons";
-import { useCoverBox } from "./photoScenes";
+import { useCoverBox, useFilmClock } from "./photoScenes";
 import { FilmReel, FilmTitle } from "./FilmBits";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -26,6 +26,7 @@ const DONE = [
   ["Report posted to Slack", "right-[6%] top-[42%]"],
 ];
 const REEL = [["9:04", "Without Hushwork"], ["9:05", "With Hushwork"]];
+const swapDesk = (v) => ({ to: v < 0.5 ? 0.86 : 0.12 });
 
 export default function BeforeAfter() {
   const track = useRef(null);
@@ -34,7 +35,9 @@ export default function BeforeAfter() {
   const box = useCoverBox(stage, SIZE[0], SIZE[1]);
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
   const half = useMotionValue(0.5);
-  const p = reduce ? half : scrollYProgress;
+  // Scroll wipes between the desks, and so does time: left alone, it swaps to the other desk every few seconds.
+  const clock = useFilmClock(scrollYProgress, swapDesk, 4800);
+  const p = reduce ? half : clock;
 
   const edge = useTransform(p, [0.2, 0.75], [100, 0], { clamp: true }); // where the tidy photo starts, % from the left
   const clip = useTransform(edge, (v) => `inset(0 0 0 ${v}%)`);
@@ -106,7 +109,7 @@ export default function BeforeAfter() {
             </div>
             <p className="mt-5 max-w-md text-lg font-extralight leading-relaxed text-white/85">Same desk, same Monday. On the right, the morning after Hushwork ran first.</p>
           </div>
-          {!reduce && <FilmReel items={REEL} progress={scrollYProgress} active={-1} />}
+          {!reduce && <FilmReel items={REEL} progress={clock} active={-1} />}
         </div>
       </div>
     </section>

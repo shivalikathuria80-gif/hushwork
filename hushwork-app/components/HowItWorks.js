@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from "motion/react";
 import { Icon } from "./icons";
-import { useCoverBox, usePhases, useTyped } from "./photoScenes";
+import { useCoverBox, useFilmClock, usePhases, useTyped } from "./photoScenes";
 import { FilmReel, FilmTitle } from "./FilmBits";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -110,6 +110,11 @@ const STEPS = [
 ];
 const SIZE = [928, 1152];
 const N = STEPS.length;
+// The middle of the shot after the one showing; after the last, a straight cut back to the first.
+const nextShot = (v) => {
+  const i = Math.min(N - 1, Math.floor(v * N)) + 1;
+  return i >= N ? { to: 0.5 / N, cut: true } : { to: (i + 0.5) / N };
+};
 
 // One full-screen photo with its words and live parts. `p` is the scene's scroll progress (a motion value), or null when still.
 function Bay({ step, index, p, active, still }) {
@@ -150,8 +155,10 @@ export default function HowItWorks() {
   const track = useRef(null);
   const reduce = usePrefersReducedMotion();
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
+  // Scroll moves the film, and so does time: left alone, it goes to the next shot every few seconds, then loops back to the first.
+  const pos = useFilmClock(scrollYProgress, nextShot);
   const [active, setActive] = useState(0);
-  useMotionValueEvent(scrollYProgress, "change", (v) => setActive(Math.min(N - 1, Math.max(0, Math.floor(v * N)))));
+  useMotionValueEvent(pos, "change", (v) => setActive(Math.min(N - 1, Math.max(0, Math.floor(v * N)))));
   const reel = STEPS.map((s) => [s.num, s.label]);
 
   return (
@@ -164,8 +171,8 @@ export default function HowItWorks() {
       ) : (
         <div ref={track} className="relative h-[400vh]">
           <div className="sticky top-0 h-dvh overflow-hidden">
-            {STEPS.map((s, i) => <Bay key={s.num} step={s} index={i} p={scrollYProgress} active={i === active} />)}
-            <FilmReel items={reel} progress={scrollYProgress} active={active} />
+            {STEPS.map((s, i) => <Bay key={s.num} step={s} index={i} p={pos} active={i === active} />)}
+            <FilmReel items={reel} progress={pos} active={active} />
           </div>
         </div>
       )}

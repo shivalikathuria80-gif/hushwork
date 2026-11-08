@@ -2,8 +2,8 @@
 
 // Hooks for the live scenes drawn over the landing page photos (HowItWorks.js, BeforeAfter.js).
 
-import { useEffect, useState } from "react";
-import { useInView } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { animate, useInView, useMotionValue } from "motion/react";
 import { useMotionPause } from "./MotionProvider";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
@@ -58,3 +58,46 @@ export function useCoverBox(ref, width, height) {
   return box;
 }
 
+
+// The clock that plays a pinned photo scene. The scroll still drives it, but when the visitor stops scrolling while the scene is
+// pinned, it moves on by itself every `every` ms (to wherever `next(pos)` says; `cut: true` jumps instead of gliding, used to loop
+// from the last shot back to the first). Scrolling again takes over at once. Paused or with reduce motion, only the scroll moves it.
+export function useFilmClock(progress, next, every = 5200) {
+  const reduce = usePrefersReducedMotion();
+  const { paused } = useMotionPause();
+  const pos = useMotionValue(0);
+  const nextRef = useRef(next);
+  useEffect(() => { nextRef.current = next; }, [next]);
+  useEffect(() => {
+    let ctl = null;
+    let timer = 0;
+    let auto = false; // true while pos is ahead of the scroll because the clock moved it
+    const stop = () => { if (ctl) ctl.stop(); ctl = null; };
+    const done = () => { ctl = null; };
+    const arm = () => {
+      clearTimeout(timer);
+      if (reduce || paused) return;
+      timer = setTimeout(function tick() {
+        const v = progress.get();
+        if (v > 0.002 && v < 0.998 && document.visibilityState === "visible") {
+          const { to, cut } = nextRef.current(pos.get());
+          stop();
+          auto = true;
+          if (cut) pos.set(to);
+          else ctl = animate(pos, to, { duration: 1.8, ease: [0.65, 0, 0.35, 1], onComplete: done });
+        }
+        timer = setTimeout(tick, every);
+      }, every);
+    };
+    pos.set(progress.get());
+    const off = progress.on("change", (v) => {
+      if (auto) { auto = false; stop(); ctl = animate(pos, v, { duration: 0.6, ease: [0.22, 1, 0.36, 1], onComplete: done }); }
+      else if (!ctl) pos.set(v);
+      else { stop(); ctl = animate(pos, v, { duration: 0.3, ease: "easeOut", onComplete: done }); }
+      arm();
+    });
+    arm();
+    return () => { off(); stop(); clearTimeout(timer); };
+  }, [progress, pos, reduce, paused, every]);
+  return pos;
+}
