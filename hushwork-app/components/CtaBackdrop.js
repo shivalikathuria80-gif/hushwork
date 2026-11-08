@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef } from "react";
-import Image from "next/image";
+import FilmVideo from "./FilmVideo";
 import { motion, useScroll, useTransform } from "motion/react";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// The tidy desk from "Same desk. Different Monday." behind the sign-up band, pulled back slowly as you scroll (a slow camera move),
+// The tidy desk (its Google Flow clip, playing on a loop) from "Same desk. Different Monday." behind the sign-up band, pulled back slowly as you scroll (a slow camera move),
 // under a violet wash so the white text stays readable. Still with reduce motion on.
 export default function CtaBackdrop() {
   const ref = useRef(null);
@@ -16,7 +16,7 @@ export default function CtaBackdrop() {
   return (
     <div ref={ref} aria-hidden="true" className="absolute inset-0 -z-10 overflow-hidden rounded-[inherit]">
       <motion.div className="absolute inset-0" style={{ scale: reduce ? 1 : scale, x: reduce ? 0 : x }}>
-        <Image src="/landing/after.jpg" alt="" fill sizes="(min-width: 1152px) 1152px, 100vw" className="object-cover" />
+        <FilmVideo name="after" />
       </motion.div>
       <div className="absolute inset-0 bg-[linear-gradient(115deg,color-mix(in_oklab,var(--accent)_92%,black)_0%,color-mix(in_oklab,var(--accent)_70%,transparent)_55%,color-mix(in_oklab,var(--accent)_35%,transparent)_100%)]" />
     </div>

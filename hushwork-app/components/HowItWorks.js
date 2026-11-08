@@ -1,14 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
 import { AnimatePresence, motion, useMotionValue, useMotionValueEvent, useScroll, useTransform } from "motion/react";
 import { Icon } from "./icons";
 import { useCoverBox, useFilmClock, usePhases, useTyped } from "./photoScenes";
 import { FilmReel, FilmTitle } from "./FilmBits";
+import FilmVideo from "./FilmVideo";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// "How it works" as a short film: the three photos (made with Nano Banana) fill the screen one after another while the section
+// "How it works" as a short film: the three photos (made with Nano Banana, brought to life with Google Flow, see FilmVideo.js) fill the screen one after another while the section
 // stays pinned, and the scroll moves the camera (a slow push in) and dissolves from one photo to the next. Huge thin type sits
 // over each photo, and small live scenes play on top of it: the request types itself, the phone gets tapped, the laptop glows.
 // With reduce motion on there is no pin: the three photos simply stack, each one still.
@@ -104,11 +104,11 @@ function RestFree({ phase }) {
 }
 
 const STEPS = [
-  { num: "01", label: "Describe", title: "Describe *it.*", body: "Write the chore the way you would tell a colleague. No nodes, no code.", src: "/landing/describe.jpg", alt: "Hands typing on a laptop at dusk", times: [900, 3400, 1300, 2800], Free: DescribeFree, pos: "50% 60%" },
-  { num: "02", label: "Approve", title: "Approve *the plan.*", body: "Hushwork shows each step and the tools it will touch. Nothing is sent until you tap approve.", src: "/landing/approve.jpg", alt: "A phone held in a cafe, showing an approval card", times: [1600, 450, 550, 2600], Glued: ApproveGlued, pos: "50% 50%" },
-  { num: "03", label: "Let it run", title: "Let it *run.*", body: "It runs on schedule, flags anything unusual and keeps a log of every action. Even at night.", src: "/landing/rest.jpg", alt: "A quiet home office at night, the laptop still glowing", times: [1700, 3400, 900], Glued: RestGlued, Free: RestFree, pos: "50% 50%" },
+  { num: "01", label: "Describe", title: "Describe *it.*", body: "Write the chore the way you would tell a colleague. No nodes, no code.", film: "describe", alt: "Hands typing on a laptop at dusk", times: [900, 3400, 1300, 2800], Free: DescribeFree, pos: "50% 60%" },
+  { num: "02", label: "Approve", title: "Approve *the plan.*", body: "Hushwork shows each step and the tools it will touch. Nothing is sent until you tap approve.", film: "approve", alt: "A phone held in a cafe, showing an approval card", times: [1600, 450, 550, 2600], Glued: ApproveGlued, pos: "50% 50%" },
+  { num: "03", label: "Let it run", title: "Let it *run.*", body: "It runs on schedule, flags anything unusual and keeps a log of every action. Even at night.", film: "rest", alt: "A quiet home office at night, the laptop still glowing", times: [1700, 3400, 900], Glued: RestGlued, Free: RestFree, pos: "50% 50%" },
 ];
-const SIZE = [928, 1152];
+const SIZE = [928, 1152]; // the photos, and their clips, which keep the same shape
 const N = STEPS.length;
 // The middle of the shot after the one showing; after the last, a straight cut back to the first.
 const nextShot = (v) => {
@@ -128,12 +128,17 @@ function Bay({ step, index, p, active, still }) {
   const opacity = useTransform(src, index === 0 ? [b - fade, b + fade] : index === N - 1 ? [a - fade, a + fade] : [a - fade, a + fade, b - fade, b + fade], index === 0 ? [1, 0] : index === N - 1 ? [0, 1] : [0, 1, 1, 0]);
   const scale = useTransform(src, [a - fade, b + fade], [1.18, 1.02]);
   const textY = useTransform(src, [a - fade, a + fade, b - fade, b + fade], [80, 0, 0, -60]);
+  // The cut to this shot opens like a shutter: a band across the middle that grows to the full screen while it fades in.
+  const shutter = useTransform(src, [a - fade, a + fade], [index === 0 ? 0 : 38, 0], { clamp: true });
+  const clipPath = useTransform(shutter, (k) => `inset(${k}% 0 ${k}% 0)`);
+  const [shown, setShown] = useState(false); // on screen during a cross, so the outgoing and incoming clips both move
+  useMotionValueEvent(src, "change", (v) => setShown(v > a - fade && v < b + fade));
   const textO = useTransform(src, [a, a + fade, b - fade, b], [index === 0 ? 1 : 0, 1, 1, index === N - 1 ? 1 : 0]);
   const { Glued, Free } = step;
   return (
-    <motion.div ref={ref} className={still ? "relative h-dvh min-h-[560px] overflow-hidden" : "absolute inset-0"} style={still ? undefined : { opacity, zIndex: index }}>
+    <motion.div ref={ref} className={still ? "relative h-dvh min-h-[560px] overflow-hidden" : "absolute inset-0"} style={still ? undefined : { opacity, clipPath, zIndex: index }}>
       <motion.div className="absolute inset-0" style={{ scale: still ? 1.02 : scale }}>
-        <Image src={step.src} alt={step.alt} fill sizes="100vw" className="object-cover" style={{ objectPosition: step.pos }} priority={index === 0} />
+        <FilmVideo name={step.film} alt={step.alt} progress={p} seconds={8 * N} live={still || active || shown} position={step.pos} />
         {Glued && box && (
           <div className="absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}><Glued phase={phase} /></div>
         )}

@@ -1,19 +1,19 @@
 "use client";
 
 import { useRef } from "react";
-import Image from "next/image";
 import { motion, useMotionValue, useScroll, useTransform } from "motion/react";
 import { Icon } from "./icons";
 import { useCoverBox, useFilmClock } from "./photoScenes";
 import { FilmReel, FilmTitle } from "./FilmBits";
+import FilmVideo from "./FilmVideo";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// "Same desk. Different Monday." as a full-screen scene: the messy desk fills the screen while the section stays pinned, and the
+// "Same desk. Different Monday." as a full-screen scene: the messy desk (a Google Flow clip of the photo, see FilmVideo.js) fills the screen while the section stays pinned, and the
 // scroll wipes the tidy desk in from the right behind a white hairline, like a film transition. The nagging notes sit on the mess,
 // the done notes on the tidy desk (glued to the photo, so they stay on the same spot at any screen shape). The camera pushes in slowly.
 // With reduce motion on there is no pin: the photo sits half and half, still.
 
-const SIZE = [1264, 848];
+const SIZE = [1264, 848]; // the photo, and its clip, which keeps the same shape
 const MESS = [
   ["43 unread emails", "left-[6%] top-[16%]", -4],
   ["Invoice #1042 overdue", "left-[46%] top-[22%]", 3],
@@ -57,7 +57,7 @@ export default function BeforeAfter() {
         <div ref={stage} className={`${reduce ? "relative h-dvh min-h-[560px]" : "sticky top-0 h-dvh"} overflow-hidden`}>
           {/* The messy desk. */}
           <motion.div className="absolute inset-0" style={{ scale: reduce ? 1.02 : push }}>
-            <Image src="/landing/before.jpg" alt="A cluttered desk covered in sticky notes, in cold light" fill sizes="100vw" className="object-cover" />
+            <FilmVideo name="before" alt="A cluttered desk covered in sticky notes, in cold light" progress={p} seconds={12} priority />
             {glued(
               <motion.ul aria-hidden="true" style={{ opacity: messO }} className="absolute inset-0 hidden sm:block">
                 {MESS.map(([label, at, turn], i) => (
@@ -80,7 +80,7 @@ export default function BeforeAfter() {
           {/* The tidy desk, wiped in from the right. */}
           <motion.div className="absolute inset-0" style={{ clipPath: clip }}>
             <motion.div className="absolute inset-0" style={{ scale: reduce ? 1.02 : push }}>
-              <Image src="/landing/after.jpg" alt="The same desk, tidy, in warm morning light" fill sizes="100vw" className="object-cover" />
+              <FilmVideo name="after" alt="The same desk, tidy, in warm morning light" progress={p} seconds={12} />
               {glued(
                 <motion.ul aria-hidden="true" style={{ opacity: doneO }} className="absolute inset-0 hidden sm:block">
                   {DONE.map(([label, at]) => (
