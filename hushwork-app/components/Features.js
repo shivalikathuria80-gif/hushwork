@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "motion/react";
 import { Btn, EASE, Reveal, StepRow, Switch, rowVariants } from "./ui";
 import { Icon } from "./icons";
-import { Spotlight } from "./ScrollFx";
+import { FlipIn, Spotlight } from "./ScrollFx";
 
 // Sample data below is illustrative. The samples are real components so visitors can try them.
 const SAMPLE_LOG = [["Zap", "Trigger", "Invoice 14 days overdue", "0.1s"], ["CreditCard", "Check Stripe", "No payment found", "0.8s"], ["PenLine", "Draft reminder", "Polite, firm, your tone", "2.1s"]];
@@ -100,14 +100,14 @@ export default function Features() {
       <div className="mx-auto max-w-6xl px-5">
         <Reveal><h2 className="max-w-2xl text-3xl font-semibold tracking-tight md:text-5xl">Workflows that ask first, <span className="text-mute">and show their work</span></h2></Reveal>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
-          <Reveal>
+          <FlipIn>
             <FeatureCard icon="MessageSquareText" title="Plain-English builder" body="Say what should happen. Hushwork turns it into a workflow you can read, edit and approve. No nodes to wire up, no code to write.">
               <p className="mb-1 px-2 text-sm text-mute">Sample request</p>
               <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm">“Every Friday at 4pm, email each client a summary of what we shipped.”</p>
               <ol className="mt-2 space-y-1">{SAMPLE_PLAN.map(([ic, a, b]) => <StepRow key={a} icon={ic} title={a} sub={b} />)}</ol>
             </FeatureCard>
-          </Reveal>
-          <Reveal className="md:col-span-2" delay={0.08}>
+          </FlipIn>
+          <FlipIn className="md:col-span-2" delay={0.12}>
             <FeatureCard icon="ShieldCheck" title="Runs you can trust" body="Every run keeps a step-by-step log. Ask for approval before anything is sent, and pause any workflow in one click.">
               <div className="grid gap-4 md:grid-cols-2">
                 <RunLogSample />
@@ -117,8 +117,8 @@ export default function Features() {
                 </div>
               </div>
             </FeatureCard>
-          </Reveal>
-          <Reveal className="md:col-span-3" delay={0.05}>
+          </FlipIn>
+          <FlipIn className="md:col-span-3" delay={0.05}>
             <article className="grid gap-6 overflow-hidden rounded-2xl border border-line bg-surface p-6 shadow-sm md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-center md:gap-10">
               <div>
                 <h3 className="flex items-center gap-2 text-base font-semibold"><Icon name="Plug" className="text-accent-text" />Connects the tools you already use</h3>
@@ -132,7 +132,7 @@ export default function Features() {
                 ))}
               </motion.ul>
             </article>
-          </Reveal>
+          </FlipIn>
         </div>
       </div>
     </section>

@@ -4,6 +4,7 @@ import AgentBox from "./AgentBox";
 import WorkflowBand from "./WorkflowBand";
 import HeroScene from "./HeroScene";
 import StoryScene from "./StoryScene";
+import { StoryExit } from "./ScrollFx";
 
 // The headline arrives one word at a time. It is the first thing a visitor reads, so it gets the one rehearsed entrance.
 // The animation is CSS (see .hw-word in globals.css), so this component needs no JavaScript of its own.
@@ -54,14 +55,14 @@ export default function Hero() {
       </div>
       {/* The story film. The track is tall so the stage stays pinned while you scroll, and the scroll plays the film.
           With reduce motion on, the track collapses and the finished frame just sits in the page. */}
-      <div data-story-track className="relative h-[300vh] motion-reduce:h-auto">
-        <div className="sticky top-0 flex h-dvh flex-col justify-center overflow-hidden pt-16 md:pt-10 motion-reduce:static motion-reduce:h-auto">
+      <StoryExit className="relative h-[300vh] motion-reduce:h-auto">
+        <div className="flex h-full flex-col justify-center overflow-hidden pt-16 md:pt-10">
           <div className="relative">
             <StoryScene className="bottom-[60px]" />
             <div className="relative pt-[340px] md:pt-[380px]"><WorkflowBand /></div>
           </div>
         </div>
-      </div>
+      </StoryExit>
     </section>
   );
 }

@@ -15,9 +15,12 @@ export function ScrollProgress() {
   return <motion.div aria-hidden="true" className="fixed inset-x-0 top-0 z-[70] h-0.5 origin-left bg-accent" style={{ scaleX }} />;
 }
 
+// Each word comes out of a blur and rises into place as it lights up, so the sentence reads like it is being said.
 function Word({ children, progress, range }) {
-  const opacity = useTransform(progress, range, [0.16, 1]);
-  return <motion.span style={{ opacity }} className="inline-block">{children}</motion.span>;
+  const opacity = useTransform(progress, range, [0.12, 1]);
+  const y = useTransform(progress, range, ["0.35em", "0em"]);
+  const blur = useTransform(progress, range, ["blur(6px)", "blur(0px)"]);
+  return <motion.span style={{ opacity, y, filter: blur }} className="inline-block will-change-transform">{children}</motion.span>;
 }
 
 // A big sentence that lights up word by word as you scroll through it. The block stays pinned while it fills.
@@ -80,7 +83,38 @@ export function TiltIn({ children, className = "", tilt = 14 }) {
   const y = useTransform(scrollYProgress, [0, 1], [40, 0]);
   return (
     <div ref={ref} className={`[perspective:1200px] ${className}`}>
-      <motion.div style={reduce ? undefined : { rotateX, scale, y, transformOrigin: "50% 0%" }}>{children}</motion.div>
+      <motion.div style={reduce ? { rotateX: 0, scale: 1, y: 0 } : { rotateX, scale, y, transformOrigin: "50% 0%" }}>{children}</motion.div>
+    </div>
+  );
+}
+
+// Wraps the pinned story film. In the last stretch of its scroll track the stage sinks back, blurs and fades, so it hands over to
+// the next section instead of sliding up under the menu bar.
+export function StoryExit({ children, className = "" }) {
+  const ref = useRef(null);
+  const reduce = usePrefersReducedMotion();
+  // 0 when the track's top meets the top of the screen, 1 when its bottom does; the pin lets go at about 0.67.
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const opacity = useTransform(scrollYProgress, [0.6, 0.85], [1, 0]);
+  const scale = useTransform(scrollYProgress, [0.6, 0.85], [1, 0.9]);
+  const filter = useTransform(scrollYProgress, [0.6, 0.85], ["blur(0px)", "blur(8px)"]);
+  return (
+    <div ref={ref} data-story-track className={className}>
+      <motion.div className="sticky top-0 h-dvh motion-reduce:static motion-reduce:h-auto" style={reduce ? { opacity: 1, scale: 1, filter: "none" } : { opacity, scale, filter }}>{children}</motion.div>
+    </div>
+  );
+}
+
+// A card that flips up out of the page the first time it is seen, hinged on its bottom edge, with a little overshoot.
+export function FlipIn({ children, className = "", delay = 0 }) {
+  const reduce = usePrefersReducedMotion();
+  if (reduce) return <div className={className}>{children}</div>;
+  return (
+    <div className={`[perspective:1200px] ${className}`}>
+      <motion.div className="h-full" style={{ transformOrigin: "50% 100%" }} initial={{ opacity: 0, rotateX: -32, y: 70, scale: 0.94 }} whileInView={{ opacity: 1, rotateX: 0, y: 0, scale: 1 }}
+        viewport={{ once: true, amount: 0.25 }} transition={{ type: "spring", stiffness: 120, damping: 16, mass: 0.9, delay }}>
+        {children}
+      </motion.div>
     </div>
   );
 }
@@ -91,5 +125,5 @@ export function Parallax({ children, className = "", speed = 60 }) {
   const reduce = usePrefersReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], [speed, -speed]);
-  return <motion.div ref={ref} className={className} style={reduce ? undefined : { y }}>{children}</motion.div>;
+  return <motion.div ref={ref} className={className} style={{ y: reduce ? 0 : y }}>{children}</motion.div>;
 }

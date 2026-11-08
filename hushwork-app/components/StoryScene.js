@@ -229,10 +229,11 @@ export default function StoryScene({ className = "" }) {
     let running = false;
     let visible = false;
     let last = 0;
-    // Where the scroll is inside the track: 0 as the stage reaches the middle of the screen, 1 at the end.
+    // Where the scroll is inside the track: 0 as the stage reaches the middle of the screen, 1 a little before the pin lets go,
+    // so the finished tick has settled before the stage fades out (StoryExit in ScrollFx.js) and never plays while scrolling away.
     const scrollTarget = () => {
       const r = track.getBoundingClientRect();
-      const runway = r.height - window.innerHeight * 0.55;
+      const runway = (r.height - window.innerHeight) * 0.8 + window.innerHeight * 0.45;
       return clamp((window.innerHeight * 0.45 - r.top) / Math.max(1, runway)) * 13.9;
     };
     const loop = (now) => {

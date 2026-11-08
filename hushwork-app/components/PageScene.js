@@ -8,7 +8,6 @@ import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 // flow from one shape into the next, so each section has its own 3D figure:
 //   statement band  → a drifting dust cloud (the week's loose chores)
 //   How it works    → three stacked rings (the three steps)
-//   Look inside     → a deck of cards standing on edge (the app screens that tip forward)
 //   Chatbot plugin  → a globe with a tail (a chat bubble)
 //   Example workflows → three cubes (the three folders)
 //   Agent rail      → a rail with tags hanging from it (the ready-made agents)
@@ -19,13 +18,13 @@ import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 // idle; it draws only while it is showing (not over the hero, which has its own scene), stops in a hidden tab,
 // stops turning on Pause, and is not loaded at all with "reduce motion" on.
 
-const SECTIONS = ["#reveal", "#how", "#inside", "#plugin", "#auto", "#rail", "#features", "#wait"];
+const SECTIONS = ["#reveal", "#how", "#plugin", "#auto", "#rail", "#features", "#wait"];
 // Where each figure sits across the screen on wide screens (away from that section's text).
-const SIDE = [0, 3.4, 0, -3.6, 0, 0, 0, 0];
+const SIDE = [0, -3.4, -3.6, 0, 0, 0, 0];
 const LAST = SECTIONS.length - 1; // the tick
 
 const VERTEX = /* glsl */ `
-  attribute vec3 aS0; attribute vec3 aS1; attribute vec3 aS2; attribute vec3 aS3; attribute vec3 aS4; attribute vec3 aS5; attribute vec3 aS6; attribute vec3 aS7;
+  attribute vec3 aS0; attribute vec3 aS1; attribute vec3 aS2; attribute vec3 aS3; attribute vec3 aS4; attribute vec3 aS5; attribute vec3 aS6;
   attribute float aSeed;
   uniform float uStage;
   uniform float uTime;
@@ -39,15 +38,14 @@ const VERTEX = /* glsl */ `
     if (i < 3.5) return aS3;
     if (i < 4.5) return aS4;
     if (i < 5.5) return aS5;
-    if (i < 6.5) return aS6;
-    return aS7;
+    return aS6;
   }
   void main() {
     float i = floor(uStage);
     // Each dot leaves a little earlier or later than its neighbours, so the morph ripples instead of snapping.
     float f = smoothstep(0.0, 1.0, clamp((uStage - i) * 1.6 - aSeed * 0.6, 0.0, 1.0));
     vec3 a = shape(i);
-    vec3 b = shape(min(i + 1.0, 7.0));
+    vec3 b = shape(min(i + 1.0, 6.0));
     vec3 p = mix(a, b, f);
     // Mid-morph the dots swirl outward a little, then settle.
     float lift = sin(f * 3.14159);
@@ -78,7 +76,7 @@ const FRAGMENT = /* glsl */ `
   }
 `;
 
-// --- The eight shapes, as lists of points. ---
+// --- The seven shapes, as lists of points. ---
 const rnd = (() => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
 function cloud(n) {
   return Array.from({ length: n }, () => {
@@ -127,18 +125,6 @@ function knot(n) {
     const j = 0.35;
     // Drawn large, so it loops out around the feature cards.
     return [r * Math.cos(p * t) * 2 + (rnd() - 0.5) * j, Math.sin(q * t) * 2.2 + (rnd() - 0.5) * j, r * Math.sin(p * t) * 1.4 + (rnd() - 0.5) * j];
-  });
-}
-function deck(n) {
-  // Five cards standing on edge one behind the other, the front one tipping forward.
-  return Array.from({ length: n }, (_, i) => {
-    const k = i % 5;
-    const a = rnd() * 2 - 1;
-    const b = rnd();
-    const tilt = k === 0 ? -0.7 : 0; // the front card is falling towards you
-    const y = -1.8 + b * 3.4 * Math.cos(tilt);
-    const z = 1.6 - k * 0.9 + b * 3.4 * Math.sin(tilt);
-    return [a * 3.1, y + k * 0.18, z];
   });
 }
 function rail(n) {
@@ -202,7 +188,7 @@ export default function PageScene() {
 
       const n = small ? 3200 : 6400;
       const geometry = new THREE.BufferGeometry();
-      const shapes = [cloud(n), rings(n), deck(n), bubble(n), cubes(n), rail(n), knot(n), tick(n)];
+      const shapes = [cloud(n), rings(n), bubble(n), cubes(n), rail(n), knot(n), tick(n)];
       shapes.forEach((pts, k) => {
         const arr = new Float32Array(n * 3);
         pts.forEach((p, i) => arr.set(p, i * 3));

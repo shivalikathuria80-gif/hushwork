@@ -8,8 +8,8 @@ import SignUpCta from "@/components/SignUpCta";
 import Footer from "@/components/Footer";
 import { ScrollProgress, TextReveal } from "@/components/ScrollFx";
 import PageScene from "@/components/PageScene";
-import AppShowcase from "@/components/AppShowcase";
 import AgentRail from "@/components/AgentRail";
+import BeforeAfter from "@/components/BeforeAfter";
 import { railAgents } from "@/lib/agent-tags";
 
 export default function Home() {
@@ -27,8 +27,8 @@ export default function Home() {
         <section id="reveal" aria-label="What Hushwork does">
           <TextReveal text="Most of your week is small chores. Chasing invoices, summing up calendars, nudging leads. *Hushwork does them quietly, asks before anything leaves, and shows you every step." />
         </section>
+        <BeforeAfter />
         <HowItWorks />
-        <AppShowcase />
         <ChatbotSection />
         <Automations />
         <AgentRail items={railAgents()} />

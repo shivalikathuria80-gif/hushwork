@@ -203,3 +203,9 @@
 @keyframes hw-shimmer { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
 [data-motion="paused"] .hw-beam::before, [data-motion="paused"] .hw-shimmer-text { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .hw-beam::before, .hw-shimmer-text { animation: none !important; } .hw-shimmer-text { background-position: 0 0; } }
+
+/* The nagging notes on the "before" photo (components/BeforeAfter.js): they twitch every few seconds, like a notification that will not go away. */
+@keyframes hw-nag { 0%, 82%, 100% { transform: translate(0, 0) rotate(0); } 85% { transform: translate(-2px, 0) rotate(-2deg); } 88% { transform: translate(2px, -1px) rotate(2deg); } 91% { transform: translate(-1px, 0) rotate(-1deg); } 94% { transform: translate(0, -3px); } }
+.hw-nag { display: flex; animation: hw-nag 3.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+[data-motion="paused"] .hw-nag { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .hw-nag { animation: none; } }
