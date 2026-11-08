@@ -27,7 +27,7 @@ import { LIMITS } from "@/lib/validate";
 const IDEAS = ["Why does a step wait for my approval?", "Every Monday at 9am, sum up my calendar week", "Tell me which emails need a reply today", "Chase unpaid invoices and email me a list"];
 const HELLO = "Hi, I am Hushwork AI. Tell me what you want done and I will build the workflow, or ask me to change the one on the canvas. Anything that sends or creates waits for your OK.";
 
-export default function Copilot({ ai, rowsCount, currentRows, busy, connections, onApply, onAddBlock, onAddSkill, onAddEmails }) {
+export default function Copilot({ initialAsk = "", ai, rowsCount, currentRows, busy, connections, onApply, onAddBlock, onAddSkill, onAddEmails }) {
   const reduce = usePrefersReducedMotion();
   const [tab, setTab] = useState("copilot");
   const [open, setOpen] = useState(true); // phones: the panel folds away so the canvas has room
@@ -36,6 +36,15 @@ export default function Copilot({ ai, rowsCount, currentRows, busy, connections,
   const [thinking, setThinking] = useState(false);
   const list = useRef(null);
   const nextId = useRef(0);
+
+  // A sentence handed over from Home (?ask=) is sent once, as if typed here. The address is then cleaned so a reload does not send it again.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!initialAsk || asked.current) return;
+    asked.current = true;
+    try { const url = new URL(window.location.href); url.searchParams.delete("ask"); window.history.replaceState(null, "", url); } catch {}
+    ask(initialAsk);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { list.current?.scrollTo({ top: list.current.scrollHeight, behavior: reduce ? "auto" : "smooth" }); }, [chat, thinking, reduce]);
 

@@ -32,14 +32,15 @@ import { insertRow, moveRow, newRow, newRowForBlock, rowsForEmailList, rowsForSk
 // `initial` comes from the server (lib/builder-start.js):
 //   { start: "new" }  { start: "template" | "skill", name, prompt, steps }  { start: "draft", draft: { id, name, prompt, version }, steps }
 // `connections` (optional) says which apps are connected (lib/skills/connection-status.js): the side panel uses it to warn about a
-// step whose app is missing. `runs` is this workflow's last runs (lib/builder-runs.js); `ai` is { enabled } (lib/ai-status.js).
+// step whose app is missing. `runs` is this workflow's last runs (lib/builder-runs.js); `ai` is { enabled } (lib/ai-status.js); `ask` (from ?ask=, sent by
+// Home) is a sentence Hushwork AI answers as soon as the page opens.
 // Publishing a NEW workflow makes a draft; publishing an opened draft changes it in place (the version check is the same one the
 // home page uses: if it was changed somewhere else, nothing is overwritten and "Load latest" brings the saved copy in).
 
 const FAILED = "Could not save. Check your connection and try again.";
 const HISTORY = 40; // how many Undo steps are kept
 
-export default function Builder({ initial, connections, runs = [], ai = { enabled: false } }) {
+export default function Builder({ initial, connections, runs = [], ai = { enabled: false }, ask = "" }) {
   const router = useRouter();
   const reduce = usePrefersReducedMotion();
   const startSteps = initial.steps ?? [];
@@ -61,7 +62,7 @@ export default function Builder({ initial, connections, runs = [], ai = { enable
 
   const announce = useCallback((sentence) => {
     // The same sentence twice in a row would not be spoken again, so a non-breaking space makes it new.
-    setStatus((previous) => (previous === sentence ? sentence + " " : sentence));
+    setStatus((previous) => (previous === sentence ? sentence + "\u00a0" : sentence));
   }, []);
 
   const atMax = working.length >= LIMITS.planSteps;
@@ -381,7 +382,7 @@ export default function Builder({ initial, connections, runs = [], ai = { enable
       </AnimatePresence>
 
       <div className="grid min-h-0 flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
-        <Copilot ai={ai} rowsCount={working.length} currentRows={working} busy={saving} connections={connections} onApply={applyPlan} onAddBlock={addBlock} onAddSkill={addSkill} onAddEmails={addEmails} />
+        <Copilot initialAsk={ask} ai={ai} rowsCount={working.length} currentRows={working} busy={saving} connections={connections} onApply={applyPlan} onAddBlock={addBlock} onAddSkill={addSkill} onAddEmails={addEmails} />
 
         <section className="relative min-h-[36rem] overflow-hidden rounded-3xl border border-line bg-[color-mix(in_oklab,var(--bg)_72%,transparent)] lg:min-h-0" aria-label={tab === "editor" ? "Workflow canvas" : "Executions"}>
           {tab === "editor" ? (

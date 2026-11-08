@@ -373,7 +373,7 @@ function Empty({ plus }) {
       <div className="w-[19.5rem] rounded-2xl border border-dashed border-line-strong bg-surface/80 p-6 text-center backdrop-blur-sm">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-accent-subtle text-accent-text"><Icon name="Workflow" size={22} /></span>
         <p className="mt-3 font-semibold">Nothing here yet</p>
-        <p className="mt-1 text-sm text-mute">Tell the copilot what you want done, or press + to add the first block. You can also drag a block from the left.</p>
+        <p className="mt-1 text-sm text-mute">Tell Hushwork AI what you want done, or press + to add the first block. You can also drag a block from the left.</p>
       </div>
       <div className="mt-4">{plus}</div>
     </div>

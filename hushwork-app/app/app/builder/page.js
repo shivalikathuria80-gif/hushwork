@@ -71,7 +71,7 @@ async function BuilderLoader({ searchParams }) {
   }
   const ai = await aiStatus();
   // A different draft or template is a different Builder: the key makes React start fresh instead of reusing the old one.
-  return <Builder key={start.draft?.id ?? start.name ?? "new"} initial={start} connections={connections} runs={runs} ai={ai} />;
+  return <Builder key={start.draft?.id ?? start.name ?? "new"} initial={start} connections={connections} runs={runs} ai={ai} ask={typeof params?.ask === "string" ? params.ask.slice(0, 1000) : ""} />;
 }
 
 function Notice({ title, children }) {

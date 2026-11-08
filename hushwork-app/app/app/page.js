@@ -21,7 +21,7 @@ export default function AppPage() {
       <header className="text-center">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-accent text-on-accent"><Icon name="Workflow" size={22} /></span>
         <h1 tabIndex={-1} className="mt-5 text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">What should Hushwork take off your plate?</h1>
-        <p className="mx-auto mt-3 max-w-[48ch] text-[15px] text-mute">Describe a chore in one sentence. Hushwork plans it and runs it, and anything that sends or creates waits for your OK.</p>
+        <p className="mx-auto mt-3 max-w-[48ch] text-[15px] text-mute">Tell Hushwork AI in the Builder, or pick up one of your workflows below. Anything that sends or creates waits for your OK.</p>
       </header>
       <div className="mt-8">
         <Suspense fallback={null}><GettingStarted /></Suspense>

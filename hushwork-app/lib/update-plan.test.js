@@ -312,47 +312,10 @@ test("saveDraft: returns the id, name and version of the saved draft, which the 
   assert.match(body, /version:\s*String\(saved\.updated_at\)/);
 });
 
-// ---- the Composer, read as plain text (there is no browser in `npm test`; the rendered check lives in the QA notes) ----
-
-const composer = fs.readFileSync(path.join(root, "components/app/Composer.js"), "utf8").replace(/\r\n/g, "\n"); // the file may use Windows line ends
-function composerFunction(name) {
-  const start = composer.indexOf(`  function ${name}(`);
-  assert.ok(start > 0, `${name} exists in Composer.js`);
-  const end = composer.slice(start + 10).search(/\n  (?:function |\/\/ |const )/);
-  return composer.slice(start, end === -1 ? undefined : start + 10 + end);
-}
-
-test("Composer: a save answer that arrives after the person moved on is dropped (QA M1)", () => {
-  for (const name of ["save", "saveSteps", "saveAsNew"]) {
-    const body = composerFunction(name);
-    const mine = body.indexOf("const mine = requestId.current;");
-    assert.ok(mine >= 0 && mine < body.indexOf("startSaving("), `${name} notes which screen it started on, before it starts saving`);
-    const awaits = (body.match(/\bawait /g) ?? []).length;
-    const checks = (body.match(/if \(mine !== requestId\.current\) return;/g) ?? []).length;
-    assert.ok(awaits >= 1 && checks >= awaits + 1, `${name}: ${awaits} await(s) need ${awaits} check(s) plus one in the error path, found ${checks}`);
-    assert.match(body, /unstable_rethrow\(problem\);[^\n]*\n\s*if \(mine !== requestId\.current\) return;/, `${name}: the error path checks too, right after the sign-in redirect is let through`);
-  }
-  assert.match(composer, /const reset = useCallback\(\(clearText\) => \{\n\s*requestId\.current \+= 1;/, "starting over bumps the number");
-  assert.match(composer, /if \(!seedId\) return;\n\s*requestId\.current \+= 1;/, "opening a draft or recipe bumps the number");
-});
-
-test("Composer: a false conflict is retried once with the newer version, a real one is shown (QA m2)", () => {
-  assert.match(composer, /import \{ onlyNameMoved \} from "@\/lib\/update-plan";/);
-  const body = composerFunction("saveSteps");
-  assert.equal((body.match(/onlyNameMoved\(result, startedFrom\)/g) ?? []).length, 1);
-  assert.equal((body.match(/\bawait send\(/g) ?? []).length, 2, "the first try and exactly one retry");
-  assert.match(body, /send\(adopted\.version\)/);
-  assert.equal(/\bfor \(|\bwhile \(/.test(body), false, "no loop: the retry happens once");
-  assert.match(body, /const startedFrom = steps;/);
-});
-
-test("Composer: the editor says unsaved changes are lost if you leave the page, only while there are changes (QA m3)", () => {
-  assert.match(composer, /\{editorChanged && <p className="w-full text-sm text-mute">Unsaved changes are lost if you leave this page\.<\/p>\}/);
-  assert.equal(/aria-live/.test(composer), false, "no second live region was added");
-});
+// (The Composer, the old request box on Home, was removed on 2026-11-08: Hushwork AI in the Builder took its place. Its text checks went with it.)
 
 test("source files hold no literal invisible characters: they are written as \\u escapes so a person can see and edit them", () => {
-  const files = ["lib/validate.js", "lib/validate.test.js", "lib/update-plan.js", "lib/update-plan.test.js", "lib/actions/drafts.js", "lib/ai/plan.js", "lib/ai/icon-names.js", "components/app/Composer.js", "components/app/StepEditor.js"];
+  const files = ["lib/validate.js", "lib/validate.test.js", "lib/update-plan.js", "lib/update-plan.test.js", "lib/actions/drafts.js", "lib/ai/plan.js", "lib/ai/icon-names.js", "components/app/builder/Copilot.js", "components/app/Builder.js", "components/app/StepEditor.js"];
   for (const file of files) {
     const text = fs.readFileSync(path.join(root, file), "utf8");
     const found = [...text.matchAll(/[\p{Cf}\u2028\u2029\u00a0]/gu)].map((match) => "U+" + match[0].codePointAt(0).toString(16));

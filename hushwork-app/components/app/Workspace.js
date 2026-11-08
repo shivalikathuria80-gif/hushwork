@@ -1,65 +1,63 @@
 "use client";
 
-import { createContext, useContext, useRef, useState } from "react";
+import { createContext, useContext } from "react";
 import Link from "next/link";
-import Composer from "./Composer";
+import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { Icon } from "../icons";
 import { Spotlight } from "../ScrollFx";
 import { Reveal, RevealItem } from "./RunMotion";
 import { TEMPLATES } from "@/lib/templates";
+import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 
-// The interactive middle of /app: the request box, then a short row of templates that really work.
-// It keeps one small piece of state, `seed` (what to put in the box), and hands it to the Composer.
-// The saved drafts list (rendered on the server and passed in as `children`) can fill the box too, through useFillComposer().
+// The middle of /app (Home). The request box that used to live here moved into the Builder as Hushwork AI, so Home shows a card that
+// opens it, the chatbot plugin, a short row of templates that really work, then the saved workflows (rendered on the server and
+// passed in as `children`). Anything that used to fill the box (the agent's "Do this", a draft) now opens the Builder instead,
+// through useFillComposer(): a sentence goes to Hushwork AI (?ask=), a saved draft opens on the canvas (?draft=).
 const FillContext = createContext(() => {});
 export const useFillComposer = () => useContext(FillContext);
 
 // Six templates that can really do something (they say what they need). The rest are on the Templates page.
 const WORKING = TEMPLATES.filter((template) => template.needs).slice(0, 6);
+const IDEAS = ["Every Friday, chase my unpaid Stripe invoices", "Every weekday, list today's meetings and email me", "Tell me which emails need a reply"];
 
-// Sentences a new person can tap to fill the empty box. Each is a chore Hushwork can really plan, and says which connections it needs.
-const EXAMPLES = [
-  { text: "Every Friday, find my unpaid Stripe invoices and email me a reminder to review", needs: "Stripe and Gmail (send)" },
-  { text: "Every weekday morning, list today's meetings and email me a prep card", needs: "Google and Gmail (send)" },
-  { text: "Every Monday, think of five post ideas and email them to me", needs: "Gmail (send)" },
-];
-
-// `ai` is { enabled, limit } from the server (AiWorkspace.js): is AI planning available, and how many AI plans a person gets a day.
-// It never holds the key.
-// `top` (optional) is shown above the request box, inside the same context, so the agent's "Do this" can fill the box.
-// `plugin` (optional) is the chatbot plugin box, shown right under the examples.
+// `ai` is { enabled } from the server (AiWorkspace.js): only whether Hushwork AI is on, never the key.
+// `top` (optional) is shown first (the always-on agent). `plugin` (optional) is the chatbot plugin box.
 export default function Workspace({ children, ai, top = null, plugin = null }) {
-  const [seed, setSeed] = useState(null);
-  const composer = useRef(null); // gives us the composer's guard: "are there unsaved step edits? ask first"
-  // Every call gets a higher id, so clicking the same draft twice still counts as a new request.
-  // `draft` ({ id, name, version }) is set when a saved draft is opened, so the composer can change that draft in place.
+  const router = useRouter();
+  const reduce = usePrefersReducedMotion();
   const fill = (text, plan, draft) => {
-    const apply = () => setSeed((previous) => ({ id: (previous?.id ?? 0) + 1, text, plan, draft }));
-    if (composer.current) composer.current.guard(apply);
-    else apply();
+    if (draft?.id) router.push(`/app/builder?draft=${encodeURIComponent(draft.id)}`);
+    else router.push(`/app/builder?ask=${encodeURIComponent(String(text ?? "").slice(0, 1000))}`);
   };
 
   return (
     <FillContext value={fill}>
       {top}
-      <Composer ref={composer} seed={seed} ai={ai} />
-
-      <section aria-labelledby="examples-heading" className="mt-4">
-        <h2 id="examples-heading" className="text-sm font-medium text-mute">Not sure what to type? Tap one, then press the arrow.</h2>
-        <Reveal as="ul" delay={0.15} className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {EXAMPLES.map((example) => (
-            <RevealItem as="li" key={example.text} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
-              <button
-                type="button" onClick={() => fill(example.text)}
-                className="flex min-h-11 w-full flex-col items-start rounded-xl border border-line bg-surface px-3 py-2 text-left text-sm transition-[background-color,border-color] duration-120 ease-standard hover:border-line-strong active:bg-raised sm:w-auto sm:max-w-[28ch] md:min-h-9"
-              >
-                <span>{example.text}</span>
-                <span className="font-mono text-xs text-mute">Needs {example.needs}</span>
-              </button>
-            </RevealItem>
+      <motion.div initial={reduce ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 30 }}>
+        <Spotlight className="rounded-3xl">
+          <Link id="task" href="/app/builder" className="hw-beam group relative block overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-6">
+            <span className="flex items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent transition-transform duration-300 ease-standard group-hover:-rotate-6 group-hover:scale-110"><Icon name="Sparkles" size={22} weight="fill" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold tracking-[-0.01em]">Ask Hushwork AI in the Builder</span>
+                <span className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-hint">
+                  <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${ai?.enabled ? "hw-pulse-dot bg-success" : "bg-line-strong"}`} />Powered by Groq
+                </span>
+              </span>
+              <Icon name="ArrowRight" size={20} className="shrink-0 text-mute transition-transform duration-200 group-hover:translate-x-1 group-hover:text-ink" />
+            </span>
+            <span className="mt-3 block text-[15px] text-mute">Say a chore in one sentence. It builds the workflow on the canvas, and anything that sends or creates waits for your OK.</span>
+          </Link>
+        </Spotlight>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {IDEAS.map((idea) => (
+            <li key={idea}>
+              <button type="button" onClick={() => fill(idea)} className="rounded-full border border-line bg-surface px-3 py-1.5 text-left text-sm transition-colors hover:border-accent hover:text-accent-text">{idea}</button>
+            </li>
           ))}
-        </Reveal>
-      </section>
+        </ul>
+      </motion.div>
 
       {plugin && <section aria-label="Chatbot plugin" className="mt-10">{plugin}</section>}
 
