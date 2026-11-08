@@ -11,6 +11,7 @@ export const PAGES = [
   { id: "page:templates", title: "Templates", hint: "Ready-made workflows and packs", icon: "ListTodo", href: "/app/templates", words: "examples packs library" },
   { id: "page:runs", title: "Runs", hint: "What ran, and what waits for your OK", icon: "History", href: "/app/runs", words: "history approve results" },
   { id: "page:week", title: "Your week", hint: "Time Hushwork gave back in the last 7 days", icon: "FileBarChart", href: "/app/week", words: "report recap stats saved" },
+  { id: "page:calendar", title: "Calendar", hint: "Every run planned for the next 7 days", icon: "Calendar", href: "/app/calendar", words: "schedule plan upcoming next when agenda" },
   { id: "page:connections", title: "Connections", hint: "Connect Gmail, Linear, Slack and more", icon: "Plug", href: "/app/connections", words: "apps connect gmail linear google slack" },
   { id: "page:settings", title: "Settings", hint: "Memory, chatbot plugin, your account", icon: "Settings", href: "/app/settings", words: "account memory tokens plugin delete" },
   { id: "page:docs", title: "Docs", hint: "How Hushwork works", icon: "FileText", href: "/docs", words: "help guide" },

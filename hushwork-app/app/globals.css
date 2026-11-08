@@ -210,3 +210,20 @@
 .hw-nag { display: flex; animation: hw-nag 3.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
 [data-motion="paused"] .hw-nag { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .hw-nag { animation: none; } }
+
+/* Calendar page (components/app/CalendarBoard.js): the bold "spec sheet" look. One rainbow border turns slowly around the Next up card
+   (the page's one continuous animation), and the headline word carries the cyan-to-magenta brand gradient. */
+@property --hw-conic { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.hw-conic { position: relative; isolation: isolate; }
+.hw-conic::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--hw-conic), #7d5be7 0%, #bc3fda 12%, #fa24ce 24%, #fb49a5 34%, #fc6d7b 44%, #fd9a46 54%, #f687c6 66%, #a3a0e0 78%, #4fb9fa 90%, #0091ff 96%, #7d5be7 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+  animation: hw-conic 4s linear infinite;
+}
+@keyframes hw-conic { to { --hw-conic: 360deg; } }
+.hw-grad-text { background: linear-gradient(83deg, #40ddff -5%, #7612fa 51%, #fa18e3 125%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dark .hw-grad-text { background: linear-gradient(83deg, #6fe6ff -5%, #a77bff 51%, #ff6bee 125%); -webkit-background-clip: text; background-clip: text; }
+[data-motion="paused"] .hw-conic::before { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .hw-conic::before { animation: none; } }

@@ -103,6 +103,7 @@ export function buildWeekRecap(rows, now = Date.now()) {
     needsYou: needsYou.slice(0, 5),
     byWorkflow,
     dots: dots.map(({ t, tone }) => ({ t, tone })),
+    runDots: dots, // the same, with each run's workflow name and id (the Calendar page lists today's runs by name)
   };
 }
 
