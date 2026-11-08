@@ -55,9 +55,7 @@ export default function AppNav({ userBadge }) {
   const close = () => setOpen(false);
   // Escape closes the phone menu and puts the keyboard cursor back on the menu button, so it is not lost.
   const closeWithEscape = () => { if (open) { setOpen(false); menuButtonRef.current?.focus(); } };
-  // "New workflow" is the same page as the workspace, so the link alone would do nothing there.
-  // This tells the composer (if it is on screen) to clear itself and take focus.
-  const newWorkflow = () => { close(); window.dispatchEvent(new Event("hw:new-workflow")); };
+  // No "New workflow" button here any more: a new workflow starts in Hushwork AI, in the Builder (and the box on Home).
 
   return (
     <header
@@ -76,7 +74,6 @@ export default function AppNav({ userBadge }) {
 
       <div id="app-menu" className={`${open ? "flex animate-[hw-fade_200ms_var(--ease)_both]" : "hidden"} hw-glass absolute inset-x-0 top-full max-h-[calc(100dvh-3.5rem)] flex-col gap-6 overflow-y-auto rounded-b-2xl border-t-0 p-3 shadow-lg sm:px-6 lg:static lg:flex lg:max-h-none lg:flex-1 lg:justify-between lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none lg:backdrop-blur-none`}>
         <nav aria-label="Workspace" className="flex flex-col gap-1">
-          <Btn href="/app" icon="Plus" onClick={newWorkflow} className="mb-2 w-full">New workflow</Btn>
           <button
             type="button" onClick={() => { close(); openPalette(); }}
             className="mb-2 flex h-10 w-full items-center gap-2 rounded-xl border border-line bg-surface/70 px-3 text-sm text-mute transition-colors duration-120 hover:border-accent-edge hover:text-ink"
