@@ -40,7 +40,7 @@ test("lib/ai/key.js is marked server-only and is imported only by server code", 
   const key = files.find((file) => file.name === "lib/ai/key.js").text;
   assert.match(key, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["'](?:@\/lib\/ai\/key|(?:\.\.?\/)+(?:lib\/)?(?:ai\/)?key)(?:\.js)?["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/api/mcp/route.js", "lib/actions/agents.js", "lib/actions/plan.js", "lib/agent/check.js", "lib/ai-status.js", "lib/run-core.js"]); // the code that calls the AI (plans, agents, steps, the agent's look), and the helper that tells pages only "on or off"
+  assert.deepEqual(importers.sort(), ["app/api/mcp/route.js", "lib/actions/agents.js", "lib/actions/copilot.js", "lib/actions/plan.js", "lib/agent/check.js", "lib/ai-status.js", "lib/run-core.js"]); // the code that calls the AI (plans, agents, steps, the agent's look, the Builder's Hushwork AI chat), and the helper that tells pages only "on or off"
   for (const name of importers) {
     const text = files.find((file) => file.name === name).text;
     assert.ok(!/^\s*["']use client["']/m.test(text), `${name} is browser code and must not import the key reader`);

@@ -381,7 +381,7 @@ export default function Builder({ initial, connections, runs = [], ai = { enable
       </AnimatePresence>
 
       <div className="grid min-h-0 flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
-        <Copilot ai={ai} rowsCount={working.length} busy={saving} connections={connections} onApply={applyPlan} onAddBlock={addBlock} onAddSkill={addSkill} onAddEmails={addEmails} />
+        <Copilot ai={ai} rowsCount={working.length} currentRows={working} busy={saving} connections={connections} onApply={applyPlan} onAddBlock={addBlock} onAddSkill={addSkill} onAddEmails={addEmails} />
 
         <section className="relative min-h-[36rem] overflow-hidden rounded-3xl border border-line bg-[color-mix(in_oklab,var(--bg)_72%,transparent)] lg:min-h-0" aria-label={tab === "editor" ? "Workflow canvas" : "Executions"}>
           {tab === "editor" ? (

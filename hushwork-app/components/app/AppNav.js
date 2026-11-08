@@ -84,10 +84,11 @@ export default function AppNav({ userBadge }) {
             <Icon name="Search" size={16} /><span className="flex-1 text-left">Search or run…</span>
             <kbd className="rounded-md border border-line px-1.5 text-[11px]">Ctrl K</kbd>
           </button>
-          {/* Make: home (your workflows), agents, templates. Run: what they did and the apps they can use. The Builder opens from a workflow. */}
+          {/* Make: home (your workflows), agents, templates. Run: what they did and the apps they can use. The Builder is a page of its own too. */}
           <NavLink href="/app" icon="Sparkles" onNavigate={close} exact>Home</NavLink>
           <NavLink href="/app/agents" icon="Bot" onNavigate={close}>Agents</NavLink>
           <NavLink href="/app/templates" icon="ListTodo" onNavigate={close}>Templates</NavLink>
+          <NavLink href="/app/builder" icon="Workflow" onNavigate={close}>Builder</NavLink>
           <div aria-hidden="true" className="my-2 border-t border-line" />
           <NavLink href="/app/runs" icon="History" onNavigate={close}>Runs</NavLink>
           <NavLink href="/app/calendar" icon="Calendar" onNavigate={close}>Calendar</NavLink>

@@ -7,7 +7,7 @@ import { Btn } from "../../ui";
 import { Icon } from "../../icons";
 import { usePrefersReducedMotion } from "../../usePrefersReducedMotion";
 import { pulse } from "../AppScene";
-import { previewPlan } from "@/lib/actions/plan";
+import { copilotTurn } from "@/lib/actions/copilot";
 import { keywordPlan } from "@/lib/ai/keyword-plan";
 import { stepsToPlan } from "@/lib/steps";
 import { planLines } from "@/lib/flow-graph";
@@ -24,10 +24,10 @@ import { LIMITS } from "@/lib/validate";
 //
 // Props: ai ({ enabled }), rowsCount, busy, onApply(rows, prompt), onAddBlock(id, label), onAddSkill(skill), onAddEmails(text) -> error or "".
 
-const IDEAS = ["Every Monday at 9am, sum up my calendar week", "Tell me which emails need a reply today", "Chase unpaid invoices and email me a list"];
-const HELLO = "I can build a workflow from one sentence, then you can change any step on the canvas. Anything that sends or creates waits for your OK.";
+const IDEAS = ["Why does a step wait for my approval?", "Every Monday at 9am, sum up my calendar week", "Tell me which emails need a reply today", "Chase unpaid invoices and email me a list"];
+const HELLO = "Hi, I am Hushwork AI. Tell me what you want done and I will build the workflow, or ask me to change the one on the canvas. Anything that sends or creates waits for your OK.";
 
-export default function Copilot({ ai, rowsCount, busy, connections, onApply, onAddBlock, onAddSkill, onAddEmails }) {
+export default function Copilot({ ai, rowsCount, currentRows, busy, connections, onApply, onAddBlock, onAddSkill, onAddEmails }) {
   const reduce = usePrefersReducedMotion();
   const [tab, setTab] = useState("copilot");
   const [open, setOpen] = useState(true); // phones: the panel folds away so the canvas has room
@@ -44,27 +44,42 @@ export default function Copilot({ ai, rowsCount, busy, connections, onApply, onA
     if (!task || thinking) return;
     if (task.length > LIMITS.promptMax) { say({ from: "ai", text: `That is a bit long. Use ${LIMITS.promptMax} characters or fewer.` }); return; }
     setText("");
+    const history = chat.filter((one) => one.from === "me" || one.from === "ai").map((one) => ({ from: one.from, text: one.text }));
     say({ from: "me", text: task });
     setThinking(true);
     pulse("think");
+
+    // AI on: Hushwork AI (Groq) answers, and builds or changes the workflow when that is what was asked.
+    // AI off, offline or failing: the quick keyword plan, made right here in the browser, with a sentence saying why.
+    let reply = null;
     let plan = null;
     let note = null;
+    let request = task;
     if (ai?.enabled && navigator.onLine !== false) {
       try {
-        const result = await previewPlan({ prompt: task });
-        if (result?.source === "ai" && Array.isArray(result.steps) && result.steps.length) plan = stepsToPlan(result.steps);
-        else note = result?.notice ?? null;
+        const result = await copilotTurn({ message: task, history, lines: planLines(currentRows ?? []) });
+        if (result?.error) {
+          note = result.error;
+          if (result.why === "empty" || result.why === "too_long" || result.why === "sensitive") { setThinking(false); say({ from: "ai", text: result.error }); pulse("bad"); return; }
+        } else {
+          reply = result.reply;
+          if (Array.isArray(result.steps) && result.steps.length) plan = stepsToPlan(result.steps);
+          else if (result.request) { request = result.request; note = result.notice ?? null; plan = keywordPlan(request); }
+          else { setThinking(false); say({ from: "ai", text: reply }); pulse("good"); return; } // a question: just the answer
+        }
       } catch (problem) {
         unstable_rethrow(problem);
-        note = "The AI could not be reached, so this is the quick plan.";
+        note = "Hushwork AI could not be reached, so this is the quick plan.";
       }
+    } else if (!ai?.enabled) {
+      note = "Hushwork AI is off on this server, so this is the quick plan.";
     }
-    if (!plan) plan = keywordPlan(task);
+    if (!plan) plan = keywordPlan(request);
     setThinking(false);
     const rows = toWorking(plan);
     if (!rows.length) { say({ from: "ai", text: "I could not make a plan from that. Try saying what should happen, and when." }); pulse("bad"); return; }
     pulse("good");
-    say({ from: "ai", text: "Here is a workflow with these steps:", lines: planLines(rows), rows, prompt: task, note, applied: false });
+    say({ from: "ai", text: reply ?? "Here is a workflow with these steps:", lines: planLines(rows), rows, prompt: request, note, applied: false });
   }
 
   function say(message) {
@@ -79,21 +94,24 @@ export default function Copilot({ ai, rowsCount, busy, connections, onApply, onA
   }
 
   return (
-    <aside aria-label="Copilot and blocks" className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface/95 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.25)] backdrop-blur-md lg:h-full">
+    <aside aria-label="Hushwork AI and blocks" className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface/95 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.25)] backdrop-blur-md lg:h-full">
       <div className="flex items-start gap-3 border-b border-line p-4">
         <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.01em]"><Icon name="Sparkles" size={18} weight="fill" className="text-accent-text" />Copilot</h2>
-          <p className="mt-1 text-sm text-mute">Build, fix and tidy workflows by saying what you want.</p>
+          <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.01em]"><Icon name="Sparkles" size={18} weight="fill" className="text-accent-text" />Hushwork AI</h2>
+          <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-hint">
+            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${ai?.enabled ? "hw-pulse-dot bg-success" : "bg-line-strong"}`} />Powered by Groq{ai?.enabled ? "" : " · off"}
+          </p>
+          <p className="mt-2 text-sm text-mute">Ask a question, or say what to build or change.</p>
         </div>
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="copilot-body" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-mute hover:bg-raised hover:text-ink lg:hidden" aria-label={open ? "Fold the copilot away" : "Open the copilot"}>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="copilot-body" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-mute hover:bg-raised hover:text-ink lg:hidden" aria-label={open ? "Fold Hushwork AI away" : "Open Hushwork AI"}>
           <Icon name="ChevronDown" size={18} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
       </div>
 
       <div id="copilot-body" className={`${open ? "flex" : "hidden"} min-h-0 flex-1 flex-col lg:flex`}>
         <LayoutGroup id="copilot-tabs">
-          <div role="tablist" aria-label="Copilot panel" className="mx-4 mt-3 flex rounded-xl bg-raised p-1 text-sm">
-            {[["copilot", "Copilot"], ["blocks", "Blocks"]].map(([id, label]) => (
+          <div role="tablist" aria-label="Hushwork AI panel" className="mx-4 mt-3 flex rounded-xl bg-raised p-1 text-sm">
+            {[["copilot", "Chat"], ["blocks", "Blocks"]].map(([id, label]) => (
               <button key={id} type="button" role="tab" id={`cp-tab-${id}`} aria-selected={tab === id} aria-controls={`cp-panel-${id}`} onClick={() => setTab(id)} className="relative flex-1 rounded-lg px-3 py-1.5 font-medium text-mute aria-selected:text-ink">
                 {tab === id && <motion.span layoutId="cp-tab" className="absolute inset-0 rounded-lg bg-surface shadow-sm" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
                 <span className="relative">{label}</span>
@@ -145,16 +163,16 @@ export default function Copilot({ ai, rowsCount, busy, connections, onApply, onA
             </div>
 
             <form onSubmit={(event) => { event.preventDefault(); ask(); }} className="m-3 mt-0 rounded-2xl border border-field bg-surface p-3 focus-within:border-accent">
-              <label htmlFor="copilot-input" className="sr-only">Tell the copilot what the workflow should do</label>
+              <label htmlFor="copilot-input" className="sr-only">Message Hushwork AI</label>
               <textarea
                 id="copilot-input" value={text} onChange={(event) => setText(event.target.value)} rows={2} readOnly={busy}
                 onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); ask(); } }}
-                placeholder="For example: every Friday, sum up my Linear tasks and email them to me"
+                placeholder="Ask Hushwork AI, or say: every Friday, sum up my Linear tasks and email them to me"
                 className="w-full resize-none bg-transparent text-[15px] placeholder:text-hint focus:outline-none"
               />
               <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-raised px-2 py-1 text-xs font-medium" title={ai?.enabled ? "Plans are written by the AI" : "AI planning is off: a quick plan is made in your browser"}>
-                  <Icon name="Sparkles" size={13} className="text-accent-text" />{ai?.enabled ? "Hushwork AI" : "Quick plan"}
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-raised px-2 py-1 text-xs font-medium" title={ai?.enabled ? "Answers come from Groq" : "AI is off: a quick plan is made in your browser"}>
+                  <Icon name="Sparkles" size={13} className="text-accent-text" />{ai?.enabled ? "Groq" : "Quick plan"}
                 </span>
                 <span className="flex-1" />
                 <button type="submit" aria-label="Send" disabled={!text.trim() || thinking || busy} className="grid h-9 w-9 place-items-center rounded-full bg-accent text-on-accent transition-[transform,opacity] hover:bg-accent-hover active:scale-95 disabled:opacity-40">
