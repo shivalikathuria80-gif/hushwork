@@ -39,6 +39,15 @@
 
 /* Makes the tokens available as Tailwind classes: bg-surface, text-mute, border-field, rounded-2xl ... */
 @theme inline {
+  /* The shadcn names that 21st.dev components use (components/ui/*.tsx), mapped onto the Hushwork tokens. */
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-muted-foreground: var(--mute);
+  --color-border: var(--line);
+  --color-ring: var(--focus);
+  --color-primary: var(--accent);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-raised: var(--raised);

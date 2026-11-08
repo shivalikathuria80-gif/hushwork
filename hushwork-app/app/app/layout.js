@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import AppNav from "@/components/app/AppNav";
 import UserBadge from "@/components/app/UserBadge";
 import AppScene from "@/components/app/AppScene";
+import CommandPalette from "@/components/app/CommandPalette";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -23,6 +24,8 @@ export default function AppLayout({ children }) {
       />
       {/* A calm three.js cloud behind every app page, which reacts when the AI plans or a step is approved (components/app/AppScene.js). */}
       <AppScene />
+      {/* Ctrl+K / Cmd+K: jump anywhere, or start a practice run (components/app/CommandPalette.js). */}
+      <CommandPalette />
       <div className="relative min-w-0 flex-1">{children}</div>
     </div>
   );

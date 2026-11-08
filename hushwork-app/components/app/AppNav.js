@@ -7,6 +7,7 @@ import { usePathname, unstable_rethrow } from "next/navigation";
 import { Btn, Logo } from "../ui";
 import { Icon } from "../icons";
 import ThemeToggle from "./ThemeToggle";
+import { openPalette } from "./CommandPalette";
 import { signOut } from "@/lib/actions/auth";
 
 // The app's frame. At 1024px and wider it is a sticky sidebar. Below that it is a 56px top bar whose menu button
@@ -76,6 +77,13 @@ export default function AppNav({ userBadge }) {
       <div id="app-menu" className={`${open ? "flex animate-[hw-fade_200ms_var(--ease)_both]" : "hidden"} hw-glass absolute inset-x-0 top-full max-h-[calc(100dvh-3.5rem)] flex-col gap-6 overflow-y-auto rounded-b-2xl border-t-0 p-3 shadow-lg sm:px-6 lg:static lg:flex lg:max-h-none lg:flex-1 lg:justify-between lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none lg:backdrop-blur-none`}>
         <nav aria-label="Workspace" className="flex flex-col gap-1">
           <Btn href="/app" icon="Plus" onClick={newWorkflow} className="mb-2 w-full">New workflow</Btn>
+          <button
+            type="button" onClick={() => { close(); openPalette(); }}
+            className="mb-2 flex h-10 w-full items-center gap-2 rounded-xl border border-line bg-surface/70 px-3 text-sm text-mute transition-colors duration-120 hover:border-accent-edge hover:text-ink"
+          >
+            <Icon name="Search" size={16} /><span className="flex-1 text-left">Search or run…</span>
+            <kbd className="rounded-md border border-line px-1.5 text-[11px]">Ctrl K</kbd>
+          </button>
           {/* Make: home (your workflows), agents, templates. Run: what they did and the apps they can use. The Builder opens from a workflow. */}
           <NavLink href="/app" icon="Sparkles" onNavigate={close} exact>Home</NavLink>
           <NavLink href="/app/agents" icon="Bot" onNavigate={close}>Agents</NavLink>

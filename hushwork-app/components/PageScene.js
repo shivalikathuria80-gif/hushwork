@@ -8,8 +8,10 @@ import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 // flow from one shape into the next, so each section has its own 3D figure:
 //   statement band  → a drifting dust cloud (the week's loose chores)
 //   How it works    → three stacked rings (the three steps)
+//   Look inside     → a deck of cards standing on edge (the app screens that tip forward)
 //   Chatbot plugin  → a globe with a tail (a chat bubble)
 //   Example workflows → three cubes (the three folders)
+//   Agent rail      → a rail with tags hanging from it (the ready-made agents)
 //   Features        → a knot (everything connected)
 //   Sign up         → a big tick
 // The scroll position between two sections sets how far the morph has got, so it plays forwards and backwards
@@ -17,12 +19,13 @@ import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 // idle; it draws only while it is showing (not over the hero, which has its own scene), stops in a hidden tab,
 // stops turning on Pause, and is not loaded at all with "reduce motion" on.
 
-const SECTIONS = ["#reveal", "#how", "#plugin", "#auto", "#features", "#wait"];
+const SECTIONS = ["#reveal", "#how", "#inside", "#plugin", "#auto", "#rail", "#features", "#wait"];
 // Where each figure sits across the screen on wide screens (away from that section's text).
-const SIDE = [0, 3.4, -3.6, 0, 0, 0];
+const SIDE = [0, 3.4, 0, -3.6, 0, 0, 0, 0];
+const LAST = SECTIONS.length - 1; // the tick
 
 const VERTEX = /* glsl */ `
-  attribute vec3 aS0; attribute vec3 aS1; attribute vec3 aS2; attribute vec3 aS3; attribute vec3 aS4; attribute vec3 aS5;
+  attribute vec3 aS0; attribute vec3 aS1; attribute vec3 aS2; attribute vec3 aS3; attribute vec3 aS4; attribute vec3 aS5; attribute vec3 aS6; attribute vec3 aS7;
   attribute float aSeed;
   uniform float uStage;
   uniform float uTime;
@@ -35,14 +38,16 @@ const VERTEX = /* glsl */ `
     if (i < 2.5) return aS2;
     if (i < 3.5) return aS3;
     if (i < 4.5) return aS4;
-    return aS5;
+    if (i < 5.5) return aS5;
+    if (i < 6.5) return aS6;
+    return aS7;
   }
   void main() {
     float i = floor(uStage);
     // Each dot leaves a little earlier or later than its neighbours, so the morph ripples instead of snapping.
     float f = smoothstep(0.0, 1.0, clamp((uStage - i) * 1.6 - aSeed * 0.6, 0.0, 1.0));
     vec3 a = shape(i);
-    vec3 b = shape(min(i + 1.0, 5.0));
+    vec3 b = shape(min(i + 1.0, 7.0));
     vec3 p = mix(a, b, f);
     // Mid-morph the dots swirl outward a little, then settle.
     float lift = sin(f * 3.14159);
@@ -73,7 +78,7 @@ const FRAGMENT = /* glsl */ `
   }
 `;
 
-// --- The six shapes, as lists of points. ---
+// --- The eight shapes, as lists of points. ---
 const rnd = (() => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
 function cloud(n) {
   return Array.from({ length: n }, () => {
@@ -124,6 +129,31 @@ function knot(n) {
     return [r * Math.cos(p * t) * 2 + (rnd() - 0.5) * j, Math.sin(q * t) * 2.2 + (rnd() - 0.5) * j, r * Math.sin(p * t) * 1.4 + (rnd() - 0.5) * j];
   });
 }
+function deck(n) {
+  // Five cards standing on edge one behind the other, the front one tipping forward.
+  return Array.from({ length: n }, (_, i) => {
+    const k = i % 5;
+    const a = rnd() * 2 - 1;
+    const b = rnd();
+    const tilt = k === 0 ? -0.7 : 0; // the front card is falling towards you
+    const y = -1.8 + b * 3.4 * Math.cos(tilt);
+    const z = 1.6 - k * 0.9 + b * 3.4 * Math.sin(tilt);
+    return [a * 3.1, y + k * 0.18, z];
+  });
+}
+function rail(n) {
+  // A long bar, and tags swinging from it on short hooks.
+  return Array.from({ length: n }, (_, i) => {
+    if (i % 5 === 0) return [(rnd() - 0.5) * 9, 2.4 + (rnd() - 0.5) * 0.12, (rnd() - 0.5) * 0.12];
+    const k = i % 7;
+    const x = (k - 3) * 1.3;
+    const yaw = (k - 3) * 0.35;
+    if (i % 5 === 1) { const t = rnd(); return [x, 2.4 - t * 0.5, 0]; }
+    const a = rnd() - 0.5;
+    const y = 1.9 - rnd() * 2.8;
+    return [x + Math.cos(yaw) * a * 1.0, y, Math.sin(yaw) * a * 1.0];
+  });
+}
 function tick(n) {
   // Two thick strokes: short down-stroke, long up-stroke.
   const A = [-2.6, 0.2], B = [-0.8, -1.7], C = [3, 2.3];
@@ -172,7 +202,7 @@ export default function PageScene() {
 
       const n = small ? 3200 : 6400;
       const geometry = new THREE.BufferGeometry();
-      const shapes = [cloud(n), rings(n), bubble(n), cubes(n), knot(n), tick(n)];
+      const shapes = [cloud(n), rings(n), deck(n), bubble(n), cubes(n), rail(n), knot(n), tick(n)];
       shapes.forEach((pts, k) => {
         const arr = new Float32Array(n * 3);
         pts.forEach((p, i) => arr.set(p, i * 3));
@@ -263,23 +293,23 @@ export default function PageScene() {
         const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
         last = now;
         const vis = visibility();
-        uniforms.uAlpha.value += (vis * alphaMax * (1 + Math.max(0, uniforms.uStage.value - 4) * 0.6) - uniforms.uAlpha.value) * Math.min(1, dt * 6); // the tick glows brighter
+        uniforms.uAlpha.value += (vis * alphaMax * (1 + Math.max(0, uniforms.uStage.value - (LAST - 1)) * 0.6) - uniforms.uAlpha.value) * Math.min(1, dt * 6); // the tick glows brighter
         if (uniforms.uAlpha.value < 0.01 && vis === 0) { canvas.style.visibility = "hidden"; return; }
         canvas.style.visibility = "visible";
         const stage = stageNow();
         uniforms.uStage.value += (stage - uniforms.uStage.value) * Math.min(1, dt * 5);
-        uniforms.uTintMix.value = Math.max(0, uniforms.uStage.value - 4); // the tick turns green
+        uniforms.uTintMix.value = Math.max(0, uniforms.uStage.value - (LAST - 1)); // the tick turns green
         if (!pausedRef.current) { uniforms.uTime.value += dt; spin += dt * 0.12; }
         // Turn with the scroll as well as with time, and lean toward the mouse.
         // The tick turns to face you (so it never reads backwards); the other figures keep turning.
-        const face = Math.min(1, Math.max(0, uniforms.uStage.value - 4));
+        const face = Math.min(1, Math.max(0, uniforms.uStage.value - (LAST - 1)));
         const turn = spin + window.scrollY * 0.0004;
         const facing = Math.round(turn / (Math.PI * 2)) * Math.PI * 2;
         points.rotation.y = turn + (facing - turn) * face + target.x * 0.5;
         points.rotation.x = target.y * 0.3 + Math.sin(uniforms.uStage.value * 1.3) * 0.15;
         // Sit to the side the section's text is not on, on wide screens.
         const st = uniforms.uStage.value;
-        const k = Math.min(4, Math.floor(st));
+        const k = Math.min(LAST - 1, Math.floor(st));
         const side = window.innerWidth >= 1024 ? SIDE[k] + (SIDE[k + 1] - SIDE[k]) * (st - k) : 0;
         points.position.x += (side - points.position.x) * Math.min(1, dt * 3);
         renderer.render(scene, camera);
