@@ -31,6 +31,8 @@ import { DRAG_KIND, DRAG_ROW, blockById, blockIdFor, blockName, insertRow, moveR
 //               picker, no "shown in the plan as" line, no Add step button: blocks are added from the Builder's list)
 //   dnd         true turns on drag and drop (the Builder does): drag a step by its handle to move it, or drop a step kind
 //               dragged from the palette into the list. The arrow and Add buttons always work too: dragging needs a mouse.
+//   single      true when the list holds ONE step being edited on its own (the Builder's canvas side panel): no move arrows and no
+//               step count; `firstNumber` is that step's real number in the workflow.
 
 // The rows are built by lib/step-rows.js (pure code, tested). They are re-exported so the Composer and the Builder import them from here.
 export { newRow, toWorking };
@@ -53,7 +55,7 @@ const iconButton = "grid h-11 w-11 shrink-0 place-items-center rounded-xl text-m
 const inputBase = "h-11 w-full rounded-xl border bg-surface px-3 text-[15px] placeholder:text-hint focus-visible:border-accent read-only:opacity-90";
 const COUNTER_FROM = 160; // the character counter appears from here
 
-export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false, simple = false, renderExtra = null }) {
+export default function StepEditor({ steps, onChange, announce, showErrors, busy, heading, subheading, focusOnOpen = true, dnd = false, simple = false, renderExtra = null, single = false, firstNumber = 1 }) {
   const reduce = usePrefersReducedMotion();
   const [openIcon, setOpenIcon] = useState(null); // key of the step whose icon panel is open (only one at a time)
   const [touched, setTouched] = useState(() => new Set()); // keys of titles the person has already left
@@ -215,7 +217,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
         <h2 id="step-editor-heading" className="flex items-center gap-2 text-sm font-medium">
           <Icon name="ListChecks" className="text-accent-text" />{heading}
         </h2>
-        <p className="text-sm text-mute">{count} of {LIMITS.planSteps} steps</p>
+        {!single && <p className="text-sm text-mute">{count} of {LIMITS.planSteps} steps</p>}
       </div>
       <p className="mt-1 px-2 text-sm text-mute">{subheading}</p>
       {dnd && !simple && <p className="mt-1 px-2 text-sm text-mute">Drag a step by its handle to move it, or use the arrows. Dragging needs a mouse.</p>}
@@ -235,7 +237,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
       <ol className="mt-3 px-2">
         <AnimatePresence initial={false}>
           {steps.map((row, index) => {
-            const number = index + 1;
+            const number = index + firstNumber;
             const typed = isTypedKind(row.kind);
             const spec = typed ? STEP_KINDS[row.kind] : null;
             const open = openIcon === row.key && !typed; // only a free-text step has an icon to choose
@@ -296,8 +298,8 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                     </button>
                     )}
                     <span className="min-w-0 flex-1" />
-                    <button type="button" id={fieldId(row.key, "up")} aria-label={`Move step ${number} up`} title={`Move step ${number} up`} aria-disabled={index === 0 || busy || undefined} onClick={() => move(index, -1)} className={iconButton}><Icon name="ArrowUp" size={18} /></button>
-                    <button type="button" id={fieldId(row.key, "down")} aria-label={`Move step ${number} down`} title={`Move step ${number} down`} aria-disabled={index === count - 1 || busy || undefined} onClick={() => move(index, 1)} className={iconButton}><Icon name="ArrowDown" size={18} /></button>
+                    {!single && (<><button type="button" id={fieldId(row.key, "up")} aria-label={`Move step ${number} up`} title={`Move step ${number} up`} aria-disabled={index === 0 || busy || undefined} onClick={() => move(index, -1)} className={iconButton}><Icon name="ArrowUp" size={18} /></button>
+                    <button type="button" id={fieldId(row.key, "down")} aria-label={`Move step ${number} down`} title={`Move step ${number} down`} aria-disabled={index === count - 1 || busy || undefined} onClick={() => move(index, 1)} className={iconButton}><Icon name="ArrowDown" size={18} /></button></>)}
                     <button type="button" id={fieldId(row.key, "delete")} aria-label={`Delete step ${number}`} title={`Delete step ${number}`} aria-disabled={busy || undefined} onClick={() => remove(index)} className={iconButton}><Icon name="Trash" size={18} /></button>
                   </div>
 

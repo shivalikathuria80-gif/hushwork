@@ -6,23 +6,23 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { builderStart } from "@/lib/builder-start";
 import { connectionStates } from "@/lib/skills/connection-status";
+import { aiStatus } from "@/lib/ai-status";
+import { runRows } from "@/lib/builder-runs";
 
 export const metadata = { title: "Builder - Hushwork", robots: { index: false, follow: false } };
 
 // The page shell (heading and intro) is built ahead of time. What the Builder opens with depends on the address
 // (`?template=`, `?skill=` or `?draft=`) and on who is signed in, so it is decided in BuilderLoader, behind <Suspense>.
+// The Builder is a full-height studio: a copilot chat on the left, the workflow drawn as a canvas on the right, and a bar on top
+// (Editor / Executions, Undo, Saved, Test, Publish). The shell is built ahead of time; what it opens with depends on the address
+// (`?template=`, `?skill=` or `?draft=`) and on who is signed in, so it is decided in BuilderLoader, behind <Suspense>.
 export default function BuilderPage({ searchParams }) {
   return (
-    <main id="main" className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
-      <h1 tabIndex={-1} className="text-[length:clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.01em] outline-offset-4">Builder</h1>
-      <p className="mt-3 max-w-[62ch] text-[15px] text-mute">
-        Drag blocks into a line, fill in the blanks, and save. Then press Run on the home page.
-      </p>
-      <div className="mt-8">
-        <Suspense fallback={<div aria-busy="true"><p role="status" className="sr-only">Loading the Builder</p><div aria-hidden="true" className="h-72 rounded-2xl border border-line bg-raised" /></div>}>
-          <BuilderLoader searchParams={searchParams} />
-        </Suspense>
-      </div>
+    <main id="main" className="relative flex min-h-dvh w-full flex-col lg:h-dvh">
+      <h1 tabIndex={-1} className="sr-only">Builder</h1>
+      <Suspense fallback={<div aria-busy="true" className="flex-1 p-6"><p role="status" className="sr-only">Loading the Builder</p><div aria-hidden="true" className="h-full min-h-72 rounded-2xl border border-line bg-raised" /></div>}>
+        <BuilderLoader searchParams={searchParams} />
+      </Suspense>
     </main>
   );
 }
@@ -59,13 +59,24 @@ async function BuilderLoader({ searchParams }) {
   } catch {
     connections = undefined;
   }
+  // The Executions tab: this workflow's last runs. Missing or unreadable means an empty list, never a broken page.
+  let runs = [];
+  if (start.draft?.id) {
+    try {
+      const read = await (await createClient()).from("runs").select("id, mode, created_at, results").eq("user_id", user.id).eq("workflow_id", start.draft.id).order("created_at", { ascending: false }).limit(25);
+      runs = read.error ? [] : runRows(read.data);
+    } catch {
+      runs = [];
+    }
+  }
+  const ai = await aiStatus();
   // A different draft or template is a different Builder: the key makes React start fresh instead of reusing the old one.
-  return <Builder key={start.draft?.id ?? start.name ?? "new"} initial={start} connections={connections} />;
+  return <Builder key={start.draft?.id ?? start.name ?? "new"} initial={start} connections={connections} runs={runs} ai={ai} />;
 }
 
 function Notice({ title, children }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <div className="m-5 max-w-xl rounded-2xl border border-line bg-surface p-4 shadow-sm sm:m-8">
       <p className="flex items-center gap-2 font-medium"><Icon name="CircleAlert" className="shrink-0 text-error" />{title}</p>
       <p className="mt-1 text-[15px] text-mute">{children}</p>
       <div className="mt-3 flex flex-wrap gap-2">
