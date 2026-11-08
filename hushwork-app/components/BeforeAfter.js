@@ -1,128 +1,113 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import Image from "next/image";
-import { animate, motion, useInView, useMotionValue, useMotionValueEvent, useScroll, useTransform } from "motion/react";
+import { motion, useMotionValue, useScroll, useTransform } from "motion/react";
 import { Icon } from "./icons";
-import { useMotionPause } from "./MotionProvider";
+import { useCoverBox } from "./photoScenes";
+import { FilmReel, FilmTitle } from "./FilmBits";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// "Your Monday, before and after": two photos of the same desk (made with Nano Banana, then retouched), one on top of the other.
-// Drag the handle (or use the arrow keys on it) to wipe between them. The first time it is seen, the handle sweeps across once
-// by itself to show that it moves. The messy side carries the nagging notes; the tidy side carries what Hushwork did.
+// "Same desk. Different Monday." as a full-screen scene: the messy desk fills the screen while the section stays pinned, and the
+// scroll wipes the tidy desk in from the right behind a white hairline, like a film transition. The nagging notes sit on the mess,
+// the done notes on the tidy desk (glued to the photo, so they stay on the same spot at any screen shape). The camera pushes in slowly.
+// With reduce motion on there is no pin: the photo sits half and half, still.
 
+const SIZE = [1264, 848];
 const MESS = [
-  ["43 unread emails", "left-[6%] top-[14%]", -4],
-  ["Invoice #1042 overdue", "left-[16%] top-[58%]", 3],
-  ["3 missed Slack pings", "left-[30%] top-[30%]", -2],
-  ["Weekly report due", "left-[4%] top-[78%]", 2],
+  ["43 unread emails", "left-[6%] top-[16%]", -4],
+  ["Invoice #1042 overdue", "left-[46%] top-[22%]", 3],
+  ["3 missed Slack pings", "left-[24%] top-[33%]", -2],
+  ["Weekly report due", "left-[8%] top-[44%]", 2],
 ];
 const DONE = [
-  ["Inbox summed up in 5 lines", "right-[6%] top-[16%]"],
-  ["Invoice reminder sent", "right-[18%] top-[44%]"],
-  ["Report posted to Slack", "right-[5%] top-[70%]"],
+  ["Inbox summed up in 5 lines", "right-[8%] top-[14%]"],
+  ["Invoice reminder sent", "right-[24%] top-[29%]"],
+  ["Report posted to Slack", "right-[6%] top-[42%]"],
 ];
+const REEL = [["9:04", "Without Hushwork"], ["9:05", "With Hushwork"]];
 
 export default function BeforeAfter() {
-  const ref = useRef(null);
-  const frame = useRef(null);
+  const track = useRef(null);
+  const stage = useRef(null);
   const reduce = usePrefersReducedMotion();
-  const { paused } = useMotionPause();
-  const seen = useInView(ref, { once: true, margin: "0px 0px -35% 0px" });
-  const pos = useMotionValue(50); // % of the width that shows the "before" photo
-  const [value, setValue] = useState(50);
-  const touched = useRef(false);
-  useMotionValueEvent(pos, "change", (v) => setValue(Math.round(v)));
+  const box = useCoverBox(stage, SIZE[0], SIZE[1]);
+  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
+  const half = useMotionValue(0.5);
+  const p = reduce ? half : scrollYProgress;
 
-  const clip = useTransform(pos, (v) => `inset(0 ${100 - v}% 0 0)`);
-  const left = useTransform(pos, (v) => `${v}%`);
-  const messOpacity = useTransform(pos, [10, 45], [0, 1]);
-  const doneOpacity = useTransform(pos, [55, 90], [1, 0]);
+  const edge = useTransform(p, [0.2, 0.75], [100, 0], { clamp: true }); // where the tidy photo starts, % from the left
+  const clip = useTransform(edge, (v) => `inset(0 0 0 ${v}%)`);
+  const left = useTransform(edge, (v) => `${v}%`);
+  const push = useTransform(p, [0, 1], [1.16, 1.02]);
+  const before = useTransform(p, [0.3, 0.48], [1, 0]);
+  const after = useTransform(p, [0.5, 0.68], [0, 1]);
+  const messO = useTransform(edge, [20, 60], [0, 1]);
+  const doneO = useTransform(edge, [40, 10], [0, 1]);
+  const lineO = useTransform(edge, [0, 2, 98, 100], [0, 1, 1, 0]);
 
-  // Depth: the photos drift and zoom a touch as the section passes.
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const zoom = useTransform(scrollYProgress, [0, 1], [1.12, 1]);
-  const tiltX = useTransform(scrollYProgress, [0, 0.45], [18, 0]);
-
-  // The one-time sweep: to the messy side, across to the tidy side, then back to the middle.
-  useEffect(() => {
-    if (!seen || reduce || paused || touched.current) return;
-    const controls = animate(pos, [50, 88, 12, 50], { duration: 3.2, ease: "easeInOut", times: [0, 0.3, 0.75, 1], delay: 0.4 });
-    return () => controls.stop();
-  }, [seen, reduce, paused, pos]);
-
-  const setFrom = (clientX) => {
-    const r = frame.current.getBoundingClientRect();
-    pos.set(Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100)));
-  };
-  const onDown = (e) => {
-    touched.current = true;
-    pos.stop();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setFrom(e.clientX);
-  };
-  const onMove = (e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) setFrom(e.clientX); };
+  const glued = (children) => box && <div className="absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>{children}</div>;
 
   return (
-    <section id="monday" ref={ref} aria-labelledby="monday-heading" className="mx-auto max-w-6xl px-5 py-20">
-      <div className="mx-auto max-w-2xl text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-text">Monday, 9:04</p>
-        <h2 id="monday-heading" className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Same desk. Different Monday.</h2>
-        <p className="mt-3 text-mute">Drag across the photo. On the left, the chores waiting for you. On the right, the same morning after Hushwork ran first.</p>
-      </div>
-
-      <div className="mt-10 [perspective:1400px]">
-        <motion.div
-          ref={frame}
-          style={{ rotateX: reduce ? 0 : tiltX, transformOrigin: "50% 100%" }}
-          onPointerDown={onDown} onPointerMove={onMove}
-          className="relative aspect-[4/5] cursor-ew-resize sm:aspect-[1264/848] touch-pan-y select-none overflow-hidden rounded-3xl border border-line bg-raised shadow-2xl shadow-black/30"
-        >
-          {/* After: the whole frame. */}
-          <motion.div className="absolute inset-0" style={{ scale: reduce ? 1 : zoom }}>
-            <Image src="/landing/after.jpg" alt="The same desk, tidy, in warm morning light" fill sizes="(min-width: 1152px) 1100px, 100vw" className="object-cover" draggable={false} />
+    <section id="monday" aria-labelledby="monday-heading" className="relative bg-black text-white">
+      <div ref={track} className={reduce ? "" : "relative h-[280vh]"}>
+        <div ref={stage} className={`${reduce ? "relative h-dvh min-h-[560px]" : "sticky top-0 h-dvh"} overflow-hidden`}>
+          {/* The messy desk. */}
+          <motion.div className="absolute inset-0" style={{ scale: reduce ? 1.02 : push }}>
+            <Image src="/landing/before.jpg" alt="A cluttered desk covered in sticky notes, in cold light" fill sizes="100vw" className="object-cover" />
+            {glued(
+              <motion.ul aria-hidden="true" style={{ opacity: messO }} className="absolute inset-0 hidden sm:block">
+                {MESS.map(([label, at, turn], i) => (
+                  <li key={label} className={`absolute ${at}`} style={{ rotate: `${turn}deg` }}>
+                    <span className="hw-nag items-center gap-2 border border-white/25 bg-black/70 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-white sm:text-[13px]" style={{ "--d": `${i * 0.7}s` }}>
+                      <span className="h-1.5 w-1.5 rounded-full bg-error" />{label}
+                    </span>
+                  </li>
+                ))}
+              </motion.ul>,
+            )}
           </motion.div>
-          <motion.ul aria-hidden="true" style={{ opacity: doneOpacity }} className="absolute inset-0">
-            {DONE.map(([label, at], i) => (
-              <motion.li key={label} className={`absolute ${at} ${i > 1 ? "hidden sm:flex" : "flex"} items-center gap-2 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md sm:text-sm`}
-                initial={{ opacity: 0, y: 14, scale: 0.9 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 220, damping: 20, delay: 0.9 + i * 0.15 }}>
-                <span className="grid h-4 w-4 place-items-center rounded-full bg-success text-[10px] text-bg"><Icon name="Check" size={10} weight="bold" /></span>{label}
-              </motion.li>
+          {/* Phones crop the photo hard, so there the notes stack in a corner of the screen instead of sitting on the desk. */}
+          <motion.ul aria-hidden="true" style={{ opacity: messO }} className="absolute left-5 top-24 space-y-2 sm:hidden">
+            {MESS.slice(0, 3).map(([label]) => (
+              <li key={label} className="flex w-max items-center gap-2 border border-white/25 bg-black/70 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-white"><span className="h-1.5 w-1.5 rounded-full bg-error" />{label}</li>
             ))}
           </motion.ul>
-          <span className="absolute bottom-4 right-4 rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">With Hushwork</span>
 
-          {/* Before: clipped to the left of the handle. */}
+          {/* The tidy desk, wiped in from the right. */}
           <motion.div className="absolute inset-0" style={{ clipPath: clip }}>
-            <motion.div className="absolute inset-0" style={{ scale: reduce ? 1 : zoom }}>
-              <Image src="/landing/before.jpg" alt="A cluttered desk covered in sticky notes, in cold light" fill sizes="(min-width: 1152px) 1100px, 100vw" className="object-cover" draggable={false} />
+            <motion.div className="absolute inset-0" style={{ scale: reduce ? 1.02 : push }}>
+              <Image src="/landing/after.jpg" alt="The same desk, tidy, in warm morning light" fill sizes="100vw" className="object-cover" />
+              {glued(
+                <motion.ul aria-hidden="true" style={{ opacity: doneO }} className="absolute inset-0 hidden sm:block">
+                  {DONE.map(([label, at]) => (
+                    <li key={label} className={`absolute ${at} flex items-center gap-2 border border-white/25 bg-black/60 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-white sm:text-[13px]`}>
+                      <Icon name="Check" size={12} weight="bold" className="text-success" />{label}
+                    </li>
+                  ))}
+                </motion.ul>,
+              )}
             </motion.div>
-            <motion.ul aria-hidden="true" style={{ opacity: messOpacity }} className="absolute inset-0">
-              {MESS.map(([label, at, turn], i) => (
-                <li key={label} className={`absolute ${at} ${i > 1 ? "hidden sm:block" : ""}`} style={{ rotate: `${turn}deg` }}>
-                  <span className="hw-nag flex items-center gap-2 rounded-lg border border-error/40 bg-black/60 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md sm:text-sm" style={{ "--d": `${i * 0.7}s` }}>
-                    <span className="h-2 w-2 rounded-full bg-error" />{label}
-                  </span>
-                </li>
+            <motion.ul aria-hidden="true" style={{ opacity: doneO }} className="absolute right-5 top-24 space-y-2 sm:hidden">
+              {DONE.map(([label]) => (
+                <li key={label} className="ml-auto flex w-max items-center gap-2 border border-white/25 bg-black/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-white"><Icon name="Check" size={11} weight="bold" className="text-success" />{label}</li>
               ))}
             </motion.ul>
-            <span className="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">Without</span>
           </motion.div>
+          <motion.span aria-hidden="true" className="absolute inset-y-0 z-10 w-px bg-white" style={{ left, opacity: lineO }} />
 
-          {/* The handle. The real control is a range input, so it works with a keyboard and screen readers. */}
-          <motion.div aria-hidden="true" className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white/90 shadow-[0_0_24px_rgba(255,255,255,0.6)]" style={{ left }}>
-            <span className="absolute left-1/2 top-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/70 bg-black/50 text-white shadow-xl backdrop-blur-md">
-              <Icon name="Compare" size={20} />
-            </span>
-          </motion.div>
-          <input
-            type="range" min={0} max={100} value={value} aria-label="Compare the desk before and after Hushwork" aria-valuetext={`${value}% before`}
-            onChange={(e) => { touched.current = true; pos.stop(); pos.set(Number(e.target.value)); }}
-            className="peer absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
-            onPointerDown={(e) => e.preventDefault()}
-          />
-          <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl ring-2 ring-inset ring-transparent peer-focus-visible:ring-focus" />
-        </motion.div>
+          <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.3)_40%,rgba(0,0,0,0)_65%)]" />
+          <div className="absolute inset-x-0 bottom-20 z-10 mx-auto max-w-6xl px-5 sm:bottom-24">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/70">Monday, 9:04</p>
+            <h2 id="monday-heading" className="sr-only">Same desk. Different Monday.</h2>
+            <div aria-hidden="true" className="relative mt-3 h-[2.1em] text-[length:clamp(2.75rem,8.5vw,8rem)] leading-[0.92]">
+              <motion.span className="absolute inset-x-0 bottom-0" style={{ opacity: reduce ? 1 : before }}><FilmTitle text="Forty-seven things *need you.*" /></motion.span>
+              {!reduce && <motion.span className="absolute inset-x-0 bottom-0" style={{ opacity: after }}><FilmTitle text="Done before *coffee.*" /></motion.span>}
+            </div>
+            <p className="mt-5 max-w-md text-lg font-extralight leading-relaxed text-white/85">Same desk, same Monday. On the right, the morning after Hushwork ran first.</p>
+          </div>
+          {!reduce && <FilmReel items={REEL} progress={scrollYProgress} active={-1} />}
+        </div>
       </div>
     </section>
   );
