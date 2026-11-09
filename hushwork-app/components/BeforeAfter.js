@@ -1,103 +1,100 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useMotionValue, useScroll, useTransform } from "motion/react";
+import { motion, useScroll, useSpring, useTransform } from "motion/react";
 import { Icon } from "./icons";
-import { useCoverBox, useFilmClock } from "./photoScenes";
 import { FilmReel, FilmTitle } from "./FilmBits";
-import FilmVideo from "./FilmVideo";
+import CameraFilm, { shotRanges } from "./CameraFilm";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-// "Same desk. Different Monday." as a full-screen scene: the messy desk (a Google Flow clip of the photo, see FilmVideo.js) fills the screen while the section stays pinned, and the
-// scroll wipes the tidy desk in from the right behind a white hairline, like a film transition. The nagging notes sit on the mess,
-// the done notes on the tidy desk (glued to the photo, so they stay on the same spot at any screen shape). The camera pushes in slowly.
-// With reduce motion on there is no pin: the photo sits half and half, still.
+// "Same desk. Different Monday." as a short film made in code (CameraFilm.js) that the scroll plays: the section stays pinned
+// while the camera tilts over the messy desk, whips to the buzzing phone, pans the wall of sticky notes and dives into the
+// laptop, then flashes out onto the same desk, tidy, craning down from above, a close-up of the coffee, and a pull back.
+// Scroll fast and the camera flies fast; scroll back and it flies back. No timer.
+// The nagging notes are thrown off the screen on the dive; the done notes land on the tidy desk.
+// With reduce motion there is no pin and no film: the first shot, still, with the first title.
 
-const SIZE = [1264, 848]; // the photo, and its clip, which keeps the same shape
+const B = { src: "/landing/before.jpg", size: [1264, 848] };
+const A = { src: "/landing/after.jpg", size: [1264, 848] };
+const SHOTS = [
+  { ...B, alt: "A cluttered desk covered in sticky notes, in cold light", into: "whip",
+    keys: [{ t: 0, x: 0.5, y: 0.5, z: 1.02, rx: 6, ry: -7 }, { t: 1, x: 0.45, y: 0.4, z: 1.55, rx: 0, ry: 5, rz: -1.5 }] },
+  { ...B, alt: "", into: "whip", blur: [[0, 7], [0.35, 0], [1, 0]],
+    keys: [{ t: 0, x: 0.68, y: 0.76, z: 2.3, rx: 16, rz: -5 }, { t: 1, x: 0.62, y: 0.7, z: 2.6, rx: 6, rz: 2 }] },
+  { ...B, alt: "", into: "dip",
+    keys: [{ t: 0, x: 0.86, y: 0.2, z: 2.1, ry: -16, rz: 3 }, { t: 1, x: 0.7, y: 0.3, z: 1.8, ry: 8, rz: -1 }] },
+  { ...B, alt: "", into: "zoom",
+    keys: [{ t: 0, x: 0.42, y: 0.36, z: 1.5, rx: 8 }, { t: 1, x: 0.47, y: 0.31, z: 2.4, rx: 0, rz: 1 }] },
+  { ...A, alt: "The same desk, tidy, in warm morning light", into: "whip",
+    keys: [{ t: 0, x: 0.5, y: 0.62, z: 1.7, rx: 24, rz: -4 }, { t: 1, x: 0.5, y: 0.5, z: 1.08, rx: 0, rz: 0 }] },
+  { ...A, alt: "", into: "whip", blur: [[0, 6], [0.3, 0], [1, 0]],
+    keys: [{ t: 0, x: 0.69, y: 0.42, z: 2.3, ry: 10, rz: 2 }, { t: 1, x: 0.66, y: 0.4, z: 2.6, ry: -5 }] },
+  { ...A, alt: "", len: 1.2,
+    keys: [{ t: 0, x: 0.42, y: 0.5, z: 1.7, ry: -8 }, { t: 1, x: 0.5, y: 0.5, z: 1.02, ry: 2 }] },
+];
+const R = shotRanges(SHOTS);
+
 const MESS = [
-  ["43 unread emails", "left-[6%] top-[16%]", -4],
-  ["Invoice #1042 overdue", "left-[46%] top-[22%]", 3],
-  ["3 missed Slack pings", "left-[24%] top-[33%]", -2],
-  ["Weekly report due", "left-[8%] top-[44%]", 2],
+  ["43 unread emails", "left-[6%] top-[18%]", -4, -260],
+  ["Invoice #1042 overdue", "left-[44%] top-[24%]", 3, 220],
+  ["3 missed Slack pings", "left-[22%] top-[36%]", -2, -180],
+  ["Weekly report due", "left-[64%] top-[52%]", 2, 240],
 ];
-const DONE = [
-  ["Inbox summed up in 5 lines", "right-[8%] top-[14%]"],
-  ["Invoice reminder sent", "right-[24%] top-[29%]"],
-  ["Report posted to Slack", "right-[6%] top-[42%]"],
-];
+const DONE = ["Inbox summed up in 5 lines", "Invoice reminder sent", "Report posted to Slack"];
 const REEL = [["9:04", "Without Hushwork"], ["9:05", "With Hushwork"]];
-const swapDesk = (v) => ({ to: v < 0.5 ? 0.86 : 0.12 });
+
+// One nagging note: it shakes while the desk is a mess, then the camera move flings it off the screen.
+function Nag({ label, at, turn, fling, i, p }) {
+  const start = R[3][0] - 0.02 + i * 0.012;
+  const x = useTransform(p, [start, start + 0.08], [0, fling * 3], { clamp: true });
+  const y = useTransform(p, [start, start + 0.08], [0, -420], { clamp: true });
+  const rotate = useTransform(p, [start, start + 0.08], [turn, turn * 12], { clamp: true });
+  const opacity = useTransform(p, [start + 0.03, start + 0.08], [1, 0], { clamp: true });
+  return (
+    <motion.li className={`absolute ${at}`} style={{ x, y, rotate, opacity }}>
+      <span className="hw-nag items-center gap-2 border border-white/25 bg-black/70 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-white sm:text-[13px]" style={{ "--d": `${i * 0.7}s` }}>
+        <span className="h-1.5 w-1.5 rounded-full bg-error" />{label}
+      </span>
+    </motion.li>
+  );
+}
+
+function Done({ label, i, p }) {
+  const start = R[4][0] + 0.03 + i * 0.025;
+  const opacity = useTransform(p, [start, start + 0.06], [0, 1], { clamp: true });
+  const x = useTransform(p, [start, start + 0.08], [60, 0], { clamp: true });
+  return (
+    <motion.li style={{ opacity, x }} className="ml-auto flex w-max items-center gap-2 border border-white/25 bg-black/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-white backdrop-blur-sm sm:text-[13px]">
+      <Icon name="Check" size={12} weight="bold" className="text-success" />{label}
+    </motion.li>
+  );
+}
 
 export default function BeforeAfter() {
   const track = useRef(null);
-  const stage = useRef(null);
   const reduce = usePrefersReducedMotion();
-  const box = useCoverBox(stage, SIZE[0], SIZE[1]);
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
-  const half = useMotionValue(0.5);
-  // Scroll wipes between the desks, and so does time: left alone, it swaps to the other desk every few seconds.
-  const clock = useFilmClock(scrollYProgress, swapDesk, 4800);
-  const p = reduce ? half : clock;
-
-  const edge = useTransform(p, [0.2, 0.75], [100, 0], { clamp: true }); // where the tidy photo starts, % from the left
-  const clip = useTransform(edge, (v) => `inset(0 0 0 ${v}%)`);
-  const left = useTransform(edge, (v) => `${v}%`);
-  const push = useTransform(p, [0, 1], [1.16, 1.02]);
-  const before = useTransform(p, [0.3, 0.48], [1, 0]);
-  const after = useTransform(p, [0.5, 0.68], [0, 1]);
-  const messO = useTransform(edge, [20, 60], [0, 1]);
-  const doneO = useTransform(edge, [40, 10], [0, 1]);
-  const lineO = useTransform(edge, [0, 2, 98, 100], [0, 1, 1, 0]);
-
-  const glued = (children) => box && <div className="absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>{children}</div>;
+  // A light spring so the camera glides over the frames instead of stepping, but still keeps up with a fast flick.
+  const p = useSpring(scrollYProgress, { stiffness: 260, damping: 34, mass: 0.35 });
+  const before = useTransform(p, [R[1][1] - 0.02, R[2][0] + 0.02], [1, 0]);
+  const after = useTransform(p, [R[5][0], R[5][0] + 0.05], [0, 1]);
 
   return (
     <section id="monday" aria-labelledby="monday-heading" className="relative bg-black text-white">
-      <div ref={track} className={reduce ? "" : "relative h-[280vh]"}>
-        <div ref={stage} className={`${reduce ? "relative h-dvh min-h-[560px]" : "sticky top-0 h-dvh"} overflow-hidden`}>
-          {/* The messy desk. */}
-          <motion.div className="absolute inset-0" style={{ scale: reduce ? 1.02 : push }}>
-            <FilmVideo name="before" alt="A cluttered desk covered in sticky notes, in cold light" progress={p} seconds={12} priority />
-            {glued(
-              <motion.ul aria-hidden="true" style={{ opacity: messO }} className="absolute inset-0 hidden sm:block">
-                {MESS.map(([label, at, turn], i) => (
-                  <li key={label} className={`absolute ${at}`} style={{ rotate: `${turn}deg` }}>
-                    <span className="hw-nag items-center gap-2 border border-white/25 bg-black/70 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-white sm:text-[13px]" style={{ "--d": `${i * 0.7}s` }}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-error" />{label}
-                    </span>
-                  </li>
-                ))}
-              </motion.ul>,
-            )}
-          </motion.div>
-          {/* Phones crop the photo hard, so there the notes stack in a corner of the screen instead of sitting on the desk. */}
-          <motion.ul aria-hidden="true" style={{ opacity: messO }} className="absolute left-5 top-24 space-y-2 sm:hidden">
-            {MESS.slice(0, 3).map(([label]) => (
-              <li key={label} className="flex w-max items-center gap-2 border border-white/25 bg-black/70 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-white"><span className="h-1.5 w-1.5 rounded-full bg-error" />{label}</li>
-            ))}
-          </motion.ul>
+      <div ref={track} className={reduce ? "" : "relative h-[460vh]"}>
+        <div className={`${reduce ? "relative h-dvh min-h-[560px]" : "sticky top-0 h-dvh"} overflow-hidden`}>
+          <CameraFilm shots={SHOTS} progress={p} />
 
-          {/* The tidy desk, wiped in from the right. */}
-          <motion.div className="absolute inset-0" style={{ clipPath: clip }}>
-            <motion.div className="absolute inset-0" style={{ scale: reduce ? 1.02 : push }}>
-              <FilmVideo name="after" alt="The same desk, tidy, in warm morning light" progress={p} seconds={12} />
-              {glued(
-                <motion.ul aria-hidden="true" style={{ opacity: doneO }} className="absolute inset-0 hidden sm:block">
-                  {DONE.map(([label, at]) => (
-                    <li key={label} className={`absolute ${at} flex items-center gap-2 border border-white/25 bg-black/60 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-white sm:text-[13px]`}>
-                      <Icon name="Check" size={12} weight="bold" className="text-success" />{label}
-                    </li>
-                  ))}
-                </motion.ul>,
-              )}
-            </motion.div>
-            <motion.ul aria-hidden="true" style={{ opacity: doneO }} className="absolute right-5 top-24 space-y-2 sm:hidden">
-              {DONE.map(([label]) => (
-                <li key={label} className="ml-auto flex w-max items-center gap-2 border border-white/25 bg-black/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-white"><Icon name="Check" size={11} weight="bold" className="text-success" />{label}</li>
-              ))}
-            </motion.ul>
-          </motion.div>
-          <motion.span aria-hidden="true" className="absolute inset-y-0 z-10 w-px bg-white" style={{ left, opacity: lineO }} />
+          {!reduce && (
+            <>
+              <ul aria-hidden="true" className="absolute inset-0">
+                {MESS.map(([label, at, turn, fling], i) => <Nag key={label} label={label} at={at} turn={turn} fling={fling} i={i} p={p} />)}
+              </ul>
+              <ul aria-hidden="true" className="absolute right-5 top-24 space-y-2 sm:right-[6%] sm:top-[18%]">
+                {DONE.map((label, i) => <Done key={label} label={label} i={i} p={p} />)}
+              </ul>
+            </>
+          )}
 
           <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.3)_40%,rgba(0,0,0,0)_65%)]" />
           <div className="absolute inset-x-0 bottom-20 z-10 mx-auto max-w-6xl px-5 sm:bottom-24">
@@ -107,9 +104,9 @@ export default function BeforeAfter() {
               <motion.span className="absolute inset-x-0 bottom-0" style={{ opacity: reduce ? 1 : before }}><FilmTitle text="Forty-seven things *need you.*" /></motion.span>
               {!reduce && <motion.span className="absolute inset-x-0 bottom-0" style={{ opacity: after }}><FilmTitle text="Done before *coffee.*" /></motion.span>}
             </div>
-            <p className="mt-5 max-w-md text-lg font-extralight leading-relaxed text-white/85">Same desk, same Monday. On the right, the morning after Hushwork ran first.</p>
+            <p className="mt-5 max-w-md text-lg font-extralight leading-relaxed text-white/85">Same desk, same Monday. Scroll, and watch the morning after Hushwork ran first.</p>
           </div>
-          {!reduce && <FilmReel items={REEL} progress={clock} active={-1} />}
+          {!reduce && <FilmReel items={REEL} progress={p} active={-1} />}
         </div>
       </div>
     </section>
