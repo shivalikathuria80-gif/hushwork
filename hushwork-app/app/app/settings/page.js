@@ -11,6 +11,10 @@ import { OAUTH_SETUP } from "@/lib/plugin/oauth";
 import { PLUGIN_ADDRESS } from "@/lib/plugin/address";
 import { NO_TABLE, TOKEN_SETUP } from "@/lib/plugin/tokens";
 import { createClient } from "@/lib/supabase/server";
+import NotifySettings from "@/components/app/NotifySettings";
+import { NOTIFY_SETUP, readSettings } from "@/lib/approve-links";
+import { pushKeysFromEnv } from "@/lib/approve-notify";
+import { getComposioKey } from "@/lib/connectors/composio-env";
 
 export const metadata = { title: "Settings - Hushwork", robots: { index: false, follow: false } };
 
@@ -33,6 +37,16 @@ export default function SettingsPage() {
             <a href="/api/export" download className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-field bg-surface px-4 text-sm font-medium shadow-sm hover:bg-raised">Download my data</a>
           </div>
           <div className="mt-4 border-t border-line pt-4"><DeleteAccount /></div>
+        </div>
+      </section>
+
+      <section id="notify-settings" aria-labelledby="notify-heading" className="mt-8 scroll-mt-20">
+        <h2 id="notify-heading" className="text-xl font-semibold leading-[1.35] tracking-tight">Notifications</h2>
+        <p className="mt-1 text-sm text-mute">How Hushwork tells you a step is waiting for your OK, and whether you can approve it straight from that message.</p>
+        <div className="mt-3 rounded-[28px] border border-line bg-surface p-4 shadow-sm sm:p-6">
+          <Suspense fallback={<span aria-hidden="true" className="block h-64 w-full rounded-2xl bg-raised" />}>
+            <Notify />
+          </Suspense>
         </div>
       </section>
 
@@ -82,6 +96,23 @@ export default function SettingsPage() {
       </section>
     </main>
   );
+}
+
+async function Notify() {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const [settings, browsers, links] = await Promise.all([
+    supabase.from("notify_settings").select("email, slack, slack_to, push, links, digest, digest_hour, tz_offset").eq("user_id", user.id).limit(1),
+    supabase.from("push_subscriptions").select("id").eq("user_id", user.id).limit(20),
+    supabase.from("approve_links").select("id").eq("user_id", user.id).is("used_at", null).gt("expires_at", new Date().toISOString()).limit(100),
+  ]);
+  if (settings.error) {
+    if (!NO_TABLE.has(settings.error.code)) console.error("Loading notification settings failed:", settings.error.code);
+    return <p className="text-[15px]">{NO_TABLE.has(settings.error.code) ? NOTIFY_SETUP : "Could not load your notification settings. Try again in a minute."}</p>;
+  }
+  const read = readSettings(settings.data?.[0]);
+  const initial = { email: read.email, slack: read.slack, slackTo: read.slackTo, push: read.push, links: read.links, digest: read.digest, digestHour: read.digestHour };
+  return <NotifySettings initial={initial} pushKey={pushKeysFromEnv().publicKey} pushBrowsers={browsers.data?.length ?? 0} openLinks={links.data?.length ?? 0} mailReady={Boolean(getComposioKey())} />;
 }
 
 async function Memory() {

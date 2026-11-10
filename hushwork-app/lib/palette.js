@@ -15,6 +15,7 @@ export const PAGES = [
   { id: "page:links", title: "Start links", hint: "Start a workflow from a form, a new email or a new calendar event", icon: "Link", href: "/app/links", words: "webhook trigger form lead incoming event hook url tally typeform new email inbox calendar event starts watch" },
   { id: "page:connections", title: "Connections", hint: "Connect Gmail, Linear, Slack and more", icon: "Plug", href: "/app/connections", words: "apps connect gmail linear google slack" },
   { id: "page:settings", title: "Settings", hint: "Memory, chatbot plugin, your account", icon: "Settings", href: "/app/settings", words: "account memory tokens plugin delete" },
+  { id: "page:notify", title: "Notifications", hint: "Email, Slack, push, digest, approve from the message", icon: "Bell", href: "/app/settings#notify-settings", words: "notifications notify email slack push digest approve link alert" },
   { id: "page:docs", title: "Docs", hint: "How Hushwork works", icon: "FileText", href: "/docs", words: "help guide" },
 ];
 

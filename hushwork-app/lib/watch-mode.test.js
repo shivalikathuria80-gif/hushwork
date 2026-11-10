@@ -413,7 +413,12 @@ test("the nudge: 'off' without a Composio key (nothing is even looked up), no re
 
 test("the nudge is the only thing watch mode does by itself, and it is wired in with no new door: source checks", () => {
   const notify = fs.readFileSync(new URL("./schedule-notify.js", import.meta.url), "utf8");
-  const watchPart = notify.slice(notify.indexOf("// ---- THE NUDGE"), notify.indexOf("// ---- THE HUSHWORK AGENT")).replace(/\/\/.*$/gm, "");
+  const wholeWatchPart = notify.slice(notify.indexOf("// ---- THE NUDGE"), notify.indexOf("// ---- THE HUSHWORK AGENT")).replace(/\/\/.*$/gm, "");
+  // A person who saved notification settings goes through lib/approve-notify.js instead (its words are checked in approve-links.test.js: names
+  // and step titles only, never what a step would send). Everything below checks the plain email everyone else gets.
+  const savedBranch = wholeWatchPart.slice(wholeWatchPart.indexOf("if (settings.saved) {"), wholeWatchPart.indexOf("} else {", wholeWatchPart.indexOf("if (settings.saved) {")));
+  assert.ok(savedBranch.includes("deliver({") && !/willDo|answer|outcome/.test(savedBranch.replace(/willDo: ""/, "")), "the saved-settings branch only hands steps to deliver(), which never writes their words into a message");
+  const watchPart = wholeWatchPart.replace(savedBranch, "");
   assert.ok(watchPart.includes('findAction("gmail_send")') && watchPart.includes("found?.user?.email"), "to the person's own address, through Gmail (send)");
   assert.ok(!/\bfetch\(|webhook|oauth/i.test(watchPart), "no webhook, no raw request");
   assert.equal(watchPart.match(/details:/g).length, 1, "the email body is built in one place");
@@ -421,7 +426,7 @@ test("the nudge is the only thing watch mode does by itself, and it is wired in 
   const fixedWords = watchPart.slice(watchPart.indexOf("const NUDGE = {"), watchPart.indexOf("\n};\n", watchPart.indexOf("const NUDGE = {")) + 4); // the two fixed wordings: only the name and site go in
   assert.ok(!/\$\{(?!name\}|siteUrl\})/.test(fixedWords), "the fixed wordings take only the workflow's name and the site address");
   assert.ok(!/step|answer|outcome|detail\b/.test(watchPart.replace(fixedWords, "").replace(/details: watchText\(name[^)]*\)\.replace[^)]*\)[^)]*\)/, "").replace(/detail: ""/, "").replace(/outcome: nudgeOf\(reason\)\.record/, "")), "no step text or findings are read into the email");
-  assert.ok(watchPart.indexOf("if (!key) return \"off\"") < watchPart.indexOf("getUserById"), "off means nothing is looked up");
+  assert.ok(watchPart.indexOf("if (!key && !(settings.saved && settings.push && pushKeys?.publicKey)) return \"off\"") < watchPart.indexOf("getUserById"), "off means nothing is looked up");
   const tick = fs.readFileSync(new URL("./schedule-tick.js", import.meta.url), "utf8");
   assert.ok(tick.includes("nudge: (watch) => notifyWatch({ admin, ...watch })"), "the clock hands the runner the nudge");
   assert.ok(tick.indexOf("isPaused(admin)") < tick.indexOf("runDueSchedules("), "the pause switch still comes first, so a paused app sends no nudge either");

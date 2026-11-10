@@ -14,6 +14,9 @@ import { WATCH_LIMITS } from "@/lib/app-events";
 import { createTokenClient } from "@/lib/supabase/admin";
 import { takeDbSlot } from "@/lib/db-limits";
 import { makeLimiter } from "@/lib/ai/limits";
+import { runDigests, pushKeysFromEnv } from "@/lib/approve-notify";
+import { runActionTool } from "@/lib/connectors/composio";
+import { getComposioKey } from "@/lib/connectors/composio-env";
 
 // What the clock calls (app/api/cron/tick). It does NOTHING unless the call carries the clock's password in the Authorization header
 // ("Bearer <CRON_SECRET>"; Vercel Cron sends exactly that when CRON_SECRET is set). Answers are small and never hold anyone's data:
@@ -55,5 +58,7 @@ export async function handleTick(request) {
   const agents = await runDueAgents({ admin, check: checkAgent, nudge: (found) => notifyAgent({ admin, ...found }), deadline }).catch(() => ({ ok: false }));
   // App events (lib/app-event-runner.js): new mail and new calendar events that start a workflow. A problem there never fails the schedules either.
   const watches = await runDueWatches({ ...watchDeps(admin), deadline }).catch(() => ({ ok: false }));
-  return reply(summary.ok ? 200 : 500, { ...summary, agents: { looked: agents.looked ?? 0, told: agents.told ?? 0 }, watches: { looked: watches.looked ?? 0, started: watches.started ?? 0 } });
+  // The daily digests of waiting steps (lib/approve-notify.js), for the people who chose one. A problem there never fails the schedules either.
+  const digests = await runDigests({ admin, deadline, send: runActionTool, key: getComposioKey(), pushKeys: pushKeysFromEnv() }).catch(() => ({ sent: 0 }));
+  return reply(summary.ok ? 200 : 500, { ...summary, agents: { looked: agents.looked ?? 0, told: agents.told ?? 0 }, watches: { looked: watches.looked ?? 0, started: watches.started ?? 0 }, digests: { sent: digests.sent ?? 0 } });
 }

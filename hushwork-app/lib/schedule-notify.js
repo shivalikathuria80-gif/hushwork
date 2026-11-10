@@ -3,6 +3,7 @@ import { getComposioKey } from "@/lib/connectors/composio-env";
 import { runActionTool } from "@/lib/connectors/composio";
 import { checkTarget, findAction } from "@/lib/connectors/composio-actions";
 import { DAILY_CAP, canSpeak, inQuietHours, localDayStartMs } from "@/lib/watch-rules";
+import { deliver, loadNotifySettings, mintLinks, pushKeysFromEnv, waitingItems } from "@/lib/approve-notify";
 
 // The email a person gets when a scheduled workflow stops working. It is sent ONLY when a schedule changes from working (or never run) to
 // failed or stopped, so a broken schedule mails once, not every five minutes. It goes to the person's own address through their own
@@ -36,7 +37,7 @@ export async function notifyScheduleProblem({ admin, userId, workflowId, status,
 // else) saying to open the Runs page. `reason` says why: "watch" (a watch workflow found something new), "arrived" (a start link started the run, lib/hook-receive.js) or "waiting" (any other scheduled run, an
 // agent included, skipped its writing steps because the schedule does not allow writing). Rules (lib/watch-rules.js), the same for both: never
 // between 20:00 and 08:00 their time, at most 3 a day per person in all. The words never include anything from the run (no step text, no findings)
-// and never a link that approves anything.
+// and never a link that approves anything (a person who switched on "review and approve" links in Settings gets links to a page that shows the words first, see below).
 // To count the day, each email leaves a small "Told you" record (spoke: true); the number sent today is the number of those records since the
 // person's local midnight. Nothing sent means nothing recorded. It never throws; it returns "sent" or the reason it did not send.
 const NUDGE = {
@@ -69,9 +70,16 @@ const NUDGE = {
 const nudgeOf = (reason) => NUDGE[reason] ?? NUDGE.watch;
 export const watchText = (name, siteUrl, reason = "watch") => nudgeOf(reason).text(String(name).slice(0, 80), siteUrl);
 
-export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, reason = "watch", now = Date.now(), send = runActionTool, key = getComposioKey(), siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "" }) {
+// NOTIFICATION SETTINGS (supabase/notify.sql, lib/approve-notify.js). A person who saved none gets exactly the email above. A person who did:
+//   * chose the daily digest: nothing is sent now ("digest"); the clock's digest names this step at their hour.
+//   * else: the same limits, then one message on each channel they chose (email, a Slack direct message, push), naming the waiting steps by
+//     their titles, and, only if they switched it on, one single-use "review and approve" link per step (lib/approve-links.js). The link opens a
+//     page that shows the exact words first; it never approves by being opened.
+export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, reason = "watch", now = Date.now(), send = runActionTool, key = getComposioKey(), siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "", pushKeys = pushKeysFromEnv(), fetchImpl }) {
   try {
-    if (!key) return "off";
+    const settings = await loadNotifySettings(admin, userId);
+    if (settings.saved && settings.digest) return "digest";
+    if (!key && !(settings.saved && settings.push && pushKeys?.publicKey)) return "off";
     if (inQuietHours(now, tzOffset)) return "quiet_hours";
     const { data: told, error: countError } = await admin
       .from("runs").select("id")
@@ -81,13 +89,22 @@ export async function notifyWatch({ admin, userId, workflowId, runId, tzOffset, 
     if (countError || !Array.isArray(told)) return "error"; // cannot count how many times it spoke today, so it stays silent
     if (!canSpeak({ spokenToday: told.length, nowMs: now, tzOffset })) return "capped";
     const { data: found } = await admin.auth.admin.getUserById(userId);
-    const action = findAction("gmail_send");
-    const target = checkTarget(action, found?.user?.email);
-    if (target.error) return "no_address";
     const { data: workflows } = await admin.from("workflows").select("name").eq("user_id", userId).eq("id", workflowId).limit(1);
     const name = workflows?.[0]?.name ?? "a workflow";
-    const result = await send({ key, userId, action, values: { target: target.value, title: nudgeOf(reason).title, details: watchText(name, siteUrl.replace(/\/$/, ""), reason) } });
-    if (!result.ok) return "not_sent";
+    if (settings.saved) {
+      const who = { user: { id: userId, email: found?.user?.email ?? "" }, supabase: admin };
+      let items = await waitingItems(who, { runId });
+      if (!items.length) items = [{ runId, step: 0, title: "", workflow: name, willDo: "" }]; // still say something waits; no link without words
+      else if (settings.links) items = await mintLinks(admin, userId, items, settings.email ? "email" : settings.slack ? "slack" : "push", { siteUrl, now });
+      const told = await deliver({ admin, userId, settings, reason, name, items, send, key, siteUrl, pushKeys, fetchImpl, email: found?.user?.email ?? "", now });
+      if (!told.any) return told.email === "no_address" ? "no_address" : "not_sent";
+    } else {
+      const action = findAction("gmail_send");
+      const target = checkTarget(action, found?.user?.email);
+      if (target.error) return "no_address";
+      const result = await send({ key, userId, action, values: { target: target.value, title: nudgeOf(reason).title, details: watchText(name, siteUrl.replace(/\/$/, ""), reason) } });
+      if (!result.ok) return "not_sent";
+    }
     const { error: recordError } = await admin.from("runs").insert({
       user_id: userId, workflow_id: workflowId, workflow_name: name, mode: "live", status: "done",
       results: [{ icon: "Mail", title: "Told you", detail: "", status: "done", spoke: true, outcome: nudgeOf(reason).record, from: runId, fromStep: 0 }],

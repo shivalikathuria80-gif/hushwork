@@ -364,3 +364,7 @@ export async function callTool(name, args, who, deps) {
     return { error: "Something went wrong in Hushwork. Try again in a moment." };
   }
 }
+
+// Read by the "review and approve" links of notifications (lib/approve-notify.js, lib/approve-decide.js), so a link shows and checks the very same
+// `will_do` words a chatbot is given here and the Runs page shows.
+export { readRun, listWaiting };

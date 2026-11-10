@@ -5,8 +5,9 @@ import { randomUUID } from "node:crypto";
 // ---- a pretend Supabase -------------------------------------------------------------------------------------------------------------------------
 // Supports exactly what the app uses: from(table).select/insert/delete/eq/in/gte/contains/order/limit, rpc(), and auth.admin.getUserById.
 // `asUser` is who rows belong to when a signed-in person inserts (the real database fills user_id in from the session).
-export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, rpc = () => ({ data: "ok", error: null }), admin = false } = {}) {
-  const tables = { workflows: workflows.map((row) => ({ ...row })), runs: [] };
+// `extra` names more (empty) tables a test needs, like ["notify_settings", "approve_links"]; any other table answers "does not exist" (42P01).
+export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, rpc = () => ({ data: "ok", error: null }), admin = false, extra = [] } = {}) {
+  const tables = { workflows: workflows.map((row) => ({ ...row })), runs: [], ...Object.fromEntries(extra.map((name) => [name, []])) };
   let tick = Date.parse("2026-10-24T08:00:00Z");
   const subset = (needle, row) => Object.entries(needle).every(([key, value]) => row?.[key] === value);
 
@@ -15,6 +16,9 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
     select() { this.wantsRows = true; return this; }
     insert(values) { this.mode = "insert"; this.values = values; return this; }
     delete() { this.mode = "delete"; return this; }
+    update(values) { this.mode = "update"; this.values = values; return this; }
+    is(column, value) { this.filters.push((row) => (value === null ? row[column] == null : row[column] === value)); return this; }
+    gt(column, value) { this.filters.push((row) => String(row[column]) > String(value)); return this; }
     eq(column, value) { this.filters.push((row) => row[column] === value); return this; }
     in(column, values) { this.filters.push((row) => values.includes(row[column])); return this; }
     gte(column, value) { this.filters.push((row) => String(row[column]) >= String(value)); return this; }
@@ -43,6 +47,7 @@ export function makeFakeSupabase({ asUser = null, workflows = [], emails = {}, r
       }
       let found = table.filter((row) => this.filters.every((test) => test(row)));
       if (this.mode === "delete") { for (const row of found) table.splice(table.indexOf(row), 1); return { error: null }; }
+      if (this.mode === "update") { for (const row of found) Object.assign(row, this.values); return this.wantsRows ? { data: found.map((row) => ({ ...row })), error: null } : { error: null }; }
       if (this.sort) found = [...found].sort((a, b) => String(a[this.sort.column]).localeCompare(String(b[this.sort.column])) * (this.sort.ascending ? 1 : -1));
       return { data: found.slice(0, this.max).map((row) => ({ ...row })), error: null };
     }

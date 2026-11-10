@@ -152,6 +152,14 @@ The Hushwork plugin (`plugins/hushwork/`) lets a person use Hushwork from Claude
 
 How it works, the tools and the safety rules: [reference/plugin.md](reference/plugin.md).
 
+## 12g. Notifications: approve from email, Slack or push (optional, one paste + three settings)
+
+1. Supabase > SQL Editor: paste `supabase/notify.sql` and press Run (once).
+2. For push only: on your computer run `npm run vapid` in `hushwork-app`, then add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (a `mailto:` address) in Vercel > Settings > Environment Variables, and deploy again. Without them email and Slack still work and push is shown as not switched on.
+3. Each person chooses in Settings > Notifications: email, a Slack direct message (their member ID) and/or push; each time or one daily digest (08:00 to 19:00 their time); and whether messages carry a "review and approve" link. Links are OFF until they switch them on.
+
+A link opens `/a/<code>`: a page that shows the exact words the step will send. Opening it does nothing; only the Approve button does the step, with the same "changed since you read it" check as the Runs page. One link = one step, works once, for 48 hours; only its hash is stored. "Cancel them" in Settings stops every open link at once.
+
 ## 12d. After the 2026-10-25 update: reconnect Stripe (and Slack)
 
 Stripe invoices and Slack messages are extra read-only tools on the same sign-in as Stripe and Slack. A sign-in made before only allowed the first tool. On the Connections page press **Disconnect** and then **Connect** for Stripe (and for Slack if you use it). Nothing else is needed.

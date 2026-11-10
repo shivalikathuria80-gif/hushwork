@@ -305,7 +305,7 @@ test("Composio: the key is read only in composio-env.js (server-only, never NEXT
   const env = files.find((file) => file.name === "lib/connectors/composio-env.js").text;
   assert.match(env, /^import "server-only";/m);
   const importers = files.filter((file) => /from\s+["']@\/lib\/connectors\/composio-env["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/agent/check.js", "lib/app-event-read.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/skills/connection-status.js"]);
+  assert.deepEqual(importers.sort(), ["app/app/connections/page.js", "app/app/settings/page.js", "lib/actions/account.js", "lib/actions/composio.js", "lib/actions/notify.js", "lib/agent/check.js", "lib/app-event-read.js", "lib/connections/composio-flow.js", "lib/run-core.js", "lib/schedule-notify.js", "lib/schedule-tick.js", "lib/skills/connection-status.js"]);
   for (const name of importers) assert.ok(!/^\s*["']use client["']/m.test(files.find((file) => file.name === name).text), `${name} must not be browser code`);
   const client = files.find((file) => file.name === "lib/connectors/composio.js").text.replace(/^\s*\/\/.*$/gm, "");
   assert.deepEqual(client.match(/\/tools\/execute\/[^`"']*/g), ["/tools/execute/${app.tool}", "/tools/execute/${tool}", "/tools/execute/${action.tool}", "/tools/execute/${second.tool}"], "the tools that run are the lookups in the apps list and the actions in the actions list (and the second call of an action that needs two, written in that same action's entry)");
@@ -403,13 +403,21 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   assert.match(env, /^import "server-only";/m);
   assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example" && name !== "scripts/clock.mjs"), ["lib/schedule-env.js"], "only schedule-env.js reads them (the clock script on your own computer sends the password, it is not server code)");
   const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(adminImporters.sort(), ["app/api/hooks/[code]/route.js", "app/api/mcp/route.js", "lib/actions/account.js", "lib/actions/app-events.js", "lib/plugin/oauth-server.js", "lib/schedule-tick.js"], "the all-access client has exactly six users: the clock's handler, Delete my account, the plugin endpoint (for the token's owner only), the chatbot sign-in (OAuth clients and codes are nobody's own rows), a start link's address (for the link's owner only), and Check now on an app watch (for the signed-in person's own watch only)");
+  assert.deepEqual(adminImporters.sort(), ["app/a/[code]/page.js", "app/api/hooks/[code]/route.js", "app/api/mcp/route.js", "lib/actions/account.js", "lib/actions/app-events.js", "lib/actions/approve-link.js", "lib/plugin/oauth-server.js", "lib/schedule-tick.js"], "the all-access client has exactly these users: the clock's handler, Delete my account, the plugin endpoint (for the token's owner only), the chatbot sign-in (OAuth clients and codes are nobody's own rows), a start link's address (for the link's owner only), Check now on an app watch (for the signed-in person's own watch only), and a notification's review page and its buttons (for the link's owner only)");
   // An app watch (new email or calendar event): Check now is only ever for the signed-in person, and a run it starts never writes by itself.
   const checkNow = files.find((file) => file.name === "lib/actions/app-events.js").text;
   assert.ok(/^"use server"/.test(checkNow) && checkNow.indexOf("requireUser()") < checkNow.indexOf("createAdminClient()") && checkNow.includes("onlyId: id.value, userId: user.id"), "Check now looks only at the signed-in person's own watch");
   const watchRunner = files.find((file) => file.name === "lib/app-event-runner.js").text;
   assert.ok(watchRunner.includes("allowWrites: false") && !/allowWrites:\s*true/.test(watchRunner), "a run started by a new email or event never writes by itself");
   assert.ok(watchRunner.includes('.eq("id", deps.onlyId).eq("user_id", deps.userId)'), "one watch is looked up with its owner");
+  // A review link: the page only reads; a button claims the single-use link BEFORE the step is done, as the link's owner, with the words the page showed.
+  const reviewPage = files.find((file) => file.name === "app/a/[code]/page.js").text;
+  assert.ok(reviewPage.includes("viewLink(") && !/approveStep|rejectStep|decideLink/.test(reviewPage), "opening the page never approves anything");
+  const decide = files.find((file) => file.name === "lib/approve-decide.js").text;
+  const decideBody = decide.slice(decide.indexOf("export async function decideLink"));
+  assert.ok(decideBody.indexOf('.is("used_at", null)') > 0 && decideBody.indexOf('.is("used_at", null)') < decideBody.indexOf("deps.approveStep("), "the link is claimed once before anything is done");
+  assert.ok(decideBody.includes("seen: input.seen"), "the exact words the person read go with the approval");
+  assert.ok(decide.includes("whoFor(deps, row.user_id)") && !/user_id:\s*input/.test(decide), "the link's own row says whose step it is, never the button");
   // A start link: the code in the address finds the owner before anything runs, the run is only ever the owner's, and it never writes by itself.
   const hookRoute = files.find((file) => file.name === "app/api/hooks/[code]/route.js").text;
   const receive = files.find((file) => file.name === "lib/hook-receive.js").text;

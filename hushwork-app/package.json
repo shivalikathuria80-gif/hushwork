@@ -11,7 +11,8 @@
     "secret": "node scripts/make-secret.mjs",
     "clock": "node --env-file=.env.local scripts/clock.mjs",
     "check:privacy": "node --env-file=.env.local scripts/two-account-check.mjs",
-    "make:sculpture": "node scripts/make-sculpture.mjs"
+    "make:sculpture": "node scripts/make-sculpture.mjs",
+    "vapid": "node scripts/make-vapid.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
