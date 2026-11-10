@@ -4,7 +4,8 @@
 -- by itself, as its owner, with writing switched OFF (anything that sends or creates still waits for the owner's Approve).
 --
 --   hooks        one row per workflow that has a link: the secret code, its hash (how the address is looked up), on/off and counters.
---   hook_events  what arrived lately: when, how it went, which run it started, and a SHORT preview of the fields (never more than 2,000 bytes).
+--   hook_events  what arrived lately: when, how it went, which run it started, a SHORT preview of the fields (never more than 2,000 bytes) and
+--                every field (already cut by the server), so the owner can read and replay an arrival.
 --
 -- The owner reads and manages their own links with the normal privacy rules. Arrivals are written by the server only (the all-access key),
 -- because the sender is a stranger with no account.
@@ -54,12 +55,15 @@ create table public.hook_events (
   status text not null,                                 -- started | limited | off | failed
   run_id uuid references public.runs (id) on delete set null,
   preview jsonb not null default '[]'::jsonb,           -- [{ "name": "email", "value": "ana@..." }], cut short
+  fields jsonb,                                         -- every field that arrived (cut by the server: 20 fields, 4,000 characters), for the inspector and Replay
   test boolean not null default false,                  -- true when the owner pressed "Send a test"
   created_at timestamptz not null default now(),
 
   constraint hook_events_status check (status in ('started', 'limited', 'off', 'failed')),
   constraint hook_events_preview_is_array check (jsonb_typeof(preview) = 'array'),
-  constraint hook_events_preview_size check (octet_length(preview::text) <= 2000)
+  constraint hook_events_preview_size check (octet_length(preview::text) <= 2000),
+  constraint hook_events_fields_is_array check (fields is null or jsonb_typeof(fields) = 'array'),
+  constraint hook_events_fields_size check (fields is null or octet_length(fields::text) <= 16000)
 );
 
 create index hook_events_user_created_idx on public.hook_events (user_id, created_at desc);

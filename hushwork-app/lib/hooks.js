@@ -23,6 +23,7 @@ export const HOOK_LIMITS = {
 };
 export const HOOK_SETUP = "Start links need one setup step that is not done yet. Open supabase/hooks.sql and run it in Supabase.";
 export const NO_TABLE = new Set(["42P01", "PGRST205"]);
+export const NO_COLUMN = new Set(["42703", "PGRST204"]); // supabase/hook-fields.sql not run yet: hook_events has no `fields` column
 export { INCOMING_TAG, TEST_ARRIVAL, TEST_FLAG, dailyCounts, hookUrl, snippets } from "./hook-tags.js";
 
 export const hashCode = (code) => createHash("sha256").update(String(code)).digest("hex");

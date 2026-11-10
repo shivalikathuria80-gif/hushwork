@@ -135,8 +135,8 @@ export const STEP_KINDS = {
     icon: "Send",
     fields: [
       choice("action", "What to do", Object.fromEntries(COMPOSIO_ACTIONS.map((action) => [action.id, action.name]))),
-      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Email: the address it goes to. Calendar: the start, like 2026-11-05 15:00. Notion: the id of the page it goes under. Todoist, Sheet, Slides, Doc: leave empty. Drive folder: empty, or the id of the folder it goes into." }),
-      text("title", "Message or title", 80, { hint: "For example: Deploy finished. Write {answer} to use what an Ask the AI step said." }),
+      text("target", "Where", 40, { optional: true, hint: "Slack: the channel, like general. GitHub: owner/name, like acme/website. Email: the address it goes to, or {incoming.email} for the address that arrived at its start link. Calendar: the start, like 2026-11-05 15:00. Notion: the id of the page it goes under. Todoist, Sheet, Slides, Doc: leave empty. Drive folder: empty, or the id of the folder it goes into." }),
+      text("title", "Message or title", 80, { hint: "For example: Deploy finished. Write {answer} to use what an Ask the AI step said, or {incoming.subject} for a field that arrived at its start link." }),
       text("details", "More details", 120, { optional: true, hint: "Optional. More words for the message or the issue. For an email this is the text of the email; for a Sheet, the rows (one row per line, boxes separated by |); for Slides, the outline (a line starting with # begins a slide); for a Doc, its text. A typed box is one line, so for several lines write {answer} and let an Ask the AI step write them." }),
     ],
     describe: (fields, label) => ({ title: label("action"), detail: join(fields.title, fields.target ? `in ${fields.target}` : "") }),

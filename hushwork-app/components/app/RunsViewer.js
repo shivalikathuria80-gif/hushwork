@@ -10,7 +10,7 @@ import { summarizeRun } from "@/lib/studio/run-summary";
 import { PAUSED_MESSAGE, isPaused } from "@/lib/app-controls";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, runOutcome, stepState, SETUP_MESSAGE } from "@/lib/run-engine";
+import { readSavedResults, isRequestStep, requestSummary, isLinearLookup, linearSummary, isCalendarLookup, calendarSummary, isGmailLookup, gmailSummary, isDriveLookup, driveSummary, isLinearCreate, linearCreateSummary, isAppLookup, appSummary, isActionStep, actionSummary, isApprovable, isSheetsRow, sheetsSummary, isAiStep, aiSummary, runOutcome, stepState, incomingOf, SETUP_MESSAGE } from "@/lib/run-engine";
 import { connectorStatus } from "@/lib/connector-status";
 import { aiStatus } from "@/lib/ai-status";
 import { ANSWERS_TAG, findAnswer, findAnswers } from "@/lib/run-answer";
@@ -216,12 +216,13 @@ export default async function RunsViewer({ searchParams }) {
   const needsAnswers = approvals.some(({ step }) => isActionStep(step) && String(step.fields?.details).includes(ANSWERS_TAG));
   const answers = needsAnswers ? await findAnswers(await createClient(), user.id, { id: selected.id, workflow_id: selected.workflowId, created_at: selected.createdAt }) : [];
   const paused = await isPaused(await createClient());
+  const incoming = incomingOf(selected.results); // what arrived at the start link, for steps that write {incoming.name}
 
   // What each approval card needs, keyed by step number, so the card sits right under the step it belongs to.
   const approvalFor = new Map(approvals.map(({ step, index }) => [index, {
     kind: isAiStep(step) ? "ai" : isLinearLookup(step) ? "linear" : isCalendarLookup(step) ? "calendar" : isGmailLookup(step) ? "gmail" : isDriveLookup(step) ? "drive" : isLinearCreate(step) ? "issue" : isAppLookup(step) ? "app" : isActionStep(step) ? "action" : isSheetsRow(step) ? "sheets" : "request",
     connected: isAiStep(step) ? aiOn : isLinearLookup(step) || isLinearCreate(step) ? linearConnected : isCalendarLookup(step) || isGmailLookup(step) || isDriveLookup(step) || isSheetsRow(step) ? google.usable : true,
-    message: isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer, answers, user.email) : isSheetsRow(step) ? sheetsSummary(step, answer) : requestSummary(step),
+    message: isAiStep(step) ? aiSummary(step) : isLinearLookup(step) ? linearSummary(step) : isCalendarLookup(step) ? calendarSummary(step) : isGmailLookup(step) ? gmailSummary(step) : isDriveLookup(step) ? driveSummary(step) : isLinearCreate(step) ? linearCreateSummary(step, answer) : isAppLookup(step) ? appSummary(step) : isActionStep(step) ? actionSummary(step, answer, answers, user.email, incoming) : isSheetsRow(step) ? sheetsSummary(step, answer, incoming) : requestSummary(step),
   }]));
   const firstApproval = approvals[0]?.index;
   const liveLine = selectedOutcome.key === "stopped" ? "A step stopped before it could finish. The reason is below." : selectedOutcome.key === "unsure" ? "This was started, but Hushwork never saw it finish. Look in the app first." : liveAi ? "The AI ran this step." : liveSheets ? "A row was added to your Google Sheet." : liveCalendar ? "Google Calendar was read." : liveGmail ? "Gmail was read." : liveDrive ? "Google Drive was read." : liveIssue ? "A task was created in Linear." : liveApp ? "Another app was read, through Composio." : liveAction ? "Something was done in another app, through Composio." : liveLinear ? "Linear was read." : "A web address was read.";

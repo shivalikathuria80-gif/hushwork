@@ -27,6 +27,7 @@
 //   then         (optional) for a file that needs TWO calls (make it, then write into it): { tool, candidates, meaning(values, made), when(values), partial }.
 //                `made` = { id, link } found in the first answer. The second tool is looked at BEFORE the first call, so a mismatch makes nothing.
 //                If the file was made but the second call fails, the step is still recorded as done with `partial` and the reason, and nothing is retried.
+import { fillFields, isOnlyFieldTag } from "../hook-fields.js";
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,4}$/;
 
 // ---- reading the plain words of a sheet or a presentation -------------------------------------------------------------------------------------------------
@@ -206,6 +207,8 @@ export function checkTarget(action, raw) {
   const text = typeof raw === "string" ? raw.trim() : "";
   if (!action.needsTarget) return text ? { error: "This action does not use a place. Leave that box empty." } : { value: "" };
   if (action.selfAllowed && text === MY_EMAIL) return { value: MY_EMAIL }; // filled in later by resolveTarget, from the signed-in person
+  // {incoming.email}: the address that ARRIVED at the workflow's start link (lib/hook-fields.js), filled in and checked by resolveTarget
+  if (action.selfAllowed && isOnlyFieldTag(text)) return { value: text };
   if (!action.target.pattern.test(text)) return { error: action.target.hint };
   return { value: text };
 }
@@ -245,7 +248,14 @@ export function buildArguments(action, values, { names, required }, made = {}) {
 
 // The real "where": {myEmail} becomes the signed-in person's own address (checked like any other address); anything else is already real.
 // `myEmail` comes from the session or the database, never from the step. Returns { value } or { error }.
-export function resolveTarget(action, value, myEmail) {
+// `fields`: what arrived at the start link for this run (lib/hook-fields.js), or null. An address filled in from it is checked like a typed one.
+export function resolveTarget(action, value, myEmail, fields = null) {
+  if (typeof value === "string" && isOnlyFieldTag(value)) {
+    const filled = fillFields(value.trim(), fields, { oneLine: true, max: 200 });
+    if (filled.error) return filled;
+    const checked = checkTarget({ ...action, selfAllowed: false }, filled.text);
+    return checked.error ? { error: `What arrived as ${value.trim()} ("${filled.text.slice(0, 60)}") is not an email address, so nothing can be sent to it.` } : checked;
+  }
   if (value !== MY_EMAIL) return { value };
   const own = checkTarget({ ...action, selfAllowed: false }, typeof myEmail === "string" ? myEmail : "");
   return own.error ? { error: "Your account has no email address to send to. Write an address in the step instead of {myEmail}." } : own;

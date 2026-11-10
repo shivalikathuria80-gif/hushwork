@@ -8,6 +8,7 @@ import { findComposioApp, parseAppAddress, showInput } from "./connectors/compos
 import { EXAMPLE_NOTICE, checkTarget, findAction, isExampleTarget, labelFor, resolveTarget } from "./connectors/composio-actions.js";
 import { fillActionDetails, fillAnswerText } from "./run-answer.js";
 import { fillAnswer, parseCells, parseSheetUrl } from "./connectors/google-sheets.js";
+import { fillFields, isOnlyFieldTag, readFieldList } from "./hook-fields.js";
 
 // A "Call a web address" step can also be approved on the Runs page: Hushwork then asks that address (a read-only GET).
 export const isRequestStep = (step) => step?.kind === "request" && typeof step?.fields?.url === "string";
@@ -46,12 +47,28 @@ export const isSheetsRow = (step) => step?.kind === "row" && !parseSheetUrl(step
 
 // What you read before approving: the exact boxes, in order. The server builds the row again from the saved run.
 // `answer` is what an Ask the AI step of the same workflow said (or ""): it fills in {answer} so you read the exact words first.
-export const sheetsSummary = (step, answer = "") => {
+export const sheetsSummary = (step, answer = "", incoming = null) => {
   const parsed = parseCells(step?.fields?.values).cells ?? [];
-  const filled = fillAnswer(parsed, answer);
-  const cells = filled.cells ?? parsed;
-  return ["Hushwork will add ONE row at the bottom of your Google Sheet. It adds a row and changes nothing else.", `The row has ${cells.length} ${cells.length === 1 ? "box" : "boxes"}:`, cells.map((cell, index) => `${index + 1}. ${cell || "(empty)"}`).join(String.fromCharCode(10)), filled.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
+  const fromLink = fillCells(parsed, incoming);
+  const filled = fillAnswer(fromLink.cells ?? parsed, answer);
+  const cells = filled.cells ?? fromLink.cells ?? parsed;
+  return ["Hushwork will add ONE row at the bottom of your Google Sheet. It adds a row and changes nothing else.", `The row has ${cells.length} ${cells.length === 1 ? "box" : "boxes"}:`, cells.map((cell, index) => `${index + 1}. ${cell || "(empty)"}`).join(String.fromCharCode(10)), fromLink.error ?? filled.error ?? ""].filter(Boolean).join(String.fromCharCode(10));
 };
+
+// {incoming.name} in the boxes of a row: each box is filled on its own (after the row was cut into boxes, so a comma that arrived never makes an
+// extra box), on one line, cut to 300 characters. Returns { cells } or { error }.
+export function fillCells(cells, incoming) {
+  const out = [];
+  for (const cell of cells) {
+    const filled = fillFields(cell, incoming, { oneLine: true, max: 300 });
+    if (filled.error) return { error: filled.error };
+    out.push(filled.text);
+  }
+  return { cells: out };
+}
+
+// What arrived at the start link for a run, as the list of fields its Start step keeps (or null: nothing arrived). `results` = readSavedResults(...).
+export const incomingOf = (results) => (Array.isArray(results) && Array.isArray(results[0]?.incomingFields) ? results[0].incomingFields : null);
 
 // A "Create a Linear task" step with a title can be approved on the Runs page: Hushwork then adds that ONE task in Linear.
 export const isLinearCreate = (step) => step?.kind === "issue" && typeof step?.fields?.title === "string" && step.fields.title.trim() !== "";
@@ -91,24 +108,40 @@ export const isActionStep = (step) => {
 };
 
 // What you read before approving: exactly what will be sent. `answer` fills in {answer} (see lib/run-answer.js).
-export const actionSummary = (step, answer = "", answers = [], myEmail = "") => {
+// `incoming` fills {incoming.name} (what arrived at the start link, lib/hook-fields.js) BEFORE {answer}, so an arrived value can never form a tag.
+export const actionSummary = (step, answer = "", answers = [], myEmail = "", incoming = null) => {
   const action = findAction(step?.fields?.action);
   const f = step?.fields ?? {};
-  const title = fillAnswerText(String(f.title ?? ""), answer, 150);
-  const details = fillActionDetails(action?.id, String(f.details ?? ""), answer, answers);
-  const where = resolveTarget(action, f.target, myEmail).value;
+  const words = actionWords(action, f, incoming);
+  const title = words.title.error ? words.title : fillAnswerText(words.title.text, answer, 150);
+  const details = words.details.error ? words.details : fillActionDetails(action?.id, words.details.text, answer, answers);
+  const resolved = action ? resolveTarget(action, f.target, myEmail, incoming) : { value: f.target };
+  const where = resolved.value;
+  const fromLink = isOnlyFieldTag(f.target);
   return [
     `Hushwork will do ONE thing: ${action?.name ?? "an action"}. It does nothing else in the app.`,
-    action?.needsTarget ? `${labelFor(action, "target")}: ${where === "" && action.target?.empty ? action.target.empty : where ?? "your own email address"}` : "",
+    action?.needsTarget ? `${labelFor(action, "target")}: ${where === "" && action.target?.empty ? action.target.empty : where ?? (fromLink ? String(f.target).trim() : "your own email address")}` : "",
     `${labelFor(action, "title")}: ${title.text ?? f.title}`,
     f.details && !action?.noDetails ? `${labelFor(action, "details")}: ${details.text ?? f.details}` : "",
     // what is BUILT from the words (the rows, the slides), so it is read before it is made
     action?.preview && title.text !== undefined && !details.error ? action.preview({ target: where ?? "", title: title.text, details: details.text ?? "" }) : "",
     isExampleTarget(action, f.target) ? `Warning: ${EXAMPLE_NOTICE}` : "",
     "It is sent through Composio, the company that keeps the connection to the app.",
+    resolved.error && fromLink && action?.needsTarget ? resolved.error : "",
     title.error ?? (action?.noDetails ? "" : details.error) ?? "",
   ].filter(Boolean).join(String.fromCharCode(10));
 };
+
+// The subject and the text of an action step with {incoming.name} filled in: { title: { text } | { error }, details: { text } | { error } }.
+// The run's approval (lib/run-core.js) uses the very same words.
+export function actionWords(action, fields, incoming) {
+  const f = fields ?? {};
+  return {
+    title: fillFields(String(f.title ?? ""), incoming, { oneLine: true, max: 150 }),
+    details: fillFields(String(f.details ?? ""), incoming, { oneLine: !LETTERS.has(action?.id), max: 2800 }),
+  };
+}
+const LETTERS = new Set(["gmail_send", "gmail_draft", "notion_page", "sheet_create", "slides_create", "doc_create"]);
 
 // Steps that WRITE somewhere (add a row, create a task). Auto mode runs them too, so the screens that offer Auto say so in plain words.
 export const isWriteStep = (step) => isSheetsRow(step) || isLinearCreate(step) || isActionStep(step);
@@ -240,6 +273,7 @@ export function readSavedResults(value) {
     const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : r?.status === "pending" ? "pending" : "done" };
     if (r?.note === true) read.note = true; // a stop note: words for the person, not a step's state
     if (typeof r?.incoming === "string" && r.incoming) read.incoming = r.incoming.slice(0, 5200); // what arrived at the workflow's start link (lib/hooks.js); only ever on the Start step
+    if (Array.isArray(r?.incomingFields)) read.incomingFields = readFieldList(r.incomingFields); // the same, field by field, for {incoming.name} (lib/hook-fields.js)
     if (r?.quiet === true) read.quiet = true; // a watch run that found NOTHING NEW and stopped quietly (the Runs page folds these into one line)
     if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
     if (Number.isInteger(r?.fromStep) && r.fromStep >= 0 && r.fromStep < 100) read.fromStep = r.fromStep; // which step of that practice run

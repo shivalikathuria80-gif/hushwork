@@ -424,3 +424,45 @@ test("a run that nothing arrived for says so, and a link cannot start a workflow
   const refused = await startPracticeRun({ id: bare.workflow, auto: true, incoming: { text: "x", count: 1 } }, bare.who);
   assert.match(refused.error, /no Start step/);
 });
+
+// ---- START LINKS: {incoming.name} puts ONE arrived field into an email's To, subject or text, read before Approve ----
+const replyPlan = () => finishSteps({ steps: [{ ...trigger, choice: "lead", a: "" }, { icon: "Mail", title: "Reply", detail: "Hello {incoming.name}, thanks for: {incoming.message}", block: "action", choice: "gmail_send", a: "{incoming.email}", b: "Thanks, {incoming.name}" }] });
+const ARRIVED = [{ name: "name", value: "Ana {answer} {myEmail}" }, { name: "Email", value: "ana@example.com" }, { name: "message", value: "a small website\nby Friday" }];
+
+test("{incoming.email} fills the To, {incoming.name} the subject and text: the card shows the real words, a stranger's braces stay text, and it waits for Approve", async () => {
+  const plan = replyPlan();
+  const { workflow, supabase, who } = setup({ plan });
+  const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
+  try {
+    const started = await startPracticeRun({ id: workflow, auto: true, allowWrites: false, incoming: { text: "x", count: 3, fields: ARRIVED } }, who);
+    assert.equal(started.ok, true);
+    assert.equal(started.auto.waiting, 1, "the email waits");
+    assert.equal(livePosts(composio).length, 0);
+    const practice = supabase.tables.runs.find((run) => run.mode === "practice");
+    assert.deepEqual(practice.results[0].incomingFields, ARRIVED, "the Start step keeps the fields one by one");
+    const sent = await approveActionStep({ runId: started.runId, index: actionIndex(plan) }, who);
+    assert.equal(sent.error, undefined, sent.error);
+    const mail = livePosts(composio)[0].body.arguments;
+    assert.equal(mail.recipient_email, "ana@example.com", "to the address that arrived");
+    assert.equal(mail.subject, "Thanks, Ana ｛answer｝ ｛myEmail｝", "what arrived can never become another tag");
+    assert.equal(mail.body, "Hello Ana ｛answer｝ ｛myEmail｝, thanks for: a small website\nby Friday");
+  } finally { composio.restore(); }
+});
+
+test("a field tag in a run nothing arrived for, a missing field or an address that is not one: nothing is sent and the reason is plain", async () => {
+  const plan = replyPlan();
+  const composio = fakeComposio({ GMAIL_SEND_EMAIL: GMAIL_TOOL });
+  try {
+    const manual = setup({ plan });
+    const run = await startPracticeRun({ id: manual.workflow }, manual.who);
+    const refused = await approveActionStep({ runId: run.runId, index: actionIndex(plan) }, manual.who);
+    assert.match(refused.error, /not started by its start link/);
+    const missing = setup({ plan });
+    const run2 = await startPracticeRun({ id: missing.workflow, incoming: { text: "x", count: 1, fields: [{ name: "email", value: "ana@example.com" }] } }, missing.who);
+    assert.match((await approveActionStep({ runId: run2.runId, index: actionIndex(plan) }, missing.who)).error, /Nothing named "name" arrived/);
+    const bad = setup({ plan });
+    const run3 = await startPracticeRun({ id: bad.workflow, incoming: { text: "x", count: 3, fields: [...ARRIVED.filter((one) => one.name !== "Email"), { name: "email", value: "bcc@evil.test, boss@example.com" }] } }, bad.who);
+    assert.match((await approveActionStep({ runId: run3.runId, index: actionIndex(plan) }, bad.who)).error, /is not an email address/);
+    assert.equal(livePosts(composio).length, 0, "nothing was sent in any of them");
+  } finally { composio.restore(); }
+});

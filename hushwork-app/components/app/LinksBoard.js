@@ -9,7 +9,8 @@ import { EASE, Switch } from "../ui";
 import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { pulse } from "./AppScene";
 import { INCOMING_TAG, TEST_ARRIVAL, dailyCounts, snippets } from "@/lib/hook-tags";
-import { createHook, deleteHook, renewHook, setHookEnabled } from "@/lib/actions/hooks";
+import { createHook, deleteHook, renewHook, replayHookEvent, setHookEnabled } from "@/lib/actions/hooks";
+import { fieldTag } from "@/lib/hook-fields";
 
 // "Start links": the browser half. One motion language for the whole page: a signal travelling a hairline, from "something arrives" to
 // "you approve". It moves only when something really arrived (or a test was sent), never as decoration, and stands still with reduce motion.
@@ -168,6 +169,81 @@ function Snippets({ url, id }) {
   );
 }
 
+// ---- FIELDS: what a step can use -----------------------------------------------------------------------------------------------------
+// One chip per field of the newest arrival: its name, a sample of what came, and its tag. Pressing a chip copies the tag. Next to them, a small
+// picture of an email step with the tags in place, so "To = the address that arrived" is seen, not explained.
+function TagChip({ field }) {
+  const [state, setState] = useState("");
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(field.tag);
+      setState("done");
+    } catch {
+      setState("failed");
+    }
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState(""), 1800);
+  }
+  return (
+    <li className="min-w-0">
+      <button type="button" onClick={copy} title={state === "failed" ? "Select and copy it by hand" : `Copy ${field.tag}`} className="group flex w-full min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2 text-left transition-colors duration-120 hover:border-accent hover:bg-accent-subtle">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium">{field.name}</span>
+          <span className="block truncate text-xs text-mute">{field.sample || "(empty)"}</span>
+        </span>
+        <code className="shrink-0 rounded-full bg-sunken px-2 py-0.5 font-mono text-[11.5px] text-accent-text group-hover:bg-surface">{state === "done" ? "Copied" : field.tag}</code>
+        <span role="status" className="sr-only">{state === "done" ? `${field.tag} copied` : ""}</span>
+      </button>
+    </li>
+  );
+}
+
+const looksLikeEmail = (field) => /email|e-mail|mail/i.test(field.name) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.sample);
+function FieldsPanel({ link }) {
+  const fields = link.fields ?? [];
+  const missing = link.missing ?? [];
+  const email = fields.find(looksLikeEmail);
+  const other = fields.find((field) => field !== email && /subject|topic|title|name/i.test(field.name)) ?? fields.find((field) => field !== email);
+  return (
+    <div className="mt-5 border-t border-line pt-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <p className={`${label} text-mute`}>Fields your steps can use</p>
+        {fields.length > 0 && <p className="text-xs text-mute">From the last arrival. Press one to copy its tag.</p>}
+      </div>
+      {fields.length === 0 ? (
+        <p className="mt-3 text-sm text-mute">Nothing with fields has arrived yet. Press <b className="font-medium text-ink">Send a test</b>, or wait for the first answer from your form, and every field it sent shows up here with its tag.</p>
+      ) : (
+        <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)]">
+          <ul className="grid grid-cols-[minmax(0,1fr)] content-start gap-2 sm:grid-cols-2">
+            {fields.map((field) => <TagChip key={field.tag} field={field} />)}
+          </ul>
+          {/* The picture: a "Do something in another app" email with the tags where they go. */}
+          <figure aria-label="Example: an email step that uses these fields" className="rounded-2xl bg-sunken p-4">
+            <figcaption className={`${label} text-mute`}>In a step, like this</figcaption>
+            <div className="mt-3 rounded-xl border border-line bg-surface p-3 text-[13px] shadow-sm">
+              <p className="flex items-center gap-2 font-medium"><Icon name="Mail" size={14} className="text-accent-text" />Send an email</p>
+              <dl className="mt-2 space-y-1.5">
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-mute">To</dt><dd className="min-w-0 truncate font-mono text-[12px] text-accent-text">{email ? email.tag : "{incoming.email}"}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-mute">Subject</dt><dd className="min-w-0 truncate"><span>Thanks, </span><span className="font-mono text-[12px] text-accent-text">{other ? other.tag : "{incoming.name}"}</span></dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-mute">Text</dt><dd className="min-w-0 truncate font-mono text-[12px] text-accent-text">{"{answer}"}</dd></div>
+              </dl>
+            </div>
+            <p className="mt-2 text-xs text-mute">The real values go in when the step waits for you, so you read the actual address and subject before you press Approve.</p>
+          </figure>
+        </div>
+      )}
+      {missing.length > 0 && (
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-2xl border border-warning/60 px-3 py-2 text-sm">
+          <Icon name="CircleAlert" className="mt-0.5 shrink-0 text-warning" />
+          <span>Your steps use {missing.map((key, index) => <span key={key}>{index > 0 ? ", " : ""}<code className="rounded bg-sunken px-1 py-0.5 font-mono text-[12.5px]">{`{incoming.${key}}`}</code></span>)}, but the last arrival had no field with {missing.length === 1 ? "that name" : "those names"}. Those steps will wait and say so. Rename the field in your form, or change the tag in the Builder.</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ---- ONE LINK -----------------------------------------------------------------------------------------------------------------------
 function LinkCard({ link, times, now, tzOffset, onSignal, index }) {
   const router = useRouter();
@@ -258,9 +334,11 @@ function LinkCard({ link, times, now, tzOffset, onSignal, index }) {
       {!link.readsIncoming && (
         <p className="mt-3 flex items-start gap-2 rounded-2xl border border-line px-3 py-2 text-sm text-mute">
           <Icon name="Info" className="mt-0.5 shrink-0 text-accent-text" />
-          <span>This workflow starts when something arrives, but does not read it yet. In the Builder, write <code className="rounded bg-sunken px-1 py-0.5 font-mono text-[12.5px] text-ink">{INCOMING_TAG}</code> in the job of an Ask the AI step, like &ldquo;Read {INCOMING_TAG} and draft a short friendly reply&rdquo;.</span>
+          <span>This workflow starts when something arrives, but does not read it yet. In the Builder, write <code className="rounded bg-sunken px-1 py-0.5 font-mono text-[12.5px] text-ink">{INCOMING_TAG}</code> in the job of an Ask the AI step, like &ldquo;Read {INCOMING_TAG} and draft a short friendly reply&rdquo;, or put one field&rsquo;s tag, like <code className="rounded bg-sunken px-1 py-0.5 font-mono text-[12.5px] text-ink">{fieldTag("email")}</code>, in the To of an email step.</span>
         </p>
       )}
+
+      <FieldsPanel link={link} />
 
       <Snippets url={link.url} id={`link-${link.id}`} />
 
@@ -327,7 +405,7 @@ function NewLink({ candidates, first, full, maxLinks }) {
       )}
       {(first || (!full && ready.length === 0)) && (
         <div className="mt-4">
-          <Link href={`/app/builder?ask=${encodeURIComponent(STARTER)}`} className={first && ready.length === 0 ? pillPrimary : pillQuiet}><Icon name="Sparkles" size={16} />Write a lead-reply workflow with Hushwork AI</Link>
+          <Link href={`/app/builder?ask=${encodeURIComponent(STARTER)}`} className={`${first && ready.length === 0 ? pillPrimary : pillQuiet} h-auto min-h-11 max-w-full whitespace-normal py-2 text-center md:min-h-10`}><Icon name="Sparkles" size={16} />Write a lead-reply workflow with Hushwork AI</Link>
         </div>
       )}
     </section>
@@ -335,7 +413,76 @@ function NewLink({ candidates, first, full, maxLinks }) {
 }
 
 // ---- ARRIVALS -----------------------------------------------------------------------------------------------------------------------
-function Arrivals({ arrivals, now }) {
+// One arrival: a line with its first fields, and two buttons. "All fields" opens every field with its tag; "Replay" runs the workflow again with
+// exactly these fields (writing stays off, so a send still waits for Approve).
+function ArrivalRow({ arrival, now }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const [result, setResult] = useState(null); // { runId, waiting } | { error }
+  const [words, tone] = STATUS[arrival.status] ?? STATUS.failed;
+  const panel = `arrival-${arrival.id}-fields`;
+  const replay = () => start(async () => {
+    setResult(null);
+    pulse("think");
+    const done = await replayHookEvent({ id: arrival.id }).catch(() => ({ error: "Could not reach Hushwork. Check your connection and try again." }));
+    setResult(done?.ok ? { runId: done.runId, waiting: done.waiting } : { error: done?.error || "Could not replay it. Try again." });
+    pulse(done?.ok ? "good" : "bad");
+    if (done?.ok) router.refresh();
+  });
+  return (
+    <li className="grid gap-2 border-t border-line py-4 sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:items-start sm:gap-4">
+      <p className="font-mono text-[12px] text-mute">{ago(arrival.at, now) || " "}</p>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] font-medium">
+            <span className="break-words">{arrival.name}</span>
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>{words}</span>
+            {arrival.test && <span className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] font-medium text-mute">Test</span>}
+          </p>
+          <div className="flex flex-wrap items-center gap-1">
+            {arrival.fields.length > 0 && (
+              <button type="button" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-mute hover:bg-raised hover:text-ink">
+                <Icon name="ChevronDown" size={14} className={`transition-transform duration-120 ${open ? "rotate-180" : ""}`} />{open ? "Hide fields" : arrival.full ? `All ${arrival.fields.length} ${arrival.fields.length === 1 ? "field" : "fields"}` : "Preview"}
+              </button>
+            )}
+            <button type="button" onClick={replay} disabled={pending || !arrival.full} title={arrival.full ? "Run the workflow again with these fields" : "Only a short preview was kept for this one, so it cannot be replayed"} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-sm font-medium hover:bg-raised disabled:pointer-events-none disabled:opacity-50">
+              <Icon name={pending ? "Loader2" : "RotateCcw"} size={14} className={pending ? "hw-spin" : ""} />{pending ? "Replaying" : "Replay"}
+            </button>
+            {arrival.runId ? <Link href={`/app/runs?run=${encodeURIComponent(arrival.runId)}`} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent-text hover:bg-accent-subtle">Open run<Icon name="ArrowRight" size={14} /></Link> : arrival.status === "started" ? <span className="px-3 py-2 text-sm text-mute">Running…</span> : null}
+          </div>
+        </div>
+        {arrival.fields.length === 0 ? <p className="mt-1 text-sm text-mute">Nothing came with it.</p> : !open && (
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {arrival.fields.slice(0, 4).map((field, index) => (
+              <li key={index} className="max-w-full truncate rounded-full bg-raised px-2.5 py-1 text-[12.5px] sm:max-w-[18rem]"><span className="text-mute">{field.name}</span> {field.value.replace(/\s+/g, " ").slice(0, 80)}</li>
+            ))}
+            {arrival.fields.length > 4 && <li className="rounded-full px-2 py-1 text-[12.5px] text-mute">+{arrival.fields.length - 4} more</li>}
+          </ul>
+        )}
+        {open && (
+          <motion.dl id={panel} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: EASE }} className="mt-3 overflow-hidden rounded-2xl border border-line">
+            {arrival.fields.map((field, index) => (
+              <div key={index} className={`grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-4 ${index > 0 ? "border-t border-line" : ""}`}>
+                <dt className="min-w-0">
+                  <span className="block break-words text-[13px] font-medium">{field.name}</span>
+                  {arrival.full && <code className="mt-0.5 block truncate font-mono text-[11.5px] text-accent-text">{fieldTag(field.name)}</code>}
+                </dt>
+                <dd className="min-w-0 whitespace-pre-wrap break-words text-sm">{field.value}</dd>
+              </div>
+            ))}
+            <p className="border-t border-line bg-sunken px-4 py-2 text-xs text-mute">{arrival.full ? "Someone else wrote this. Hushwork only ever uses it as information." : "Only this short preview was kept, from before Hushwork kept every field."}</p>
+          </motion.dl>
+        )}
+        {result && (result.error
+          ? <p role="alert" className="mt-3 flex items-start gap-2 rounded-2xl border border-error px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />{result.error}</p>
+          : <p role="status" className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-accent-subtle px-3 py-2 text-sm"><Icon name="CircleCheck" className="shrink-0 text-accent-text" />Replayed.{result.waiting > 0 ? ` ${result.waiting === 1 ? "A step is" : `${result.waiting} steps are`} waiting for your Approve.` : ""}<Link href={`/app/runs?run=${encodeURIComponent(result.runId)}`} className="font-medium text-accent-text underline-offset-2 hover:underline">Open the new run</Link></p>)}
+      </div>
+    </li>
+  );
+}
+
+function Arrivals({ arrivals, now, keepsFields }) {
   const [all, setAll] = useState(false);
   const shown = all ? arrivals.slice(0, 60) : arrivals.slice(0, 8);
   return (
@@ -345,35 +492,13 @@ function Arrivals({ arrivals, now }) {
           <p className={`${label} text-mute`}>Last 14 days</p>
           <h2 id="arrivals" className="mt-1 text-[22px] font-semibold tracking-[-0.02em]">Arrivals</h2>
         </div>
-        <p className="text-sm text-mute">Only a short preview is kept here. The full words are on the run.</p>
+        <p className="max-w-[46ch] text-sm text-mute">{keepsFields ? "Every field is kept. Open one to read it all, or replay it after you change the workflow." : "Only a short preview is kept until supabase/hook-fields.sql is run in Supabase. Then every field is kept and can be replayed."}</p>
       </div>
       {arrivals.length === 0 ? (
         <p className="mt-5 border-t border-line pt-5 text-sm text-mute">Nothing has arrived yet. Press <b className="font-medium text-ink">Send a test</b> on a link to see one travel the line.</p>
       ) : (
         <ol className="mt-5">
-          {shown.map((arrival) => {
-            const [words, tone] = STATUS[arrival.status] ?? STATUS.failed;
-            return (
-              <li key={arrival.id} className="grid gap-2 border-t border-line py-4 sm:grid-cols-[7.5rem_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
-                <p className="font-mono text-[12px] text-mute">{ago(arrival.at, now) || " "}</p>
-                <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-[15px] font-medium">
-                    <span className="break-words">{arrival.name}</span>
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>{words}</span>
-                    {arrival.test && <span className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] font-medium text-mute">Test</span>}
-                  </p>
-                  {arrival.fields.length > 0 ? (
-                    <ul className="mt-2 flex flex-wrap gap-1.5">
-                      {arrival.fields.map((field, index) => (
-                        <li key={index} className="max-w-full truncate rounded-full bg-raised px-2.5 py-1 text-[12.5px]"><span className="text-mute">{field.name}</span> {field.value}</li>
-                      ))}
-                    </ul>
-                  ) : <p className="mt-1 text-sm text-mute">Nothing came with it.</p>}
-                </div>
-                {arrival.runId ? <Link href={`/app/runs?run=${encodeURIComponent(arrival.runId)}`} className="inline-flex h-9 items-center gap-1.5 self-start rounded-full px-3 text-sm font-medium text-accent-text hover:bg-accent-subtle">Open run<Icon name="ArrowRight" size={14} /></Link> : arrival.status === "started" ? <p className="self-start px-3 py-2 text-sm text-mute">Running…</p> : <span />}
-              </li>
-            );
-          })}
+          {shown.map((arrival) => <ArrivalRow key={arrival.id} arrival={arrival} now={now} />)}
         </ol>
       )}
       {arrivals.length > 8 && <button type="button" onClick={() => setAll(!all)} className={`${pillGhost} mt-1`}>{all ? "Show fewer" : `Show ${Math.min(arrivals.length, 60) - 8} more`}</button>}
@@ -381,7 +506,7 @@ function Arrivals({ arrivals, now }) {
   );
 }
 
-export default function LinksBoard({ links, arrivals, candidates, limits }) {
+export default function LinksBoard({ links, arrivals, candidates, limits, keepsFields = true }) {
   const now = useNow();
   const reduce = usePrefersReducedMotion();
   const tzOffset = now === null ? 0 : -new Date(now).getTimezoneOffset();
@@ -424,7 +549,7 @@ export default function LinksBoard({ links, arrivals, candidates, limits }) {
           {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} />)}
         </ul>
       )}
-      {links.length > 0 && <Arrivals arrivals={arrivals} now={now} />}
+      {links.length > 0 && <Arrivals arrivals={arrivals} now={now} keepsFields={keepsFields} />}
       {links.length > 0 && <NewLink candidates={candidates} first={false} full={links.length >= limits.maxLinks} maxLinks={limits.maxLinks} />}
       <p className="text-xs text-mute">Each person&rsquo;s links can start up to {limits.perMinute} runs a minute and {limits.perDay} a day; more than that is written down and not run. Fields that look like a card number or a secret key are left out before anything is saved.</p>
     </div>

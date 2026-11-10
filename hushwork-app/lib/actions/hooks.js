@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
 import { HOOK_LIMITS, HOOK_SETUP, NO_TABLE, makeCode } from "@/lib/hooks";
+import { REPLAY_ERRORS, hookLimiter, replayArrival } from "@/lib/hook-receive";
+import { startPracticeRun } from "@/lib/run-core";
+import { takeDbSlot } from "@/lib/db-limits";
+import { makeLimiter } from "@/lib/ai/limits";
 
 // The Start links page: make, switch, renew and remove the private address of a workflow (lib/hooks.js, supabase/hooks.sql). Same habits as
 // every action: requireUser first, validate, the person's own database client (user_id is filled in by the database, and the database itself
@@ -87,4 +91,20 @@ export async function deleteHook(input) {
   if (!data?.length) return { error: GONE };
   revalidatePath("/app/links");
   return { ok: true };
+}
+
+// "Replay" on an arrival: the workflow runs again with the fields that arrived then (lib/hook-receive.js). Writing stays off, so anything that
+// sends still waits for Approve on the Runs page. Returns { ok: true, runId, waiting } or { error }.
+export async function replayHookEvent(input) {
+  const user = await requireUser();
+  const id = checkId(input?.id);
+  if (id.error) return { error: REPLAY_ERRORS.gone };
+  const client = await createClient();
+  const result = await replayArrival(
+    { client, run: startPracticeRun, limiter: hookLimiter(makeLimiter), takeSlot: (supabase) => takeDbSlot(supabase, "hook", HOOK_LIMITS.perMinute, HOOK_LIMITS.perDay) },
+    { user },
+    id.value,
+  );
+  if (result.ok) revalidatePath("/app", "layout");
+  return result;
 }

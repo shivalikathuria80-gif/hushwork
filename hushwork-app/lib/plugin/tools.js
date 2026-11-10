@@ -11,6 +11,7 @@ import {
   readSavedResults, stepState, isApprovable, isWriteStep, runOutcome, aiSummary, linearSummary, calendarSummary, gmailSummary, driveSummary,
   linearCreateSummary, appSummary, actionSummary, sheetsSummary, requestSummary, isAiStep, isLinearLookup, isCalendarLookup, isGmailLookup,
   isDriveLookup, isLinearCreate, isAppLookup, isActionStep, isSheetsRow,
+  incomingOf,
 } from "../run-engine.js";
 import { ANSWERS_TAG, findAnswer, findAnswers } from "../run-answer.js";
 import { describeSchedule } from "../schedule.js";
@@ -132,7 +133,7 @@ async function loadRecords(supabase, userId, runId, since) {
 }
 
 // The exact words the Runs page's approval card shows for a step (components/app/RunsViewer.js does the same), so `seen` can be checked.
-function willDo(step, answer, answers, email) {
+function willDo(step, answer, answers, email, incoming = null) {
   if (isAiStep(step)) return aiSummary(step);
   if (isLinearLookup(step)) return linearSummary(step);
   if (isCalendarLookup(step)) return calendarSummary(step);
@@ -140,8 +141,8 @@ function willDo(step, answer, answers, email) {
   if (isDriveLookup(step)) return driveSummary(step);
   if (isLinearCreate(step)) return linearCreateSummary(step, answer);
   if (isAppLookup(step)) return appSummary(step);
-  if (isActionStep(step)) return actionSummary(step, answer, answers, email);
-  if (isSheetsRow(step)) return sheetsSummary(step, answer);
+  if (isActionStep(step)) return actionSummary(step, answer, answers, email, incoming);
+  if (isSheetsRow(step)) return sheetsSummary(step, answer, incoming);
   return requestSummary(step);
 }
 
@@ -187,7 +188,7 @@ async function readRun(who, runId) {
           state: STATE_WORDS[state] ?? state,
           writes: isWriteStep(step),
           ...(result ? { result } : {}),
-          ...(isApprovable(step) && !done.has(index) ? { will_do: willDo(step, answer, answers, who.user.email ?? "") } : {}),
+          ...(isApprovable(step) && !done.has(index) ? { will_do: willDo(step, answer, answers, who.user.email ?? "", incomingOf(steps)) } : {}),
         };
       }),
     },
