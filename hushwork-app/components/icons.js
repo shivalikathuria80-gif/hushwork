@@ -2,7 +2,7 @@
 
 import {
   ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Binoculars, Brain, CalendarBlank, CaretDown, ChartBar, Chat, ChatText,
-  Check, CheckCircle, CircleNotch, Info, ClockCounterClockwise, Clock, CreditCard, DotsSixVertical, Envelope, Eye, EyeSlash, FileText, FloppyDisk, FlowArrow, Folder, FolderOpen, FolderSimple, Gear, Kanban,
+  Check, CheckCircle, CircleNotch, Info, Key, Repeat, ClockCounterClockwise, Clock, CreditCard, DotsSixVertical, Envelope, Eye, EyeSlash, FileText, FloppyDisk, FlowArrow, Folder, FolderOpen, FolderSimple, Gear, Kanban,
   Lightning, LinkSimple, Copy, Code, List, ListChecks, MagnifyingGlass, Moon, Paperclip, PaperPlaneTilt, Pause, PencilLine, PencilSimple, Play, Plug,
   Plus, Receipt, GitBranch, DotsThreeVertical, MagnifyingGlassPlus, MagnifyingGlassMinus, CornersOut, StopCircle, ArrowUUpLeft, Database, Cpu, CloudCheck, Robot, ShareNetwork, ShieldCheck, SignOut, Sparkle, Sun, SunHorizon, ArrowsHorizontal, Table, Tag, Trash, Tray, UserPlus, WarningCircle, X, XCircle,
 } from "@phosphor-icons/react";
@@ -19,7 +19,7 @@ const ICONS = {
   Eye, EyeOff: EyeSlash, SignOut, Trash, Plus, Save: FloppyDisk, History: ClockCounterClockwise, Info, ChevronDown: CaretDown,
   Settings: Gear, GripVertical: DotsSixVertical, Bot: Robot, Share: ShareNetwork, Sunrise: SunHorizon, Compare: ArrowsHorizontal,
   Branch: GitBranch, More: DotsThreeVertical, ZoomIn: MagnifyingGlassPlus, ZoomOut: MagnifyingGlassMinus, Fit: CornersOut, Stop: StopCircle, Undo: ArrowUUpLeft, Database, Cpu, Saved: CloudCheck,
-  Link: LinkSimple, Copy, Code,
+  Link: LinkSimple, Copy, Code, Key, Repeat,
 };
 
 // `fallback` is the icon to show when `name` is not in the list (a saved draft with an icon we no longer have).

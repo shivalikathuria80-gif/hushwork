@@ -84,6 +84,7 @@ function fakeDb({ hook, event, noColumn = false } = {}) {
           return Promise.resolve({ data: event && filters.id === event.id && filters.user_id === event.user_id ? [event] : [], error: null });
         },
         insert(row) {
+          if (table === "hook_seen") return Promise.resolve({ error: null }); // the repeat check (lib/hook-receive.js claimKey): always a first delivery here
           log.inserts.push(row);
           const failed = noColumn && "fields" in row;
           return { select: () => Promise.resolve(failed ? { data: null, error: { code: "PGRST204" } } : { data: [{ id: `event-${log.inserts.length}` }], error: null }) };

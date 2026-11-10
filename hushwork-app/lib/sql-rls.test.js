@@ -55,7 +55,7 @@ test("RLS: every table made in supabase/ is either checked above or is one of th
   }
   for (const [file, table] of found) {
     if (PER_PERSON[file] === table) continue;
-    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)) || (file === "hooks.sql" && table === "hook_events"), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
+    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)) || (["hooks.sql", "hooks-signing.sql"].includes(file) && ["hook_events", "hook_seen"].includes(table)), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
     assert.match(noComments(read(file)), new RegExp(`alter table public\\.${table} enable row level security`), `${table}: row level security is on`);
   }
   assert.ok(found.length >= 8);
@@ -122,4 +122,11 @@ test("start links: arrivals are written by the server only, a link is tied to th
   assert.match(sql, /workflow_id uuid not null unique references public\.workflows \(id\) on delete cascade/);
   assert.match(sql, /code ~ '\^hwl_\[A-Za-z0-9_-\]\{32\}\$'/);
   assert.ok(!/grant (?:insert|update) \([^)]*(received_count|last_received_at)/.test(sql), "the counters are the server's");
+  for (const file of ["hooks.sql", "hooks-signing.sql"]) {
+    const text = noComments(read(file));
+    assert.ok(!/grant[^;]*public\.hook_seen/.test(text), `${file}: delivery keys are the server's alone`);
+    assert.match(text, /revoke all on public\.hook_seen from anon;/);
+    assert.match(text, /revoke all on public\.hook_seen from authenticated;/);
+    assert.match(text, /'none', 'tally', 'typeform', 'stripe', 'github', 'hushwork'/, `${file}: the database knows the same signing styles as lib/hook-sign.js`);
+  }
 });

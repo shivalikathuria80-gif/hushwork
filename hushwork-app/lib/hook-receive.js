@@ -4,12 +4,14 @@
 //
 //   1. FIND the link by the hash of its code (the all-access client: the sender is a stranger with no account).
 //   2. REFUSE early, with a small answer that never holds anyone's data: unknown link, switched off, everything paused, too much, too often.
+//   2b. CHECK THE SENDER when the link asks for signed arrivals (lib/hook-sign.js): no matching signature, nothing starts.
+//   2c. SKIP A REPEAT: the same delivery (by its id, or the same words within minutes) starts one run, not two (table hook_seen).
 //   3. WRITE DOWN the arrival (a short preview only) and count it.
 //   4. START the workflow as its owner in Auto mode with writing switched OFF: the run reads and thinks by itself, and every step that sends
 //      or creates waits for the owner's Approve. A stranger holding the link can never make Hushwork send anything.
 //   5. If a step is left waiting, ask `nudge` to tell the owner (it decides whether it may: never at night, at most 3 a day).
 // Steps 4 and 5 are returned as `finish`, a function the caller runs AFTER it has answered the sender, so a form never waits on the AI.
-import { HOOK_LIMITS, NO_COLUMN, TEST_FLAG, hashCode, incomingText, looksLikeCode, parseBody, previewOf, readFields } from "./hooks.js";
+import { HOOK_LIMITS, NO_COLUMN, NO_TABLE, TEST_FLAG, hashCode, incomingText, looksLikeCode, parseBody, previewOf, readFields, repeatKey, verifySignature } from "./hooks.js";
 import { readFieldList } from "./hook-fields.js";
 
 export const ANSWERS = {
@@ -17,19 +19,25 @@ export const ANSWERS = {
   off: { status: 410, body: { ok: false, error: "This start link is switched off." } },
   paused: { status: 503, body: { ok: false, error: "Hushwork is paused right now. Try again later." } },
   limited: { status: 429, body: { ok: false, error: "This start link got too much at once. Try again in a little while." } },
+  unsigned: { status: 401, body: { ok: false, error: "This start link only takes signed arrivals, and this one's signature did not match." } },
+  // A repeat is answered like a success, so the sender stops trying again; it starts nothing.
+  duplicate: { status: 200, body: { ok: true, received: true, duplicate: true } },
   setup: { status: 503, body: { ok: false, error: "Start links are not switched on." } },
   received: { status: 202, body: { ok: true, received: true } },
 };
 
 // `deps`: { admin, clientFor(userId), run(input, who), nudge(found), paused(admin), takeSlot(client), limiter: { minute, day, noise? }, now }.
-// `arrival`: { code, text, type } from the request.
+// `arrival`: { code, text, type, headers } from the request; `headers` is { lower-case name: value } (only the few this file reads).
 // Returns { answer: { status, body }, finish?: async () => outcome }.
 export async function receiveArrival(deps, arrival) {
   const { admin, now = Date.now() } = deps;
   if (!admin) return { answer: ANSWERS.setup };
 
   if (!looksLikeCode(arrival.code)) return { answer: ANSWERS.unknown };
-  const { data, error } = await admin.from("hooks").select("id, user_id, workflow_id, enabled, received_count, tz_offset").eq("code_hash", hashCode(arrival.code)).limit(1);
+  const find = (columns) => admin.from("hooks").select(columns).eq("code_hash", hashCode(arrival.code)).limit(1);
+  let { data, error } = await find("id, user_id, workflow_id, enabled, received_count, tz_offset, signing_style, signing_secret");
+  // 42703 = the sender-check columns are not in the database yet (supabase/hooks-signing.sql not run): links keep working without it.
+  if (error?.code === "42703") ({ data, error } = await find("id, user_id, workflow_id, enabled, received_count, tz_offset"));
   if (error) {
     console.error("finding a start link failed:", error.code);
     return { answer: ANSWERS.unknown };
@@ -49,9 +57,10 @@ export async function receiveArrival(deps, arrival) {
   const preview = previewOf(fields);
   // Every field is kept (`fields`, already cut to the limits) so the owner can read the whole arrival and replay it later. A database that has
   // not had supabase/hook-fields.sql run yet has no such column: the arrival is then saved with its preview only, as before.
-  const note = async (status, runId = null) => {
-    const row = { hook_id: hook.id, user_id: hook.user_id, status, run_id: runId, preview, test: isTest };
-    let saved = await admin.from("hook_events").insert({ ...row, fields }).select("id");
+  // `keep` false = save no words at all (a refused arrival: they came from someone who is not the sender).
+  const note = async (status, runId = null, keep = true) => {
+    const row = { hook_id: hook.id, user_id: hook.user_id, status, run_id: runId, preview: keep ? preview : [], test: isTest };
+    let saved = await admin.from("hook_events").insert({ ...row, fields: keep ? fields : [] }).select("id");
     if (saved.error && NO_COLUMN.has(saved.error.code)) saved = await admin.from("hook_events").insert(row).select("id");
     if (saved.error) console.error("saving an arrival failed:", saved.error.code);
     return saved.data?.[0]?.id ?? null;
@@ -59,14 +68,31 @@ export async function receiveArrival(deps, arrival) {
 
   // A refused or switched-off arrival is written down so the owner can see something knocked, but only a few a minute: someone holding a
   // leaked address must not be able to fill the table.
-  const noteQuiet = async (status) => {
-    if (deps.limiter.noise?.take(String(hook.user_id), now) !== false) await note(status);
+  const noteQuiet = async (status, keep = true) => {
+    if (deps.limiter.noise?.take(String(hook.user_id), now) !== false) await note(status, null, keep);
   };
   if (hook.enabled !== true) {
     await noteQuiet("off");
     return { answer: ANSWERS.off };
   }
   if (await deps.paused(admin)) return { answer: ANSWERS.paused };
+
+  // The sender check. A refused arrival keeps no preview: its words came from someone who is not the sender.
+  const style = typeof hook.signing_style === "string" && hook.signing_style !== "none" ? hook.signing_style : "";
+  if (style && !verifySignature(style, hook.signing_secret, arrival.headers ?? {}, arrival.text, now).ok) {
+    await noteQuiet("refused", false);
+    return { answer: ANSWERS.unsigned };
+  }
+
+  // One delivery, one run. The key is claimed before the limits are counted (a repeat costs no slot) and given back whenever the arrival
+  // does not end in a run, so the sender's next try can still start it.
+  const repeat = repeatKey(arrival.headers ?? {}, payload, arrival.text);
+  const claim = await claimKey(admin, hook.id, repeat, now);
+  if (!claim.ok) {
+    await noteQuiet("duplicate");
+    return { answer: ANSWERS.duplicate };
+  }
+  const release = () => (claim.held ? releaseKey(admin, hook.id, repeat.key) : Promise.resolve());
 
   // Too often? The in-memory count is taken in ONE synchronous step (so a burst of parallel requests cannot all slip through the check), then
   // the database count (holds across servers) decides too. A refused arrival starts nothing and costs no AI.
@@ -75,6 +101,7 @@ export async function receiveArrival(deps, arrival) {
   const roomNow = deps.limiter.minute.take(key, now) && deps.limiter.day.take(key, now);
   const slot = roomNow ? await deps.takeSlot(client) : { ok: false };
   if (!roomNow || !slot.ok) {
+    await release();
     await noteQuiet("limited");
     return { answer: ANSWERS.limited };
   }
@@ -98,7 +125,10 @@ export async function receiveArrival(deps, arrival) {
       const saved = await admin.from("hook_events").update(runId ? { run_id: runId } : { status: "failed" }).eq("id", eventId);
       if (saved.error) console.error("updating an arrival failed:", saved.error.code);
     }
-    if (!runId) return { ok: false, error: result?.error ?? "The run could not start." };
+    if (!runId) {
+      await release();
+      return { ok: false, error: result?.error ?? "The run could not start." };
+    }
     const auto = result.auto ?? null;
     if (auto?.waiting > 0 && !auto?.stoppedAt && !isTest) {
       try {
@@ -159,3 +189,29 @@ export async function replayArrival(deps, who, eventId) {
 }
 
 export const hookLimiter = (makeLimiter) => (globalThis.__hushworkHookLimits ??= { minute: makeLimiter({ max: HOOK_LIMITS.perMinute, windowMs: 60_000 }), day: makeLimiter({ max: HOOK_LIMITS.perDay, windowMs: 86_400_000, calendar: true }), noise: makeLimiter({ max: 3, windowMs: 60_000 }) });
+
+// Takes the key for this arrival in table hook_seen. { ok: true, held } = go on (held: a row was written and can be given back); { ok: false }
+// = the same key is already taken inside its window. One database statement decides each case, so two copies of a delivery that arrive at
+// the same moment cannot both start. If the table is missing or the database stumbles, the arrival goes on: a rare repeat beats a lost lead.
+export async function claimKey(admin, hookId, repeat, now = Date.now()) {
+  const until = new Date(now + repeat.windowMs).toISOString();
+  const made = await admin.from("hook_seen").insert({ hook_id: hookId, key_hash: repeat.key, expires_at: until });
+  if (!made.error) return { ok: true, held: true };
+  if (NO_TABLE.has(made.error.code)) return { ok: true, held: false };
+  if (made.error.code !== "23505") {
+    console.error("checking for a repeat failed:", made.error.code);
+    return { ok: true, held: false };
+  }
+  // Already there: it is a repeat unless its window is over, in which case this arrival takes the key over.
+  const taken = await admin.from("hook_seen").update({ expires_at: until }).eq("hook_id", hookId).eq("key_hash", repeat.key).lt("expires_at", new Date(now).toISOString()).select("hook_id");
+  if (taken.error) {
+    console.error("checking for a repeat failed:", taken.error.code);
+    return { ok: true, held: false };
+  }
+  return taken.data?.length ? { ok: true, held: true } : { ok: false };
+}
+
+export async function releaseKey(admin, hookId, key) {
+  const { error } = await admin.from("hook_seen").delete().eq("hook_id", hookId).eq("key_hash", key);
+  if (error && !NO_TABLE.has(error.code)) console.error("giving back a repeat key failed:", error.code);
+}

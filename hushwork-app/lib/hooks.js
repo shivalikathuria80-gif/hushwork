@@ -4,7 +4,7 @@
 //
 // What arrives is NEVER trusted: it comes from a stranger. It is cut to a few short fields here, anything that looks like a card number or a
 // secret key is left out, and the run hands it to the AI as information only (never as part of the person's request).
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { looksSensitive } from "./ai/plan.js";
 
 export const CODE_PREFIX = "hwl_";
@@ -25,6 +25,8 @@ export const HOOK_SETUP = "Start links need one setup step that is not done yet.
 export const NO_TABLE = new Set(["42P01", "PGRST205"]);
 export const NO_COLUMN = new Set(["42703", "PGRST204"]); // supabase/hook-fields.sql not run yet: hook_events has no `fields` column
 export { INCOMING_TAG, TEST_ARRIVAL, TEST_FLAG, dailyCounts, hookUrl, snippets } from "./hook-tags.js";
+import { SECRET_SHAPE, SIGNING_STYLES, STRIPE_TOLERANCE_S } from "./hook-sign.js";
+export { SECRET_SHAPE, SIGNED_HEADERS, SIGNING_STYLES, STYLE_KEYS } from "./hook-sign.js";
 
 export const hashCode = (code) => createHash("sha256").update(String(code)).digest("hex");
 export const looksLikeCode = (value) => typeof value === "string" && CODE_SHAPE.test(value);
@@ -146,3 +148,77 @@ export function readPreview(value) {
   return value.filter((one) => one && typeof one.name === "string" && typeof one.value === "string").slice(0, HOOK_LIMITS.previewFields).map((one) => ({ name: one.name.slice(0, 24), value: one.value.slice(0, HOOK_LIMITS.previewChars) }));
 }
 
+
+// ---- THE SENDER CHECK (lib/hook-sign.js) ----------------------------------------------------------------------------------------------
+// A secret Hushwork makes for the owner to paste into their sender: "hws_" and 32 random letters and digits.
+export const makeSecret = () => `hws_${randomBytes(24).toString("base64url")}`;
+export const looksLikeStyle = (value) => typeof value === "string" && Object.hasOwn(SIGNING_STYLES, value);
+export const looksLikeSecret = (value) => typeof value === "string" && SECRET_SHAPE.test(value);
+
+// Compares two texts in constant time (a wrong guess must not tell an attacker how many characters were right).
+function same(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+const mac = (secret, text) => createHmac("sha256", secret).update(text, "utf8");
+
+// Did the arrival really come from the sender that holds the secret? `headers` is { lower-case name: value }; `text` is the body exactly as
+// it arrived; `now` is in milliseconds. Returns { ok: true } or { ok: false, why: "missing" | "stale" | "wrong" | "setup" }. Never throws.
+export function verifySignature(style, secret, headers, text, now = Date.now()) {
+  const one = SIGNING_STYLES[style];
+  if (!one || !looksLikeSecret(secret)) return { ok: false, why: "setup" };
+  const sent = typeof headers?.[one.header] === "string" ? headers[one.header].trim() : "";
+  if (!sent) return { ok: false, why: "missing" };
+  const body = typeof text === "string" ? text : "";
+  try {
+    if (style === "stripe") {
+      // "t=1700000000,v1=abc,v1=def,v0=...": any v1 may match (Stripe sends two while a secret is being rolled).
+      const parts = sent.split(",").map((part) => part.trim().split("="));
+      const stamp = Number(parts.find(([name]) => name === "t")?.[1]);
+      const signatures = parts.filter(([name]) => name === "v1").map(([, value]) => value ?? "");
+      if (!Number.isInteger(stamp) || !signatures.length) return { ok: false, why: "missing" };
+      if (Math.abs(now / 1000 - stamp) > STRIPE_TOLERANCE_S) return { ok: false, why: "stale" };
+      const expected = mac(secret, `${stamp}.${body}`).digest("hex");
+      return signatures.some((value) => same(value.toLowerCase(), expected)) ? { ok: true } : { ok: false, why: "wrong" };
+    }
+    if (style === "tally" || style === "typeform") {
+      // Tally signs JSON.stringify of the body it parsed, which is the raw body in practice; the re-written form is accepted too.
+      const given = style === "typeform" ? sent.replace(/^sha256=/, "") : sent;
+      const texts = [body];
+      try {
+        const again = JSON.stringify(JSON.parse(body));
+        if (again !== body) texts.push(again);
+      } catch {
+        // not JSON: the raw body is the only candidate
+      }
+      return texts.some((candidate) => same(given, mac(secret, candidate).digest("base64"))) ? { ok: true } : { ok: false, why: "wrong" };
+    }
+    const given = sent.replace(/^sha256=/i, "").toLowerCase(); // github and hushwork
+    return same(given, mac(secret, body).digest("hex")) ? { ok: true } : { ok: false, why: "wrong" };
+  } catch {
+    return { ok: false, why: "wrong" };
+  }
+}
+
+// ---- REPEATS --------------------------------------------------------------------------------------------------------------------------
+// Senders try again when they think a delivery failed (Stripe for days, Tally and GitHub a few times), and a visitor can press Send twice.
+// One arrival must start one run, so each arrival gets a key and a key is used once per window (table hook_seen):
+//   - the sender's own delivery id, when it gives one (a header, or the event id inside the body): the same id never starts twice in 3 days;
+//   - otherwise the exact body: the same words within 5 minutes are one arrival (a double click, a quick retry).
+export const REPEAT_WINDOWS = { id: 3 * 86_400_000, body: 5 * 60_000 };
+const ID_HEADERS = ["idempotency-key", "x-hushwork-delivery", "x-github-delivery", "x-shopify-webhook-id", "webhook-id", "x-wc-webhook-delivery-id"];
+const idText = (value) => (typeof value === "string" || typeof value === "number") && String(value).trim() ? String(value).trim().slice(0, 300) : "";
+
+// Returns { key: sha-256 hex (what is saved, never the id itself), kind: "id" | "body", windowMs }.
+export function repeatKey(headers, payload, text) {
+  for (const name of ID_HEADERS) {
+    const value = idText(headers?.[name]);
+    if (value) return { key: hashCode(`h:${name}:${value}`), kind: "id", windowMs: REPEAT_WINDOWS.id };
+  }
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const event = idText(payload.eventId) || idText(payload.event_id) || (/^evt_[A-Za-z0-9]+$/.test(idText(payload.id)) ? idText(payload.id) : "");
+    if (event) return { key: hashCode(`e:${event}`), kind: "id", windowMs: REPEAT_WINDOWS.id };
+  }
+  return { key: hashCode(`b:${typeof text === "string" ? text : ""}`), kind: "body", windowMs: REPEAT_WINDOWS.body };
+}

@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { createAdminClient, createTokenClient } from "@/lib/supabase/admin";
 import { receiveArrival, hookLimiter } from "@/lib/hook-receive";
-import { HOOK_LIMITS } from "@/lib/hooks";
+import { HOOK_LIMITS, SIGNED_HEADERS } from "@/lib/hooks";
 import { startPracticeRun } from "@/lib/run-core";
 import { notifyWatch } from "@/lib/schedule-notify";
 import { isPaused } from "@/lib/app-controls";
@@ -15,7 +15,7 @@ import { makeLimiter } from "@/lib/ai/limits";
 export const maxDuration = 60;
 
 // Any site may post here (that is the point: the owner's own contact form lives on another site), and no cookie is ever read.
-const OPEN = { "access-control-allow-origin": "*", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "content-type", "cache-control": "no-store", "x-robots-tag": "noindex" };
+const OPEN = { "access-control-allow-origin": "*", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": SIGNED_HEADERS.join(", "), "cache-control": "no-store", "x-robots-tag": "noindex" };
 const json = (status, body) => Response.json(body, { status, headers: OPEN });
 // A plain HTML form sends the visitor's browser here, so it gets a small page instead of raw JSON. Fixed words only.
 const page = (status, words) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${words}</title><body style="margin:0;display:grid;place-items:center;min-height:100vh;font:16px/1.5 system-ui,sans-serif;background:#0b0b0f;color:#f4f4f6"><p>${words}</p></body>`, { status, headers: { ...OPEN, "content-type": "text/html; charset=utf-8" } });
@@ -41,6 +41,10 @@ async function readText(request) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+// Only the headers the sender check and the repeat check read (lib/hooks.js), lower case. Nothing else of the request is kept.
+const READ_HEADERS = [...SIGNED_HEADERS, "x-github-delivery", "x-shopify-webhook-id", "webhook-id", "x-wc-webhook-delivery-id"];
+const headersOf = (request) => Object.fromEntries(READ_HEADERS.map((name) => [name, request.headers.get(name)]).filter(([, value]) => typeof value === "string"));
+
 export async function POST(request, { params }) {
   const { code } = await params;
   const type = request.headers.get("content-type") ?? "";
@@ -59,7 +63,7 @@ export async function POST(request, { params }) {
       takeSlot: (client) => takeDbSlot(client, "hook", HOOK_LIMITS.perMinute, HOOK_LIMITS.perDay),
       limiter: hookLimiter(makeLimiter),
     },
-    { code, text, type },
+    { code, text, type, headers: headersOf(request) },
   );
   if (finish) after(() => finish().catch(() => console.error("finishing an arrival crashed")));
   if (fromForm) return page(answer.status, answer.body.ok ? "Thank you. Your message was received." : answer.body.error);

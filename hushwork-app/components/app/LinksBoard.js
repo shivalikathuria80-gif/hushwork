@@ -9,7 +9,8 @@ import { EASE, Switch } from "../ui";
 import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { pulse } from "./AppScene";
 import { INCOMING_TAG, TEST_ARRIVAL, dailyCounts, snippets } from "@/lib/hook-tags";
-import { createHook, deleteHook, renewHook, replayHookEvent, setHookEnabled } from "@/lib/actions/hooks";
+import { SIGNING_STYLES, STYLE_KEYS, signArrival } from "@/lib/hook-sign";
+import { createHook, deleteHook, renewHook, replayHookEvent, setHookEnabled, setHookSigning } from "@/lib/actions/hooks";
 import { fieldTag } from "@/lib/hook-fields";
 
 // "Start links": the browser half. One motion language for the whole page: a signal travelling a hairline, from "something arrives" to
@@ -28,6 +29,8 @@ const STATUS = {
   limited: ["Too many at once", "border-warning/60 text-warning"],
   off: ["Link was off", "border-line-strong text-mute"],
   failed: ["Could not start", "border-error/60 text-error"],
+  refused: ["Signature did not match", "border-error/60 text-error"],
+  duplicate: ["Repeat, skipped", "border-line-strong text-mute"],
 };
 
 // The time on the visitor's own clock. null on the server and on the first paint, so both render the same HTML.
@@ -244,8 +247,131 @@ function FieldsPanel({ link }) {
   );
 }
 
+// ---- THE SENDER CHECK ---------------------------------------------------------------------------------------------------------------
+// Who may start this link: anyone holding the address, or only one sender that signs with a shared secret (lib/hook-sign.js). Drawn as a
+// small three-stop line, in the same language as the signal stage: sender, the check, the workflow. A refused knock never reaches stop 3.
+const NO_CHECK = "none";
+const hidden = (secret) => (secret.length > 10 ? `${secret.slice(0, 4)}${"•".repeat(10)}${secret.slice(-4)}` : "•".repeat(secret.length));
+
+function CheckLine({ style }) {
+  const on = style !== NO_CHECK;
+  const sender = on ? SIGNING_STYLES[style].name : "Anyone with the address";
+  const stops = [
+    { icon: on ? "Key" : "Link", words: on ? `${sender} signs with the secret` : sender },
+    { icon: "ShieldCheck", words: on ? "Hushwork checks the signature" : "No check" },
+    { icon: "Workflow", words: on ? "Only a match starts the workflow" : "The workflow starts" },
+  ];
+  return (
+    <ol aria-label="Who can start this link" className="relative mt-4 grid gap-3 sm:grid-cols-3 sm:gap-4">
+      <span aria-hidden="true" className="absolute left-[15px] top-2 h-[calc(100%-16px)] w-px bg-line-strong sm:left-4 sm:right-4 sm:top-[15px] sm:h-px sm:w-auto" />
+      {stops.map((stop, index) => {
+        const lit = on || index !== 1;
+        return (
+          <li key={index} className="relative flex items-center gap-3 sm:block">
+            <span className={`relative z-[1] grid h-[31px] w-[31px] shrink-0 place-items-center rounded-full border bg-surface transition-colors duration-340 ease-standard ${lit ? (on ? "border-accent text-accent-text" : "border-line-strong text-ink") : "border-dashed border-line-strong text-mute"}`}>
+              <Icon name={stop.icon} size={15} />
+            </span>
+            <p className={`text-[13px] leading-snug sm:mt-2 ${lit ? "text-ink" : "text-mute"}`}>{stop.words}</p>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function SenderCheck({ link, limits }) {
+  const router = useRouter();
+  const saved = link.signing;
+  const [choice, setChoice] = useState(saved.style);
+  const [secret, setSecret] = useState("");
+  const [show, setShow] = useState(false);
+  const [pending, start] = useTransition();
+  const [message, setMessage] = useState(null);
+  const [changing, setChanging] = useState(false);
+  const editing = choice !== saved.style || changing || (choice !== NO_CHECK && !saved.secret);
+  const one = choice === NO_CHECK ? null : SIGNING_STYLES[choice];
+  const save = (input, good) => start(async () => {
+    setMessage(null);
+    const result = await setHookSigning({ id: link.id, ...input }).catch(() => ({ error: "Could not reach Hushwork. Check your connection and try again." }));
+    if (result?.error) setMessage({ tone: "bad", words: result.error });
+    else {
+      setSecret("");
+      setChanging(false);
+      setShow(Boolean(input.make));
+      setMessage({ tone: "good", words: good });
+      if (input.style !== NO_CHECK) pulse("good");
+      router.refresh();
+    }
+  });
+  const options = [[NO_CHECK, "Anyone"], ...STYLE_KEYS.map((key) => [key, SIGNING_STYLES[key].name])];
+  return (
+    <div className="mt-5 border-t border-line pt-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className={`${label} text-mute`}>Sender check</p>
+        <p className={`${label} ${saved.style === NO_CHECK ? "text-mute" : "text-success"}`}>{saved.style === NO_CHECK ? "Open to the address" : `Signed by ${SIGNING_STYLES[saved.style].name} only`}</p>
+      </div>
+      {!link.signingReady ? (
+        <p className="mt-3 flex items-start gap-2 rounded-2xl border border-line px-3 py-2 text-sm text-mute"><Icon name="Info" className="mt-0.5 shrink-0 text-accent-text" />The sender check needs one setup step: open supabase/hooks-signing.sql and run it in Supabase.</p>
+      ) : (
+        <>
+          <div role="radiogroup" aria-label="Who may start this link" className="mt-3 flex flex-wrap gap-1.5">
+            {options.map(([key, name]) => (
+              <button
+                key={key} type="button" role="radio" aria-checked={choice === key} onClick={() => { setChoice(key); setChanging(false); setMessage(null); setSecret(""); }}
+                className={`h-9 rounded-full border px-3.5 text-[13px] font-medium transition-colors duration-120 ${choice === key ? "border-ink bg-ink text-bg" : "border-line text-mute hover:bg-raised hover:text-ink"}`}
+              >{name}</button>
+            ))}
+          </div>
+          <CheckLine style={choice} />
+
+          {editing && choice === NO_CHECK && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <p className="basis-full text-sm text-mute">Anyone holding the address can start this workflow again. Nothing is ever sent without your OK either way.</p>
+              <button type="button" disabled={pending} onClick={() => save({ style: NO_CHECK }, "The sender check is off.")} className={pillQuiet}>Turn the check off</button>
+              <button type="button" onClick={() => setChoice(saved.style)} className={pillGhost}>Keep it on</button>
+            </div>
+          )}
+          {editing && one && (
+            <div className="mt-4 rounded-2xl bg-sunken p-4">
+              <p className="text-sm text-mute">{one.where}</p>
+              <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(event) => { event.preventDefault(); save({ style: choice, secret }, `Saved. Only arrivals signed by ${one.name} start this workflow now.`); }}>
+                <label htmlFor={`secret-${link.id}`} className="sr-only">{one.name} signing secret</label>
+                <input
+                  id={`secret-${link.id}`} type="password" autoComplete="off" spellCheck={false} value={secret} onChange={(event) => setSecret(event.target.value)}
+                  placeholder={choice === "stripe" ? "whsec_..." : "Paste the signing secret"}
+                  className="h-11 min-w-0 flex-1 rounded-full border border-field bg-surface px-4 font-mono text-[13px] md:h-10"
+                />
+                <button type="submit" disabled={pending || secret.trim().length < 8} className={pillPrimary}><Icon name={pending ? "Loader2" : "ShieldCheck"} size={16} className={pending ? "hw-spin" : ""} />Save the check</button>
+              </form>
+              {one.secret === "either" && (
+                <button type="button" disabled={pending} onClick={() => save({ style: choice, make: true }, `Secret made. Copy it into ${one.name}; until then its arrivals are refused.`)} className={`${pillGhost} mt-2`}><Icon name="Key" size={16} />No secret yet? Make one for me</button>
+              )}
+              {saved.style !== NO_CHECK && <button type="button" onClick={() => { setChoice(saved.style); setChanging(false); }} className={`${pillGhost} mt-2`}>Cancel</button>}
+            </div>
+          )}
+          {!editing && saved.style !== NO_CHECK && (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code tabIndex={0} aria-label={`The ${SIGNING_STYLES[saved.style].name} signing secret`} className="block w-full min-w-0 flex-1 overflow-x-auto whitespace-nowrap sm:w-auto rounded-full border border-line bg-sunken px-4 py-2.5 font-mono text-[13px] text-ink">{show ? saved.secret : hidden(saved.secret)}</code>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setShow(!show)} aria-pressed={show} className={pillGhost}><Icon name={show ? "EyeOff" : "Eye"} size={16} />{show ? "Hide" : "Show"}</button>
+                <CopyButton text={saved.secret} what="Secret">Copy secret</CopyButton>
+                <button type="button" onClick={() => { setChanging(true); setMessage(null); }} className={pillGhost}><Icon name="Pencil" size={16} />Change secret</button>
+              </div>
+            </div>
+          )}
+          {message && <p role={message.tone === "bad" ? "alert" : "status"} className={`mt-3 flex items-start gap-2 rounded-2xl px-3 py-2 text-sm ${message.tone === "bad" ? "border border-error" : "bg-accent-subtle"}`}><Icon name={message.tone === "bad" ? "CircleAlert" : "CircleCheck"} className={`mt-0.5 shrink-0 ${message.tone === "bad" ? "text-error" : "text-accent-text"}`} />{message.words}</p>}
+        </>
+      )}
+      <p className="mt-4 flex items-start gap-2 text-sm text-mute">
+        <Icon name="Repeat" className="mt-0.5 shrink-0 text-accent-text" />
+        <span>Repeats are skipped. When a sender tries the same delivery again, or the same words arrive twice within {limits.repeatMinutes} minutes, only one run starts. Delivery ids are remembered for {limits.repeatDays} days.</span>
+      </p>
+    </div>
+  );
+}
+
 // ---- ONE LINK -----------------------------------------------------------------------------------------------------------------------
-function LinkCard({ link, times, now, tzOffset, onSignal, index }) {
+function LinkCard({ link, times, now, tzOffset, onSignal, index, limits }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [testing, setTesting] = useState(false);
@@ -283,15 +409,19 @@ function LinkCard({ link, times, now, tzOffset, onSignal, index }) {
     setTesting(true);
     setMessage(null);
     try {
-      const response = await fetch(link.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(TEST_ARRIVAL) });
-      const body = await response.json().catch(() => null);
-      if (response.ok && body?.ok) {
+      // Signed like the real sender would (so the check is tested too), with a fresh delivery id (so two tests are two arrivals).
+      const body = JSON.stringify(TEST_ARRIVAL);
+      const signed = await signArrival(link.signing.style, link.signing.secret, body);
+      const delivery = `test-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      const response = await fetch(link.url, { method: "POST", headers: { "content-type": "application/json", "x-hushwork-delivery": delivery, ...signed }, body });
+      const answer = await response.json().catch(() => null);
+      if (response.ok && answer?.ok) {
         onSignal();
         pulse("good");
         setMessage({ tone: "good", words: "Test received. The workflow is running now; its run shows up under Arrivals in a few seconds." });
         timers.current.push(setTimeout(() => router.refresh(), 2500), setTimeout(() => router.refresh(), 9000), setTimeout(() => router.refresh(), 20000));
       } else {
-        setMessage({ tone: "bad", words: body?.error || "The link did not accept the test. Try again in a minute." });
+        setMessage({ tone: "bad", words: answer?.error || "The link did not accept the test. Try again in a minute." });
         router.refresh();
       }
     } catch {
@@ -314,10 +444,10 @@ function LinkCard({ link, times, now, tzOffset, onSignal, index }) {
       </div>
 
       <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <code tabIndex={0} aria-label="The address of this start link" className="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-full border border-line bg-sunken px-4 py-2.5 font-mono text-[13px] text-ink">{link.url}</code>
+        <code tabIndex={0} aria-label="The address of this start link" className="block w-full min-w-0 flex-1 overflow-x-auto whitespace-nowrap sm:w-auto rounded-full border border-line bg-sunken px-4 py-2.5 font-mono text-[13px] text-ink">{link.url}</code>
         <CopyButton text={link.url}>Copy address</CopyButton>
       </div>
-      <p className="mt-2 text-xs text-mute">Anyone who has this address can start this workflow, so share it only with the form or app that should. It can never send anything by itself.</p>
+      <p className="mt-2 text-xs text-mute">{link.signing.style === "none" ? "Anyone who has this address can start this workflow, so share it only with the form or app that should, or turn on the sender check below." : `Only arrivals signed by ${SIGNING_STYLES[link.signing.style]?.name ?? "your sender"} start this workflow; anything else is refused.`} It can never send anything by itself.</p>
 
       <div className="mt-5 grid gap-5 border-t border-line pt-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div>
@@ -339,6 +469,8 @@ function LinkCard({ link, times, now, tzOffset, onSignal, index }) {
       )}
 
       <FieldsPanel link={link} />
+
+      <SenderCheck link={link} limits={limits} />
 
       <Snippets url={link.url} id={`link-${link.id}`} />
 
@@ -405,7 +537,7 @@ function NewLink({ candidates, first, full, maxLinks }) {
       )}
       {(first || (!full && ready.length === 0)) && (
         <div className="mt-4">
-          <Link href={`/app/builder?ask=${encodeURIComponent(STARTER)}`} className={`${first && ready.length === 0 ? pillPrimary : pillQuiet} h-auto min-h-11 max-w-full whitespace-normal py-2 text-center md:min-h-10`}><Icon name="Sparkles" size={16} />Write a lead-reply workflow with Hushwork AI</Link>
+          <Link href={`/app/builder?ask=${encodeURIComponent(STARTER)}`} className={`${first && ready.length === 0 ? pillPrimary : pillQuiet} h-auto min-h-11 max-w-full whitespace-normal! py-2 text-center md:min-h-10`}><Icon name="Sparkles" size={16} />Write a lead-reply workflow with Hushwork AI</Link>
         </div>
       )}
     </section>
@@ -546,7 +678,7 @@ export default function LinksBoard({ links, arrivals, candidates, limits, keepsF
       {links.length === 0 && <NewLink candidates={candidates} first full={false} maxLinks={limits.maxLinks} />}
       {links.length > 0 && (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-6">
-          {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} />)}
+          {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} limits={limits} />)}
         </ul>
       )}
       {links.length > 0 && <Arrivals arrivals={arrivals} now={now} keepsFields={keepsFields} />}

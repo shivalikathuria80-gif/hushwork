@@ -3,7 +3,7 @@ import { Icon } from "../icons";
 import LinksBoard from "./LinksBoard";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { HOOK_LIMITS, HOOK_SETUP, INCOMING_TAG, NO_COLUMN, hookUrl, looksLikeCode, readPreview } from "@/lib/hooks";
+import { HOOK_LIMITS, HOOK_SETUP, INCOMING_TAG, NO_COLUMN, REPEAT_WINDOWS, hookUrl, looksLikeCode, looksLikeSecret, looksLikeStyle, readPreview } from "@/lib/hooks";
 import { fieldKey, fieldTag, hasFieldTag, readFieldList, tagsIn } from "@/lib/hook-fields";
 
 // "Start links": the server half. It reads the person's workflows, their links and what arrived in the last 14 days, and hands plain values
@@ -13,7 +13,7 @@ const text = (value) => (typeof value === "string" ? value : "");
 const NO_TABLE = new Set(["42P01", "PGRST205"]);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const clock = () => Date.now(); // read once per request
-const STATUSES = new Set(["started", "limited", "off", "failed"]);
+const STATUSES = new Set(["started", "limited", "off", "failed", "refused", "duplicate"]);
 // A step that fills {incoming.name} in (an email's To, subject or text, a Sheet box). An Ask the AI job reads what arrived through {incoming} instead.
 const usesFields = (step) => ["action", "row"].includes(step?.kind) && step.fields && typeof step.fields === "object" && Object.values(step.fields).some((value) => hasFieldTag(text(value)));
 
@@ -62,13 +62,18 @@ export default async function LinksData() {
     // Arrivals with every field (supabase/hook-fields.sql); a database without that column yet gives the short preview only.
     const arrivalsWith = (columns) => supabase.from("hook_events").select(columns).eq("user_id", user.id)
       .gte("created_at", new Date(now - 14 * DAY_MS).toISOString()).order("created_at", { ascending: false }).limit(300);
-    const [flows, hooks, firstEvents] = await Promise.all([
+    const linkRows = (columns) => supabase.from("hooks").select(columns).eq("user_id", user.id).order("created_at", { ascending: true }).limit(HOOK_LIMITS.maxLinks);
+    const BASE = "id, workflow_id, code, enabled, received_count, last_received_at, created_at";
+    let [flows, hooks, firstEvents] = await Promise.all([
       supabase.from("workflows").select("id, name, plan").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(100),
-      supabase.from("hooks").select("id, workflow_id, code, enabled, received_count, last_received_at, created_at").eq("user_id", user.id).order("created_at", { ascending: true }).limit(HOOK_LIMITS.maxLinks),
+      linkRows(`${BASE}, signing_style, signing_secret`),
       arrivalsWith("id, hook_id, status, run_id, preview, fields, test, created_at"),
     ]);
     const events = firstEvents.error && NO_COLUMN.has(firstEvents.error.code) ? await arrivalsWith("id, hook_id, status, run_id, preview, test, created_at") : firstEvents;
     if (events !== firstEvents && !events.error) keepsFields = false;
+    // 42703: the sender-check columns are not there yet (supabase/hooks-signing.sql not run): show the links without it.
+    const signingReady = hooks.error?.code !== "42703";
+    if (!signingReady) hooks = await linkRows(BASE);
     if (flows.error) {
       console.error("Loading start links failed:", flows.error.code);
       failure = NO_TABLE.has(flows.error.code) ? "Hushwork's database is not set up yet. Run the files in the supabase folder first." : "Check your connection and try again.";
@@ -95,6 +100,9 @@ export default async function LinksData() {
         id: text(row.id), workflowId: text(row.workflow_id), ...flowOf.get(text(row.workflow_id)),
         url: hookUrl(origin, row.code), enabled: row.enabled === true,
         count: Number(row.received_count) || 0, lastAt: text(row.last_received_at),
+        // The sender check. The secret is the owner's own (like the code in the address) and is needed to sign "Send a test".
+        signing: signingReady && looksLikeStyle(row.signing_style) && looksLikeSecret(row.signing_secret) ? { style: row.signing_style, secret: row.signing_secret } : { style: "none", secret: "" },
+        signingReady,
       }));
       const linked = new Set(links.map((link) => link.workflowId));
       const nameOf = new Map(links.map((link) => [link.id, link.name]));
@@ -119,5 +127,5 @@ export default async function LinksData() {
   }
   if (failure) return <Problem>{failure}</Problem>;
   if (setup) return <Problem title="One setup step is left">{HOOK_SETUP} Nothing else in Hushwork is affected until then.</Problem>;
-  return <LinksBoard links={links} arrivals={arrivals} candidates={candidates} keepsFields={keepsFields} limits={{ perMinute: HOOK_LIMITS.perMinute, perDay: HOOK_LIMITS.perDay, maxLinks: HOOK_LIMITS.maxLinks }} />;
+  return <LinksBoard links={links} arrivals={arrivals} candidates={candidates} keepsFields={keepsFields} limits={{ perMinute: HOOK_LIMITS.perMinute, perDay: HOOK_LIMITS.perDay, maxLinks: HOOK_LIMITS.maxLinks, repeatMinutes: REPEAT_WINDOWS.body / 60_000, repeatDays: REPEAT_WINDOWS.id / 86_400_000 }} />;
 }

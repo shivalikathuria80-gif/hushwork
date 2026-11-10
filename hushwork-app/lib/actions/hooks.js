@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
-import { HOOK_LIMITS, HOOK_SETUP, NO_TABLE, makeCode } from "@/lib/hooks";
+import { HOOK_LIMITS, HOOK_SETUP, NO_TABLE, SIGNING_STYLES, looksLikeSecret, looksLikeStyle, makeCode, makeSecret } from "@/lib/hooks";
 import { REPLAY_ERRORS, hookLimiter, replayArrival } from "@/lib/hook-receive";
 import { startPracticeRun } from "@/lib/run-core";
 import { takeDbSlot } from "@/lib/db-limits";
@@ -107,4 +107,34 @@ export async function replayHookEvent(input) {
   );
   if (result.ok) revalidatePath("/app", "layout");
   return result;
+}
+
+// The sender check (lib/hook-sign.js). `style`: "none" or one of SIGNING_STYLES. `secret`: what the owner pasted, or `make: true` for one
+// Hushwork makes (not for Stripe: Stripe makes its own). Answers { ok, secret } so the page can show the secret it now holds.
+export async function setHookSigning(input) {
+  const user = await requireUser();
+  const id = checkId(input?.id);
+  if (id.error) return { error: GONE };
+  const style = input?.style;
+  if (style !== "none" && !looksLikeStyle(style)) return { error: "Choose which app sends to this link." };
+  let secret = null;
+  if (style !== "none") {
+    if (input?.make === true) {
+      if (SIGNING_STYLES[style].secret === "paste") return { error: `${SIGNING_STYLES[style].name} makes its own secret. Copy it from there and paste it here.` };
+      secret = makeSecret();
+    } else {
+      secret = typeof input?.secret === "string" ? input.secret.trim() : "";
+      if (!looksLikeSecret(secret)) return { error: "Paste the secret exactly as the app shows it: 8 to 200 characters." };
+    }
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("hooks").update({ signing_style: style, signing_secret: secret }).eq("id", id.value).eq("user_id", user.id).select("id");
+  if (error) {
+    console.error("saving a sender check failed:", error.code);
+    if (error.code === "42703" || error.code === "PGRST204") return { error: "The sender check needs one setup step: open supabase/hooks-signing.sql and run it in Supabase." };
+    return { error: "Could not save that. Try again." };
+  }
+  if (!data?.length) return { error: GONE };
+  revalidatePath("/app/links");
+  return { ok: true, secret };
 }
