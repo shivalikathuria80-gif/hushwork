@@ -15,6 +15,8 @@ import { fieldTag } from "@/lib/hook-fields";
 import { checkWatchNow, setWatchEnabled } from "@/lib/actions/app-events";
 import { WATCH_SOURCES } from "@/lib/app-events";
 import AppLogo from "../AppLogo";
+import { forgetArrivals } from "@/lib/actions/hook-data";
+import LinkDataPanel from "./LinkDataPanel";
 
 // "Start links": the browser half. One motion language for the whole page: a signal travelling a hairline, from "something arrives" to
 // "you approve". It moves only when something really arrived (or a test was sent), never as decoration, and stands still with reduce motion.
@@ -34,6 +36,7 @@ const STATUS = {
   failed: ["Could not start", "border-error/60 text-error"],
   refused: ["Signature did not match", "border-error/60 text-error"],
   duplicate: ["Repeat, skipped", "border-line-strong text-mute"],
+  capped: ["Over its daily limit", "border-warning/60 text-warning"],
 };
 
 // The time on the visitor's own clock. null on the server and on the first paint, so both render the same HTML.
@@ -374,7 +377,7 @@ function SenderCheck({ link, limits }) {
 }
 
 // ---- ONE LINK -----------------------------------------------------------------------------------------------------------------------
-function LinkCard({ link, times, now, tzOffset, onSignal, index, limits }) {
+function LinkCard({ link, times, startedTimes, now, tzOffset, onSignal, index, limits, dataReady, reduce }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [testing, setTesting] = useState(false);
@@ -433,6 +436,8 @@ function LinkCard({ link, times, now, tzOffset, onSignal, index, limits }) {
     setTesting(false);
   }
   const total = counts.reduce((sum, count) => sum + count, 0);
+  const today = useMemo(() => dailyCounts(startedTimes, now ?? 0, 1, link.tzOffset ?? tzOffset)[0], [startedTimes, now, link.tzOffset, tzOffset]); // the same day the server counts
+  const ages = useMemo(() => (now === null ? [] : times.map((at) => (now - Date.parse(at)) / 86_400_000).filter(Number.isFinite)), [times, now]);
   return (
     <motion.li initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE, delay: 0.05 * index }} className={`${frame} min-w-0 p-5 sm:p-7`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -476,6 +481,8 @@ function LinkCard({ link, times, now, tzOffset, onSignal, index, limits }) {
       <SenderCheck link={link} limits={limits} />
 
       <Snippets url={link.url} id={`link-${link.id}`} />
+
+      <LinkDataPanel link={link} ages={ages} held={Number.isInteger(link.held) ? link.held : times.length} today={today} accountLimit={limits.perDay} ready={dataReady} reduce={reduce} />
 
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {confirm === "" && (
@@ -698,9 +705,37 @@ function AppWatches({ watches, setup, arrivals, now, tzOffset, onSignal }) {
 }
 
 // ---- ARRIVALS -----------------------------------------------------------------------------------------------------------------------
+function ForgetOne({ arrival, ready }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState("");
+  if (!ready) return null;
+  const forget = () => start(async () => {
+    setError("");
+    const result = await forgetArrivals({ linkId: arrival.linkId, eventId: arrival.id }).catch(() => ({ error: "Could not reach Hushwork. Try again." }));
+    if (result?.error) setError(result.error);
+    else router.refresh();
+    setAsking(false);
+  });
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {asking ? (
+        <>
+          <button type="button" disabled={pending} onClick={forget} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink px-3 text-sm font-medium text-bg hover:bg-ink/85"><Icon name={pending ? "Loader2" : "Trash"} size={14} className={pending ? "hw-spin" : ""} />Delete</button>
+          <button type="button" onClick={() => setAsking(false)} className="inline-flex h-9 items-center rounded-full px-3 text-sm font-medium text-mute hover:bg-raised hover:text-ink">Keep</button>
+        </>
+      ) : (
+        <button type="button" onClick={() => setAsking(true)} aria-label={`Delete this arrival from ${arrival.name}`} className="grid h-9 w-9 place-items-center rounded-full text-mute hover:bg-raised hover:text-ink"><Icon name="Trash" size={16} /></button>
+      )}
+      {error && <span role="alert" className="basis-full text-xs text-error">{error}</span>}
+    </span>
+  );
+}
+
 // One arrival: a line with its first fields, and two buttons. "All fields" opens every field with its tag; "Replay" runs the workflow again with
 // exactly these fields (writing stays off, so a send still waits for Approve).
-function ArrivalRow({ arrival, now }) {
+function ArrivalRow({ arrival, now, dataReady }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -736,6 +771,7 @@ function ArrivalRow({ arrival, now }) {
               <Icon name={pending ? "Loader2" : "RotateCcw"} size={14} className={pending ? "hw-spin" : ""} />{pending ? "Replaying" : "Replay"}
             </button>}
             {arrival.runId ? <Link href={`/app/runs?run=${encodeURIComponent(arrival.runId)}`} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent-text hover:bg-accent-subtle">Open run<Icon name="ArrowRight" size={14} /></Link> : arrival.status === "started" ? <span className="px-3 py-2 text-sm text-mute">Running…</span> : null}
+            {(arrival.runId || arrival.status !== "started") && <ForgetOne arrival={arrival} ready={dataReady} />}
           </div>
         </div>
         {arrival.fields.length === 0 ? <p className="mt-1 text-sm text-mute">Nothing came with it.</p> : !open && (
@@ -768,7 +804,7 @@ function ArrivalRow({ arrival, now }) {
   );
 }
 
-function Arrivals({ arrivals, now, keepsFields }) {
+function Arrivals({ arrivals, now, keepsFields, dataReady }) {
   const [all, setAll] = useState(false);
   const shown = all ? arrivals.slice(0, 60) : arrivals.slice(0, 8);
   return (
@@ -778,13 +814,13 @@ function Arrivals({ arrivals, now, keepsFields }) {
           <p className={`${label} text-mute`}>Last 14 days</p>
           <h2 id="arrivals" className="mt-1 text-[22px] font-semibold tracking-[-0.02em]">Arrivals</h2>
         </div>
-        <p className="max-w-[46ch] text-sm text-mute">{keepsFields ? "Every field is kept. Open one to read it all, or replay it after you change the workflow." : "Only a short preview is kept until supabase/hook-fields.sql is run in Supabase. Then every field is kept and can be replayed."}</p>
+        <p className="max-w-[46ch] text-sm text-mute">{keepsFields ? "Every field is kept. Open one to read it all, or replay it after you change the workflow. Deleting one also removes the words its run kept." : "Only a short preview is kept until supabase/hook-fields.sql is run in Supabase. Then every field is kept and can be replayed."}</p>
       </div>
       {arrivals.length === 0 ? (
         <p className="mt-5 border-t border-line pt-5 text-sm text-mute">Nothing has arrived yet. Press <b className="font-medium text-ink">Send a test</b> on a link, or <b className="font-medium text-ink">Check now</b> after a new email, to see one travel the line.</p>
       ) : (
         <ol className="mt-5">
-          {shown.map((arrival) => <ArrivalRow key={arrival.id} arrival={arrival} now={now} />)}
+          {shown.map((arrival) => <ArrivalRow key={arrival.id} arrival={arrival} now={now} dataReady={dataReady} />)}
         </ol>
       )}
       {arrivals.length > 8 && <button type="button" onClick={() => setAll(!all)} className={`${pillGhost} mt-1`}>{all ? "Show fewer" : `Show ${Math.min(arrivals.length, 60) - 8} more`}</button>}
@@ -792,7 +828,7 @@ function Arrivals({ arrivals, now, keepsFields }) {
   );
 }
 
-export default function LinksBoard({ links, arrivals, candidates, limits, keepsFields = true, watches = [], watchSetup = false, linksSetup = "" }) {
+export default function LinksBoard({ links, arrivals, candidates, limits, keepsFields = true, watches = [], watchSetup = false, linksSetup = "", dataReady = false }) {
   const now = useNow();
   const reduce = usePrefersReducedMotion();
   const tzOffset = now === null ? 0 : -new Date(now).getTimezoneOffset();
@@ -825,6 +861,11 @@ export default function LinksBoard({ links, arrivals, candidates, limits, keepsF
     for (const arrival of arrivals) if (arrival.linkId) map.set(arrival.linkId, [...(map.get(arrival.linkId) ?? []), arrival.at]);
     return map;
   }, [arrivals]);
+  const startedOf = useMemo(() => {
+    const map = new Map();
+    for (const arrival of arrivals) if (arrival.status === "started") map.set(arrival.linkId, [...(map.get(arrival.linkId) ?? []), arrival.at]);
+    return map;
+  }, [arrivals]);
 
   return (
     <div className="mt-8 min-w-0 space-y-6">
@@ -836,15 +877,15 @@ export default function LinksBoard({ links, arrivals, candidates, limits, keepsF
           {links.length === 0 && <NewLink candidates={candidates} first full={false} maxLinks={limits.maxLinks} />}
           {links.length > 0 && (
             <ul className="grid grid-cols-[minmax(0,1fr)] gap-6">
-              {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} limits={limits} />)}
+              {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} limits={limits} startedTimes={startedOf.get(link.id) ?? []} dataReady={dataReady} reduce={reduce} />)}
             </ul>
           )}
           {links.length > 0 && <NewLink candidates={candidates} first={false} full={links.length >= limits.maxLinks} maxLinks={limits.maxLinks} />}
         </>
       )}
       <AppWatches watches={watches} setup={watchSetup} arrivals={arrivals} now={now} tzOffset={tzOffset} onSignal={signal} />
-      {(links.length > 0 || watches.length > 0) && <Arrivals arrivals={arrivals} now={now} keepsFields={keepsFields} />}
-      <p className="text-xs text-mute">Each person&rsquo;s links can start up to {limits.perMinute} runs a minute and {limits.perDay} a day, and new emails and events up to {limits.watchPerDay} a day; more than that is written down and not run. Fields that look like a card number or a secret key are left out before anything is saved.</p>
+      {(links.length > 0 || watches.length > 0) && <Arrivals arrivals={arrivals} now={now} keepsFields={keepsFields} dataReady={dataReady} />}
+      <p className="text-xs text-mute">Each person&rsquo;s links can start up to {limits.perMinute} runs a minute and {limits.perDay} a day, and new emails and events up to {limits.watchPerDay} a day; more than that is written down and not run. A link can also have its own lower limit. Fields that look like a card number or a secret key are left out before anything is saved.</p>
     </div>
   );
 }

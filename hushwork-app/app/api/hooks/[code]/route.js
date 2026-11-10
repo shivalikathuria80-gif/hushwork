@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { createAdminClient, createTokenClient } from "@/lib/supabase/admin";
 import { receiveArrival, hookLimiter } from "@/lib/hook-receive";
+import { countStartedSince, pruneArrivals, scrubRun } from "@/lib/hook-prune";
 import { HOOK_LIMITS, SIGNED_HEADERS } from "@/lib/hooks";
 import { startPracticeRun } from "@/lib/run-core";
 import { notifyWatch } from "@/lib/schedule-notify";
@@ -62,6 +63,9 @@ export async function POST(request, { params }) {
       paused: isPaused,
       takeSlot: (client) => takeDbSlot(client, "hook", HOOK_LIMITS.perMinute, HOOK_LIMITS.perDay),
       limiter: hookLimiter(makeLimiter),
+      countToday: (hookId, since) => countStartedSince(admin, hookId, since),
+      prune: (hookId) => pruneArrivals(admin, hookId),
+      scrub: (runId, ownerId) => scrubRun(admin, runId, ownerId),
     },
     { code, text, type, headers: headersOf(request) },
   );

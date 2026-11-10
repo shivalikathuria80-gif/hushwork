@@ -10,7 +10,7 @@ alter table public.hooks add constraint hooks_signing_secret check (signing_styl
 grant update (signing_style, signing_secret) on public.hooks to authenticated;
 
 alter table public.hook_events drop constraint if exists hook_events_status;
-alter table public.hook_events add constraint hook_events_status check (status in ('started', 'limited', 'off', 'failed', 'refused', 'duplicate'));
+alter table public.hook_events add constraint hook_events_status check (status in ('started', 'limited', 'off', 'failed', 'refused', 'duplicate', 'capped'));
 
 create table if not exists public.hook_seen (
   hook_id uuid not null references public.hooks (id) on delete cascade,

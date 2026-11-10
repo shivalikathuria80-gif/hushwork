@@ -13,6 +13,7 @@
 // Steps 4 and 5 are returned as `finish`, a function the caller runs AFTER it has answered the sender, so a form never waits on the AI.
 import { HOOK_LIMITS, NO_COLUMN, NO_TABLE, TEST_FLAG, hashCode, incomingText, looksLikeCode, parseBody, previewOf, readFields, repeatKey, verifySignature } from "./hooks.js";
 import { readFieldList } from "./hook-fields.js";
+import { NO_DATA_SETUP, dayStart, readCap } from "./hook-data.js";
 
 export const ANSWERS = {
   unknown: { status: 404, body: { ok: false, error: "This start link does not exist." } },
@@ -22,11 +23,13 @@ export const ANSWERS = {
   unsigned: { status: 401, body: { ok: false, error: "This start link only takes signed arrivals, and this one's signature did not match." } },
   // A repeat is answered like a success, so the sender stops trying again; it starts nothing.
   duplicate: { status: 200, body: { ok: true, received: true, duplicate: true } },
+  capped: { status: 429, body: { ok: false, error: "This start link has reached its limit for today. Try again tomorrow." } },
   setup: { status: 503, body: { ok: false, error: "Start links are not switched on." } },
   received: { status: 202, body: { ok: true, received: true } },
 };
 
-// `deps`: { admin, clientFor(userId), run(input, who), nudge(found), paused(admin), takeSlot(client), limiter: { minute, day, noise? }, now }.
+// `deps`: { admin, clientFor(userId), run(input, who), nudge(found), paused(admin), takeSlot(client), limiter: { minute, day, noise? }, now,
+//          countToday?(hookId, sinceIso) -> number | null, prune?(hookId), scrub?(runId, ownerId) } (the last three: supabase/hooks-data.sql).
 // `arrival`: { code, text, type, headers } from the request; `headers` is { lower-case name: value } (only the few this file reads).
 // Returns { answer: { status, body }, finish?: async () => outcome }.
 export async function receiveArrival(deps, arrival) {
@@ -34,10 +37,16 @@ export async function receiveArrival(deps, arrival) {
   if (!admin) return { answer: ANSWERS.setup };
 
   if (!looksLikeCode(arrival.code)) return { answer: ANSWERS.unknown };
+  // Optional columns: the sender check (supabase/hooks-signing.sql) and the data controls (supabase/hooks-data.sql). A database without one
+  // of them yet answers 42703, and the link is read again without it, so links keep working whatever was run.
   const find = (columns) => admin.from("hooks").select(columns).eq("code_hash", hashCode(arrival.code)).limit(1);
-  let { data, error } = await find("id, user_id, workflow_id, enabled, received_count, tz_offset, signing_style, signing_secret");
-  // 42703 = the sender-check columns are not in the database yet (supabase/hooks-signing.sql not run): links keep working without it.
-  if (error?.code === "42703") ({ data, error } = await find("id, user_id, workflow_id, enabled, received_count, tz_offset"));
+  const BASE = "id, user_id, workflow_id, enabled, received_count, tz_offset";
+  let data = null;
+  let error = null;
+  for (const columns of [`${BASE}, signing_style, signing_secret, keep_days, daily_cap`, `${BASE}, keep_days, daily_cap`, `${BASE}, signing_style, signing_secret`, BASE]) {
+    ({ data, error } = await find(columns));
+    if (!error || !(NO_COLUMN.has(error.code) || NO_DATA_SETUP.has(error.code))) break;
+  }
   if (error) {
     console.error("finding a start link failed:", error.code);
     return { answer: ANSWERS.unknown };
@@ -94,6 +103,32 @@ export async function receiveArrival(deps, arrival) {
   }
   const release = () => (claim.held ? releaseKey(admin, hook.id, repeat.key) : Promise.resolve());
 
+  // The link's own daily limit, set by its owner: counted from the arrivals that started a run since the start of the owner's day. Checked
+  // before the account limits, so a capped link does not use up the owner's runs.
+  // Arrivals of the same link that are counting at the same moment are reserved first (one synchronous step), so a burst cannot all read
+  // "0 so far" and slip through together. (Across several servers a few could still pass; the account limits below hold either way.)
+  const cap = readCap(hook.daily_cap);
+  let reserved = false;
+  const releaseCap = () => {
+    if (!reserved) return;
+    reserved = false;
+    const left = (INFLIGHT.get(hook.id) ?? 1) - 1;
+    if (left > 0) INFLIGHT.set(hook.id, left);
+    else INFLIGHT.delete(hook.id);
+  };
+  if (cap !== null && deps.countToday) {
+    const before = INFLIGHT.get(hook.id) ?? 0;
+    INFLIGHT.set(hook.id, before + 1);
+    reserved = true;
+    const today = await deps.countToday(hook.id, dayStart(now, hook.tz_offset ?? 0)).catch(() => null);
+    if (today !== null && today + before >= cap) { // a count that could not be read lets it through: the account limits below still hold
+      releaseCap();
+      await release();
+      await noteQuiet("capped");
+      return { answer: ANSWERS.capped };
+    }
+  }
+
   // Too often? The in-memory count is taken in ONE synchronous step (so a burst of parallel requests cannot all slip through the check), then
   // the database count (holds across servers) decides too. A refused arrival starts nothing and costs no AI.
   const client = deps.clientFor(hook.user_id);
@@ -101,12 +136,14 @@ export async function receiveArrival(deps, arrival) {
   const roomNow = deps.limiter.minute.take(key, now) && deps.limiter.day.take(key, now);
   const slot = roomNow ? await deps.takeSlot(client) : { ok: false };
   if (!roomNow || !slot.ok) {
+    releaseCap();
     await release();
     await noteQuiet("limited");
     return { answer: ANSWERS.limited };
   }
 
   const eventId = await note("started");
+  releaseCap(); // the "started" row now counts for itself
   const counted = await admin.from("hooks").update({ received_count: (Number(hook.received_count) || 0) + 1, last_received_at: new Date(now).toISOString() }).eq("id", hook.id);
   if (counted.error) console.error("counting an arrival failed:", counted.error.code);
 
@@ -122,8 +159,25 @@ export async function receiveArrival(deps, arrival) {
     }
     const runId = result?.ok && result.runId ? result.runId : null;
     if (eventId) {
-      const saved = await admin.from("hook_events").update(runId ? { run_id: runId } : { status: "failed" }).eq("id", eventId);
+      const query = admin.from("hook_events").update(runId ? { run_id: runId } : { status: "failed" }).eq("id", eventId);
+      const saved = await (typeof query.select === "function" ? query.select("id") : query);
       if (saved.error) console.error("updating an arrival failed:", saved.error.code);
+      // The owner deleted this arrival while its run was still starting: nothing pointed at the run then, so its words are removed now.
+      else if (runId && !saved.data?.length && hook.keep_days !== undefined && deps.scrub) {
+        try {
+          await deps.scrub(runId, hook.user_id);
+        } catch {
+          console.error("removing the words of a deleted arrival crashed");
+        }
+      }
+    }
+    // Arrivals older than the link's keep days go now (the clock also does this for links nothing arrives at).
+    if (hook.keep_days !== undefined && deps.prune) {
+      try {
+        await deps.prune(hook.id);
+      } catch {
+        console.error("pruning old arrivals crashed");
+      }
     }
     if (!runId) {
       await release();
@@ -187,6 +241,8 @@ export async function replayArrival(deps, who, eventId) {
   if (!result?.ok || !result.runId) return { error: result?.error ?? REPLAY_ERRORS.failed };
   return { ok: true, runId: result.runId, waiting: Number(result.auto?.waiting) || 0 };
 }
+
+const INFLIGHT = (globalThis.__hushworkHookInflight ??= new Map()); // link id -> arrivals between their cap count and their "started" row
 
 export const hookLimiter = (makeLimiter) => (globalThis.__hushworkHookLimits ??= { minute: makeLimiter({ max: HOOK_LIMITS.perMinute, windowMs: 60_000 }), day: makeLimiter({ max: HOOK_LIMITS.perDay, windowMs: 86_400_000, calendar: true }), noise: makeLimiter({ max: 3, windowMs: 60_000 }) });
 

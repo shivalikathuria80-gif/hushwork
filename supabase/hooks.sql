@@ -28,7 +28,7 @@ create table public.hooks (
   constraint hooks_code_shape check (code ~ '^hwl_[A-Za-z0-9_-]{32}$'),
   constraint hooks_hash_shape check (code_hash ~ '^[0-9a-f]{64}$'),
   constraint hooks_count_positive check (received_count >= 0),
-  constraint hooks_tz_range check (tz_offset between -840 and 720),
+  constraint hooks_tz_range check (tz_offset between -720 and 840),
   constraint hooks_signing_style check (signing_style in ('none', 'tally', 'typeform', 'stripe', 'github', 'hushwork')),
   constraint hooks_signing_secret check (signing_style = 'none' or signing_secret ~ '^[!-~][ -~]{6,198}[!-~]$')
 );
@@ -64,7 +64,7 @@ create table public.hook_events (
   test boolean not null default false,                  -- true when the owner pressed "Send a test"
   created_at timestamptz not null default now(),
 
-  constraint hook_events_status check (status in ('started', 'limited', 'off', 'failed', 'refused', 'duplicate')),
+  constraint hook_events_status check (status in ('started', 'limited', 'off', 'failed', 'refused', 'duplicate', 'capped')),
   constraint hook_events_preview_is_array check (jsonb_typeof(preview) = 'array'),
   constraint hook_events_preview_size check (octet_length(preview::text) <= 2000),
   constraint hook_events_fields_is_array check (fields is null or jsonb_typeof(fields) = 'array'),

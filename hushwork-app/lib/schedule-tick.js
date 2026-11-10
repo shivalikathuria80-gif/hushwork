@@ -2,6 +2,7 @@ import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { getCronSecret } from "@/lib/schedule-env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pruneArrivals } from "@/lib/hook-prune";
 import { runDueSchedules } from "@/lib/schedule-runner";
 import { startPracticeRun } from "@/lib/run-core";
 import { notifyAgent, notifyScheduleProblem, notifyWatch } from "@/lib/schedule-notify";
@@ -52,6 +53,8 @@ export async function handleTick(request) {
   const sent = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!sent || !same(sent, secret)) return reply(401, { ok: false, error: "Wrong or missing password." });
 
+  // Start link arrivals past their keep days are deleted on every call, even while paused: how long a stranger's words are kept is a promise.
+  await pruneArrivals(admin).catch(() => 0);
   if (await isPaused(admin)) return reply(200, { ok: true, paused: true, due: 0, ran: 0, stopped: 0, failed: 0, skipped: 0 }); // the pause switch: no schedule is claimed or run, they wait
   const summary = await runDueSchedules({ admin, run: startPracticeRun, notify: (problem) => notifyScheduleProblem({ admin, ...problem }), nudge: (watch) => notifyWatch({ admin, ...watch }), deadline });
   // The Hushwork Agent's looks (lib/agent/). A problem there never fails the schedules above.

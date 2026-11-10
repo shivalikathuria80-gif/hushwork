@@ -275,6 +275,7 @@ export function readSavedResults(value) {
     if (typeof r?.incoming === "string" && r.incoming) read.incoming = r.incoming.slice(0, 5200); // what arrived at the workflow's start link (lib/hooks.js); only ever on the Start step
     if (Array.isArray(r?.incomingFields)) read.incomingFields = readFieldList(r.incomingFields); // the same, field by field, for {incoming.name} (lib/hook-fields.js)
     if (r?.incomingFrom === "gmail" || r?.incomingFrom === "calendar") read.incomingFrom = r.incomingFrom; // which app it came from (lib/app-events.js); missing = a start link
+    if (r?.incoming_deleted === true) read.incomingDeleted = true; // its owner deleted what arrived (supabase/hooks-data.sql): the run stays, the words are gone
     if (r?.quiet === true) read.quiet = true; // a watch run that found NOTHING NEW and stopped quietly (the Runs page folds these into one line)
     if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
     if (Number.isInteger(r?.fromStep) && r.fromStep >= 0 && r.fromStep < 100) read.fromStep = r.fromStep; // which step of that practice run

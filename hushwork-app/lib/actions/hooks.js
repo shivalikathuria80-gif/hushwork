@@ -15,7 +15,7 @@ import { makeLimiter } from "@/lib/ai/limits";
 // refuses a link for somebody else's workflow), small answers. What ARRIVES at a link never passes through here: see app/api/hooks/[code].
 
 const GONE = "That start link no longer exists.";
-const offsetOf = (value) => (Number.isInteger(value) && value >= -840 && value <= 720 ? value : 0);
+const offsetOf = (value) => (Number.isInteger(value) && value >= -720 && value <= 840 ? value : 0) // minutes EAST of UTC: -12:00 to +14:00;
 
 export async function createHook(input) {
   const user = await requireUser();

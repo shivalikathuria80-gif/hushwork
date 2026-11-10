@@ -117,7 +117,7 @@ function fakeAdmin({ hook, failEvents = false, oldColumns = false, noSeenTable =
           return { select: () => Promise.resolve(failEvents ? { data: null, error: { code: "X" } } : { data: [{ id: `event-${log.events.length}` }], error: null }) };
         },
         update(values) {
-          return { eq: (column, value) => { (table === "hooks" ? log.hookUpdates : log.eventUpdates).push({ values, [column]: value }); return Promise.resolve({ error: null }); } };
+          return { eq: (column, value) => { (table === "hooks" ? log.hookUpdates : log.eventUpdates).push({ values, [column]: value }); const answer = Promise.resolve({ error: null, data: [{ id: value }] }); answer.select = () => answer; return answer; } };
         },
       };
       return chain;

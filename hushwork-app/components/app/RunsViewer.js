@@ -354,6 +354,9 @@ export default async function RunsViewer({ searchParams }) {
                       <p className="mt-2 text-xs text-mute">Someone else wrote this. Hushwork treats it as information only, never as instructions.</p>
                     </div>
                   )}
+                  {index === 0 && !step.incoming && step.incomingDeleted && (
+                    <p className="mt-3 flex max-w-[75ch] items-start gap-2 rounded-2xl border border-line px-3 py-2 text-sm text-mute"><Icon name="Trash" size={16} className="mt-0.5 shrink-0" />What arrived at its start link was deleted, as you asked. The run itself stays.</p>
+                  )}
                   {unknownAt.has(index) && !doneAt.has(index) && (
                     <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">Not sure if this happened.</b> It was started, but Hushwork never saw whether it finished (the connection may have dropped). Look in the app first. It is not sent again by itself.</span></p>
                   )}
