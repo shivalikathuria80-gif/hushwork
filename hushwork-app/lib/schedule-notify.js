@@ -33,7 +33,7 @@ export async function notifyScheduleProblem({ admin, userId, workflowId, status,
 
 // ---- THE NUDGE: the one thing Hushwork does by itself -------------------------------------------------------------------------------------------
 // After a scheduled run left a step waiting for the person's Approve, Hushwork may send ONE short plain email to the person THEMSELF (never anyone
-// else) saying to open the Runs page. `reason` says why: "watch" (a watch workflow found something new) or "waiting" (any other scheduled run, an
+// else) saying to open the Runs page. `reason` says why: "watch" (a watch workflow found something new), "arrived" (a start link started the run, lib/hook-receive.js) or "waiting" (any other scheduled run, an
 // agent included, skipped its writing steps because the schedule does not allow writing). Rules (lib/watch-rules.js), the same for both: never
 // between 20:00 and 08:00 their time, at most 3 a day per person in all. The words never include anything from the run (no step text, no findings)
 // and never a link that approves anything.
@@ -49,6 +49,11 @@ const NUDGE = {
     title: "Hushwork: a step is waiting for you",
     text: (name, siteUrl) => `Your scheduled workflow "${name}" ran and has a step waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
     record: "Hushwork emailed you once to say a step is waiting for you. Nothing was approved or sent for you.",
+  },
+  arrived: {
+    title: "Hushwork: something arrived",
+    text: (name, siteUrl) => `Something arrived at the start link of "${name}", and a step is waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
+    record: "Hushwork emailed you once to say something arrived and a step is waiting for you. Nothing was approved or sent for you.",
   },
 };
 const nudgeOf = (reason) => NUDGE[reason] ?? NUDGE.watch;

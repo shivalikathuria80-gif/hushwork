@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "supabase");
 // The tables that belong to one person each. (waitlist is public-insert-only and usage_counters is reached through a function: both are checked elsewhere.)
-const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens", "oauth.sql": "oauth_grants" };
+const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens", "oauth.sql": "oauth_grants", "hooks.sql": "hooks" };
 const read = (file) => fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n");
 const noComments = (sql) => sql.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n");
 
@@ -55,7 +55,7 @@ test("RLS: every table made in supabase/ is either checked above or is one of th
   }
   for (const [file, table] of found) {
     if (PER_PERSON[file] === table) continue;
-    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
+    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)) || (file === "hooks.sql" && table === "hook_events"), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
     assert.match(noComments(read(file)), new RegExp(`alter table public\\.${table} enable row level security`), `${table}: row level security is on`);
   }
   assert.ok(found.length >= 8);
@@ -111,4 +111,15 @@ test("OAuth: chatbot clients and one-time codes are for the server only, grants 
   assert.deepEqual(sql.match(/^grant .*;$/gm), ["grant select on public.oauth_grants to authenticated;", "grant delete on public.oauth_grants to authenticated;"], "a person can only read and remove their own connections");
   for (const column of ["code_hash", "access_hash", "refresh_hash"]) assert.match(sql, new RegExp(`${column} ~ '\\^\\[0-9a-f\\]\\{64\\}\\$'`), `${column} is a sha-256 hash`);
   assert.match(sql, /code_challenge text not null/, "every code has a PKCE challenge");
+});
+
+test("start links: arrivals are written by the server only, a link is tied to the owner's own workflow, and the code can never be chosen freely", () => {
+  const sql = noComments(read("hooks.sql"));
+  assert.match(sql, /grant select on public\.hook_events to authenticated;/);
+  assert.ok(!/grant (?:insert|update|delete)[^;]*public\.hook_events/.test(sql), "a person cannot write, change or remove arrivals");
+  assert.match(sql, /create policy "people read their own arrivals" on public\.hook_events for select to authenticated using \(\(select auth\.uid\(\)\) = user_id\);/);
+  assert.match(sql, /exists \(select 1 from public\.workflows w where w\.id = workflow_id and w\.user_id = \(select auth\.uid\(\)\)\)/, "a link can only be made for the person's own workflow");
+  assert.match(sql, /workflow_id uuid not null unique references public\.workflows \(id\) on delete cascade/);
+  assert.match(sql, /code ~ '\^hwl_\[A-Za-z0-9_-\]\{32\}\$'/);
+  assert.ok(!/grant (?:insert|update) \([^)]*(received_count|last_received_at)/.test(sql), "the counters are the server's");
 });

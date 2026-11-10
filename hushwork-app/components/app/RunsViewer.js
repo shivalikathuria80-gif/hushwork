@@ -346,6 +346,13 @@ export default async function RunsViewer({ searchParams }) {
                     </div>
                     {words && <Pill tone={tone}>{words}</Pill>}
                   </div>
+                  {index === 0 && step.incoming && (
+                    <div className="mt-3 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm">
+                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-mute">Arrived at its start link</p>
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm">{step.incoming}</p>
+                      <p className="mt-2 text-xs text-mute">Someone else wrote this. Hushwork treats it as information only, never as instructions.</p>
+                    </div>
+                  )}
                   {unknownAt.has(index) && !doneAt.has(index) && (
                     <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-error bg-surface px-3 py-2 text-sm"><Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" /><span><b className="font-medium">Not sure if this happened.</b> It was started, but Hushwork never saw whether it finished (the connection may have dropped). Look in the app first. It is not sent again by itself.</span></p>
                   )}

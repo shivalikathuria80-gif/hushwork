@@ -239,6 +239,7 @@ export function readSavedResults(value) {
   return value.map((r) => {
     const read = { icon: text(r?.icon), title: text(r?.title), detail: text(r?.detail), outcome: text(r?.outcome), status: r?.status === "failed" ? "failed" : r?.status === "pending" ? "pending" : "done" };
     if (r?.note === true) read.note = true; // a stop note: words for the person, not a step's state
+    if (typeof r?.incoming === "string" && r.incoming) read.incoming = r.incoming.slice(0, 5200); // what arrived at the workflow's start link (lib/hooks.js); only ever on the Start step
     if (r?.quiet === true) read.quiet = true; // a watch run that found NOTHING NEW and stopped quietly (the Runs page folds these into one line)
     if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
     if (Number.isInteger(r?.fromStep) && r.fromStep >= 0 && r.fromStep < 100) read.fromStep = r.fromStep; // which step of that practice run

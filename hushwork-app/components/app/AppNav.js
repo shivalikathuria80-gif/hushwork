@@ -89,6 +89,7 @@ export default function AppNav({ userBadge }) {
           <div aria-hidden="true" className="my-2 border-t border-line" />
           <NavLink href="/app/runs" icon="History" onNavigate={close}>Runs</NavLink>
           <NavLink href="/app/calendar" icon="Calendar" onNavigate={close}>Calendar</NavLink>
+          <NavLink href="/app/links" icon="Link" onNavigate={close}>Start links</NavLink>
           <NavLink href="/app/week" icon="FileBarChart" onNavigate={close}>Your week</NavLink>
           <NavLink href="/app/connections" icon="Plug" onNavigate={close}>Connections</NavLink>
         </nav>

@@ -403,7 +403,14 @@ test("scheduled runs: the two settings are read only in schedule-env.js, the all
   assert.match(env, /^import "server-only";/m);
   assert.deepEqual(files.filter((file) => /process\.env/.test(file.text) && /(?:CRON_SECRET|SERVICE_ROLE_KEY)/.test(file.text)).map((file) => file.name).filter((name) => !name.endsWith(".test.js") && name !== "README.md" && name !== ".env.example" && name !== "scripts/clock.mjs"), ["lib/schedule-env.js"], "only schedule-env.js reads them (the clock script on your own computer sends the password, it is not server code)");
   const adminImporters = files.filter((file) => /from\s+["']@\/lib\/supabase\/admin["']/.test(file.text)).map((file) => file.name);
-  assert.deepEqual(adminImporters.sort(), ["app/api/mcp/route.js", "lib/actions/account.js", "lib/plugin/oauth-server.js", "lib/schedule-tick.js"], "the all-access client has exactly four users: the clock's handler, Delete my account, the plugin endpoint (for the token's owner only), and the chatbot sign-in (OAuth clients and codes are nobody's own rows)");
+  assert.deepEqual(adminImporters.sort(), ["app/api/hooks/[code]/route.js", "app/api/mcp/route.js", "lib/actions/account.js", "lib/plugin/oauth-server.js", "lib/schedule-tick.js"], "the all-access client has exactly five users: the clock's handler, Delete my account, the plugin endpoint (for the token's owner only), the chatbot sign-in (OAuth clients and codes are nobody's own rows), and a start link's address (for the link's owner only)");
+  // A start link: the code in the address finds the owner before anything runs, the run is only ever the owner's, and it never writes by itself.
+  const hookRoute = files.find((file) => file.name === "app/api/hooks/[code]/route.js").text;
+  const receive = files.find((file) => file.name === "lib/hook-receive.js").text;
+  assert.ok(hookRoute.includes("receiveArrival(") && !/allowWrites/.test(hookRoute), "the address only hands over to lib/hook-receive.js");
+  assert.ok(receive.indexOf('.eq("code_hash", hashCode(arrival.code))') > 0 && receive.indexOf('.eq("code_hash", hashCode(arrival.code))') < receive.indexOf("deps.run("), "the link is found by the hash of its code before anything runs");
+  assert.ok(receive.includes("allowWrites: false") && !/allowWrites:\s*true/.test(receive), "a run started by a link never writes by itself");
+  assert.ok(receive.includes("user: { id: hook.user_id }") && !/user_id:\s*(?:payload|arrival|parsed)/.test(receive), "what arrived never says whose run it is");
   const mcp = files.find((file) => file.name === "app/api/mcp/route.js").text;
   assert.ok(mcp.indexOf("bearer(request") > 0 && mcp.indexOf("findGrantOwner(") > mcp.indexOf("bearer(request") && mcp.indexOf("findTokenOwner(") > mcp.indexOf("bearer(request") && mcp.indexOf("findTokenOwner(") < mcp.indexOf("createTokenClient(owner.userId)") && mcp.indexOf("createTokenClient(owner.userId)") < mcp.indexOf("handleBody("), "the plugin endpoint finds the token's owner before anything runs, and acts only as that person");
   assert.ok(mcp.includes("resource_metadata="), "the 401 points a chatbot at the OAuth sign-in");
