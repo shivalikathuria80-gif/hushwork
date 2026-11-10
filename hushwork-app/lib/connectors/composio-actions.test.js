@@ -147,7 +147,7 @@ test("a calendar event and a Notion page: the start time and the page id are che
   assert.deepEqual(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "" }, pageInputs).arguments, { parent_id: "0123456789abcdef0123456789abcdef", title: "Notes" }, "no text means an empty page with the title");
   const oldTool = readToolInputs({ input_parameters: { parent_id: { required: true }, title: { required: true } } });
   assert.ok(buildArguments(page, { target: "0123456789abcdef0123456789abcdef", title: "Notes", details: "words" }, oldTool).error, "a tool with no place for the text is never sent the text by guessing");
-  assert.deepEqual(allowedTools(findComposioApp("gcalwrite")), ["GOOGLECALENDAR_LIST_CALENDARS", "GOOGLECALENDAR_CREATE_EVENT"]);
+  assert.deepEqual(allowedTools(findComposioApp("gcalwrite")), ["GOOGLECALENDAR_EVENTS_LIST", "GOOGLECALENDAR_LIST_CALENDARS", "GOOGLECALENDAR_CREATE_EVENT"], "the read-only events list is for \"When a calendar event is added\"");
   assert.deepEqual(allowedTools(findComposioApp("notion")), ["NOTION_SEARCH_NOTION_PAGE", "NOTION_CREATE_NOTION_PAGE"]);
   // Stripe has two lookups on one sign-in: connecting Stripe (or its invoices) allows both, and nothing else
   assert.deepEqual(allowedTools(findComposioApp("stripe")), ["STRIPE_LIST_CHARGES", "STRIPE_LIST_INVOICES"]);

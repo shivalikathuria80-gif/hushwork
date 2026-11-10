@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { HOOK_LIMITS, HOOK_SETUP, INCOMING_TAG, NO_COLUMN, REPEAT_WINDOWS, hookUrl, looksLikeCode, looksLikeSecret, looksLikeStyle, readPreview } from "@/lib/hooks";
 import { fieldKey, fieldTag, hasFieldTag, readFieldList, tagsIn } from "@/lib/hook-fields";
+import { WATCH_LIMITS, isWatchSource } from "@/lib/app-events";
 
 // "Start links": the server half. It reads the person's workflows, their links and what arrived in the last 14 days, and hands plain values
 // to LinksBoard. The page wraps this in <Suspense>.
@@ -57,6 +58,8 @@ export default async function LinksData() {
   let arrivals = [];
   let candidates = [];
   let keepsFields = true;
+  let watches = [];
+  let watchSetup = false; // supabase/app-events.sql not run yet: the "From your apps" part says so, start links keep working
   try {
     const supabase = await createClient();
     // Arrivals with every field (supabase/hook-fields.sql); a database without that column yet gives the short preview only.
@@ -64,10 +67,13 @@ export default async function LinksData() {
       .gte("created_at", new Date(now - 14 * DAY_MS).toISOString()).order("created_at", { ascending: false }).limit(300);
     const linkRows = (columns) => supabase.from("hooks").select(columns).eq("user_id", user.id).order("created_at", { ascending: true }).limit(HOOK_LIMITS.maxLinks);
     const BASE = "id, workflow_id, code, enabled, received_count, last_received_at, created_at";
-    let [flows, hooks, firstEvents] = await Promise.all([
+    let [flows, hooks, firstEvents, watchRows, watchEvents] = await Promise.all([
       supabase.from("workflows").select("id, name, plan").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(100),
       linkRows(`${BASE}, signing_style, signing_secret`),
       arrivalsWith("id, hook_id, status, run_id, preview, fields, test, created_at"),
+      supabase.from("app_watches").select("id, workflow_id, source, filter, enabled, last_checked_at, last_status, last_error, started_count, last_started_at, created_at").eq("user_id", user.id).order("created_at", { ascending: true }).limit(WATCH_LIMITS.maxWatches),
+      supabase.from("app_watch_events").select("id, watch_id, status, run_id, preview, created_at").eq("user_id", user.id)
+        .gte("created_at", new Date(now - 14 * DAY_MS).toISOString()).order("created_at", { ascending: false }).limit(300),
     ]);
     const events = firstEvents.error && NO_COLUMN.has(firstEvents.error.code) ? await arrivalsWith("id, hook_id, status, run_id, preview, test, created_at") : firstEvents;
     if (events !== firstEvents && !events.error) keepsFields = false;
@@ -77,13 +83,11 @@ export default async function LinksData() {
     if (flows.error) {
       console.error("Loading start links failed:", flows.error.code);
       failure = NO_TABLE.has(flows.error.code) ? "Hushwork's database is not set up yet. Run the files in the supabase folder first." : "Check your connection and try again.";
-    } else if (hooks.error) {
-      if (NO_TABLE.has(hooks.error.code)) setup = true;
-      else {
-        console.error("Loading start links failed:", hooks.error.code);
-        failure = "Check your connection and try again.";
-      }
+    } else if (hooks.error && !NO_TABLE.has(hooks.error.code)) {
+      console.error("Loading start links failed:", hooks.error.code);
+      failure = "Check your connection and try again.";
     } else {
+      setup = Boolean(hooks.error); // start links are not set up yet: the page still shows what your apps started
       const origin = await siteOrigin();
       const flowOf = new Map(flows.data.map((row) => {
         const plan = Array.isArray(row.plan) ? row.plan : [];
@@ -96,7 +100,7 @@ export default async function LinksData() {
           writes: plan.filter((step) => ["action", "row", "issue"].includes(step?.kind)).length,
         }];
       }));
-      links = hooks.data.filter((row) => flowOf.has(text(row.workflow_id)) && looksLikeCode(row.code)).map((row) => ({
+      links = (hooks.data ?? []).filter((row) => flowOf.has(text(row.workflow_id)) && looksLikeCode(row.code)).map((row) => ({
         id: text(row.id), workflowId: text(row.workflow_id), ...flowOf.get(text(row.workflow_id)),
         url: hookUrl(origin, row.code), enabled: row.enabled === true,
         count: Number(row.received_count) || 0, lastAt: text(row.last_received_at),
@@ -107,7 +111,7 @@ export default async function LinksData() {
       const linked = new Set(links.map((link) => link.workflowId));
       const nameOf = new Map(links.map((link) => [link.id, link.name]));
       candidates = [...flowOf.entries()].filter(([id]) => !linked.has(id)).map(([id, flow]) => ({ id, name: flow.name, hasStart: flow.hasStart, readsIncoming: flow.readsIncoming }));
-      if (!events.error) {
+      if (!events.error && !setup) {
         arrivals = events.data.filter((row) => nameOf.has(text(row.hook_id))).map((row) => ({
           id: text(row.id), linkId: text(row.hook_id), name: nameOf.get(text(row.hook_id)), status: STATUSES.has(row.status) ? row.status : "failed",
           runId: text(row.run_id), test: row.test === true, at: text(row.created_at),
@@ -121,11 +125,29 @@ export default async function LinksData() {
           link.missing = newest ? link.tags.filter((key) => !have.has(key)) : [];
         }
       }
+      // FROM YOUR APPS: watched workflows ("When an email arrives", "When a calendar event is added") and what they started (lib/app-events.js).
+      if (watchRows.error) watchSetup = NO_TABLE.has(watchRows.error.code);
+      else {
+        watches = watchRows.data.filter((row) => flowOf.has(text(row.workflow_id)) && isWatchSource(row.source)).map((row) => ({
+          id: text(row.id), workflowId: text(row.workflow_id), name: flowOf.get(text(row.workflow_id)).name, readsIncoming: flowOf.get(text(row.workflow_id)).readsIncoming,
+          source: row.source, filter: text(row.filter), enabled: row.enabled === true, checkedAt: text(row.last_checked_at),
+          status: ["ok", "new", "limited", "not_connected", "failed"].includes(row.last_status) ? row.last_status : "", error: text(row.last_error).slice(0, 300),
+          count: Number(row.started_count) || 0, lastAt: text(row.last_started_at),
+        }));
+        const watchOf = new Map(watches.map((watch) => [watch.id, watch]));
+        if (!watchEvents.error) {
+          arrivals.push(...watchEvents.data.filter((row) => watchOf.has(text(row.watch_id))).map((row) => ({
+            id: text(row.id), watchId: text(row.watch_id), source: watchOf.get(text(row.watch_id)).source, name: watchOf.get(text(row.watch_id)).name,
+            status: STATUSES.has(row.status) ? row.status : "failed", runId: text(row.run_id), test: false, at: text(row.created_at), fields: readPreview(row.preview), full: false,
+          })));
+          arrivals.sort((a, b) => b.at.localeCompare(a.at)); // links and apps in one list, newest first
+        }
+      }
     }
   } catch {
     failure = "Check your connection and try again.";
   }
   if (failure) return <Problem>{failure}</Problem>;
-  if (setup) return <Problem title="One setup step is left">{HOOK_SETUP} Nothing else in Hushwork is affected until then.</Problem>;
-  return <LinksBoard links={links} arrivals={arrivals} candidates={candidates} keepsFields={keepsFields} limits={{ perMinute: HOOK_LIMITS.perMinute, perDay: HOOK_LIMITS.perDay, maxLinks: HOOK_LIMITS.maxLinks, repeatMinutes: REPEAT_WINDOWS.body / 60_000, repeatDays: REPEAT_WINDOWS.id / 86_400_000 }} />;
+  if (setup && watchSetup) return <Problem title="One setup step is left">{HOOK_SETUP} Nothing else in Hushwork is affected until then.</Problem>;
+  return <LinksBoard linksSetup={setup ? HOOK_SETUP : ""} watches={watches} watchSetup={watchSetup} links={links} arrivals={arrivals} candidates={candidates} keepsFields={keepsFields} limits={{ perMinute: HOOK_LIMITS.perMinute, perDay: HOOK_LIMITS.perDay, maxLinks: HOOK_LIMITS.maxLinks, watchPerDay: WATCH_LIMITS.perDay, repeatMinutes: REPEAT_WINDOWS.body / 60_000, repeatDays: REPEAT_WINDOWS.id / 86_400_000 }} />;
 }

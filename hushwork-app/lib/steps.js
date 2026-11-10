@@ -28,10 +28,15 @@ export const STEP_KINDS = {
     help: "What starts this workflow.",
     icon: "Zap",
     fields: [
-      choice("how", "What starts it", { schedule: "On a schedule", watch: "Keep watching: tell me only when something new shows up", email:"When an email arrives", lead: "When a new lead arrives", link: "When something arrives at its start link", manual: "When I ask" }),
-      text("when", "When", 80, { optional: true, hint: "For example: every weekday at 9am" }),
+      choice("how", "What starts it", { schedule: "On a schedule", watch: "Keep watching: tell me only when something new shows up", email: "When an email arrives", event: "When a calendar event is added", lead: "When a new lead arrives", link: "When something arrives at its start link", manual: "When I ask" }),
+      // The second box means something different for each start (StepEditor shows `labelFor`/`hintFor` of the chosen one).
+      text("when", "When", 80, {
+        optional: true, hint: "For example: every weekday at 9am",
+        labelFor: { email: "Which emails", event: "Which events" },
+        hintFor: { email: "Empty for every new email, or Gmail search words like from:ana@example.com or subject:invoice", event: "Empty for every new event, or words in its title like interview" },
+      }),
     ],
-    describe: (fields, label) => ({ title: label("how"), detail: fields.when }),
+    describe: (fields, label) => ({ title: label("how"), detail: fields.how === "email" && fields.when ? `Only emails matching ${fields.when}` : fields.how === "event" && fields.when ? `Only events with "${fields.when}" in the title` : fields.when }),
   },
   find: {
     label: "Look something up",
@@ -113,7 +118,7 @@ export const STEP_KINDS = {
     help: "Look at something in an app you connected through Composio (Todoist, Notion...). It only reads. You approve the look on the Runs page.",
     icon: "Plug",
     fields: [
-      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.filter((app) => !app.input && !app.noLookup).map((app) => [app.id, app.name]))),
+      choice("app", "Which app", Object.fromEntries(COMPOSIO_APPS.filter((app) => !app.input && !app.noLookup && !app.watchOnly).map((app) => [app.id, app.name]))),
       text("what", "Your note", 120, { optional: true, hint: "Optional. What you want to know, for example: which task is due first" }),
     ],
     describe: (fields, label) => ({ title: "Look in another app", detail: join(label("app"), fields.what) }),

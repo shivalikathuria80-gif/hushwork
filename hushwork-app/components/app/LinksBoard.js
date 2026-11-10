@@ -12,6 +12,9 @@ import { INCOMING_TAG, TEST_ARRIVAL, dailyCounts, snippets } from "@/lib/hook-ta
 import { SIGNING_STYLES, STYLE_KEYS, signArrival } from "@/lib/hook-sign";
 import { createHook, deleteHook, renewHook, replayHookEvent, setHookEnabled, setHookSigning } from "@/lib/actions/hooks";
 import { fieldTag } from "@/lib/hook-fields";
+import { checkWatchNow, setWatchEnabled } from "@/lib/actions/app-events";
+import { WATCH_SOURCES } from "@/lib/app-events";
+import AppLogo from "../AppLogo";
 
 // "Start links": the browser half. One motion language for the whole page: a signal travelling a hairline, from "something arrives" to
 // "you approve". It moves only when something really arrived (or a test was sent), never as decoration, and stands still with reduce motion.
@@ -57,8 +60,8 @@ function ago(at, now) {
 // ---- THE SIGNAL STAGE ---------------------------------------------------------------------------------------------------------------
 // Four stations on one hairline. `beat` is how far the signal has travelled: 0 = resting, 1..4 = the station it has reached.
 const STATIONS = [
-  { icon: "Inbox", step: "01", title: "Something arrives", words: "A form, a booking, an order" },
-  { icon: "Link", step: "02", title: "Start link", words: "Its private address" },
+  { icon: "Inbox", step: "01", title: "Something arrives", words: "A form, an email, a new event" },
+  { icon: "Link", step: "02", title: "Hushwork notices", words: "Its start link, or your apps" },
   { icon: "Bot", step: "03", title: "The workflow runs", words: "Reads it, thinks, drafts" },
   { icon: "ShieldCheck", step: "04", title: "You approve", words: "Nothing is sent before" },
 ];
@@ -544,6 +547,156 @@ function NewLink({ candidates, first, full, maxLinks }) {
   );
 }
 
+// ---- FROM YOUR APPS -----------------------------------------------------------------------------------------------------------------
+// A workflow whose Start says "When an email arrives" or "When a calendar event is added" is watched (lib/app-events.js). It is MADE by saving
+// that Start in the Builder, so this part only shows, switches and checks. Same frame, hairlines and pills as a link, so the two read as one family.
+const WATCH_STATUS = {
+  ok: "nothing new",
+  new: "started the workflow",
+  limited: "held back: too many at once",
+};
+const ASK = {
+  gmail: "When an email arrives, read {incoming} and draft a short friendly reply for me to approve",
+  calendar: "When a calendar event is added, read {incoming} and write me a short prep note for it",
+};
+
+function WatchCard({ watch, times, now, tzOffset, onSignal, index }) {
+  const router = useRouter();
+  const source = WATCH_SOURCES[watch.source];
+  const [pending, start] = useTransition();
+  const [checking, setChecking] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [local, setLocal] = useState({ from: watch.enabled, value: watch.enabled });
+  const enabled = local.from === watch.enabled ? local.value : watch.enabled;
+  const counts = useMemo(() => dailyCounts(times, now ?? 0, 14, tzOffset), [times, now, tzOffset]);
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  const problem = enabled && (watch.status === "not_connected" || watch.status === "failed") ? watch.error || "Hushwork could not look the last time. It tries again in a few minutes." : "";
+  function toggle(next) {
+    setLocal({ from: watch.enabled, value: next });
+    start(async () => {
+      const result = await setWatchEnabled({ id: watch.id, enabled: next, tzOffset: -new Date().getTimezoneOffset() }).catch(() => ({ error: "Could not reach Hushwork. Check your connection and try again." }));
+      if (result?.error) {
+        setLocal({ from: watch.enabled, value: !next });
+        setMessage({ tone: "bad", words: result.error });
+      } else router.refresh();
+    });
+  }
+  async function checkNow() {
+    setChecking(true);
+    setMessage(null);
+    const result = await checkWatchNow({ id: watch.id }).catch(() => ({ error: "Could not reach Hushwork. Check your connection and try again." }));
+    if (result?.error) setMessage({ tone: "bad", words: result.error });
+    else {
+      if (/started/.test(result.words)) {
+        onSignal();
+        pulse("good");
+      } else pulse("rest");
+      setMessage({ tone: "good", words: result.words });
+    }
+    router.refresh();
+    setChecking(false);
+  }
+  const which = watch.filter ? (watch.source === "gmail" ? "New emails matching" : "New events with") : `Every new ${source.noun}`;
+  return (
+    <motion.li initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE, delay: 0.05 * index }} className={`${frame} min-w-0 p-5 sm:p-7`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <AppLogo id={source.logo} label={source.app} size={44} />
+          <div className="min-w-0">
+            <p className={`${label} ${!enabled ? "text-mute" : problem ? "text-error" : "text-success"}`}>{!enabled ? "Switched off" : problem ? "Needs you" : `Watching ${source.app}`}</p>
+            <h3 className="mt-1 break-words text-[22px] font-semibold leading-tight tracking-[-0.02em]">{watch.name}</h3>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-mute">
+          <span>{enabled ? "On" : "Off"}</span>
+          <Switch checked={enabled} onChange={toggle} label={`Watch ${source.app} for ${watch.name}`} disabled={pending} />
+        </label>
+      </div>
+
+      <p className="mt-5 flex flex-wrap items-center gap-2 text-[15px]">
+        <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-sunken px-3.5 py-1.5">
+          <Icon name={source.icon} size={16} className="shrink-0 text-accent-text" />
+          <span className="min-w-0 truncate">{which}{watch.filter && <> <code className="font-mono text-[13px] text-ink">{watch.filter}</code>{watch.source === "calendar" && " in the title"}</>}</span>
+        </span>
+        <span className="text-sm text-mute">{watch.source === "gmail" ? "in your inbox, never your own" : "on your main calendar"}, looked at every 2 minutes</span>
+      </p>
+      {problem ? (
+        <p role="alert" className="mt-3 flex flex-wrap items-start gap-2 rounded-2xl border border-error px-3 py-2 text-sm">
+          <Icon name="CircleAlert" className="mt-0.5 shrink-0 text-error" />
+          <span className="min-w-[12rem] flex-1">{problem}</span>
+          {watch.status === "not_connected" && <Link href="/app/connections" className="font-medium text-accent-text underline-offset-4 hover:underline">Open Connections</Link>}
+        </p>
+      ) : (
+        <p className="mt-2 text-sm text-mute">{!enabled ? "Nothing is looked at while it is off. Switched back on, it starts from that moment." : watch.checkedAt && now !== null ? `Looked ${ago(watch.checkedAt, now)}${WATCH_STATUS[watch.status] ? `: ${WATCH_STATUS[watch.status]}` : ""}.` : "It looks for the first time within 2 minutes. Only what arrives from now on counts."}</p>
+      )}
+
+      <div className="mt-5 grid gap-5 border-t border-line pt-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div>
+          <DayBars counts={counts} />
+          <p className="mt-2 text-sm text-mute"><b className="font-semibold tabular-nums text-ink">{total}</b> started in the last 14 days{watch.lastAt && now !== null ? `, last one ${ago(watch.lastAt, now)}` : watch.count === 0 ? `. No new ${source.noun} has started it yet` : ""}.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={checkNow} disabled={!enabled || checking} className={pillPrimary}><Icon name={checking ? "Loader2" : "RefreshCw"} size={16} className={checking ? "hw-spin" : ""} />Check now</button>
+          <Link href={`/app/builder?draft=${encodeURIComponent(watch.workflowId)}`} className={pillQuiet}><Icon name="Workflow" size={16} />Open workflow</Link>
+        </div>
+      </div>
+      {message && <p role={message.tone === "bad" ? "alert" : "status"} className={`mt-3 flex items-start gap-2 rounded-2xl px-3 py-2 text-sm ${message.tone === "bad" ? "border border-error" : "bg-accent-subtle"}`}><Icon name={message.tone === "bad" ? "CircleAlert" : "CircleCheck"} className={`mt-0.5 shrink-0 ${message.tone === "bad" ? "text-error" : "text-accent-text"}`} />{message.words}</p>}
+      {!watch.readsIncoming && (
+        <p className="mt-3 flex items-start gap-2 rounded-2xl border border-line px-3 py-2 text-sm text-mute">
+          <Icon name="Info" className="mt-0.5 shrink-0 text-accent-text" />
+          <span>This workflow starts on every new {source.noun}, but does not read it yet. In the Builder, write <code className="rounded bg-sunken px-1 py-0.5 font-mono text-[12.5px] text-ink">{INCOMING_TAG}</code> in the job of an Ask the AI step, like &ldquo;Read {INCOMING_TAG} and draft a short reply&rdquo;.</span>
+        </p>
+      )}
+    </motion.li>
+  );
+}
+
+function AppWatches({ watches, setup, arrivals, now, tzOffset, onSignal }) {
+  const timesOf = useMemo(() => {
+    const map = new Map();
+    for (const arrival of arrivals) if (arrival.watchId && arrival.status === "started") map.set(arrival.watchId, [...(map.get(arrival.watchId) ?? []), arrival.at]);
+    return map;
+  }, [arrivals]);
+  const missing = Object.keys(WATCH_SOURCES).filter((id) => !watches.some((watch) => watch.source === id));
+  return (
+    <section aria-labelledby="from-apps" className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-2 pt-2">
+        <div>
+          <p className={`${label} text-mute`}>From your apps</p>
+          <h2 id="from-apps" className="mt-1 text-[length:clamp(1.6rem,3vw,2.1rem)] font-semibold leading-tight tracking-[-0.03em]">A new email or event <span className="text-accent-text">starts the work.</span></h2>
+        </div>
+        <p className="max-w-[44ch] text-sm text-mute">Set a workflow&rsquo;s Start step in the Builder and save. Hushwork reads and drafts by itself; sending still waits for you.</p>
+      </div>
+      {setup ? (
+        <p className={`${frame} flex items-start gap-2 p-5 text-sm`}><Icon name="Info" className="mt-0.5 shrink-0 text-accent-text" /><span><b className="font-semibold">One setup step is left.</b> Open supabase/app-events.sql and run it in Supabase. Start links are not affected.</span></p>
+      ) : (
+        <>
+          {watches.length > 0 && (
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-6">
+              {watches.map((watch, index) => <WatchCard key={watch.id} watch={watch} times={timesOf.get(watch.id) ?? []} now={now} tzOffset={tzOffset} onSignal={onSignal} index={index} />)}
+            </ul>
+          )}
+          {missing.length > 0 && (
+            <ul className={`grid gap-4 ${missing.length > 1 ? "md:grid-cols-2" : ""}`}>
+              {missing.map((id) => {
+                const source = WATCH_SOURCES[id];
+                return (
+                  <li key={id} className={`${watches.length ? "rounded-[28px] border border-dashed border-line-strong" : frame} flex min-w-0 flex-col p-5 sm:p-7`}>
+                    <AppLogo id={source.logo} label={source.app} size={40} />
+                    <h3 className="mt-4 text-[20px] font-semibold tracking-[-0.02em]">{id === "gmail" ? "When an email arrives" : "When a calendar event is added"}</h3>
+                    <p className="mt-1 flex-1 text-sm text-mute">{id === "gmail" ? "Every new email, or only the ones that match Gmail search words like from:ana@example.com or subject:invoice. Your own emails never count." : "Every new event on your main calendar, or only ones with a word in the title, like interview. Edits to old events do not count."}</p>
+                    <div className="mt-4"><Link href={`/app/builder?ask=${encodeURIComponent(ASK[id])}`} className={pillQuiet}><Icon name="Sparkles" size={16} />{id === "gmail" ? "Write an email-reply workflow" : "Write a meeting-prep workflow"}</Link></div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 // ---- ARRIVALS -----------------------------------------------------------------------------------------------------------------------
 // One arrival: a line with its first fields, and two buttons. "All fields" opens every field with its tag; "Replay" runs the workflow again with
 // exactly these fields (writing stays off, so a send still waits for Approve).
@@ -571,6 +724,7 @@ function ArrivalRow({ arrival, now }) {
             <span className="break-words">{arrival.name}</span>
             <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>{words}</span>
             {arrival.test && <span className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] font-medium text-mute">Test</span>}
+            {arrival.source && <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-2 py-0.5 text-[11px] font-medium text-mute"><Icon name={WATCH_SOURCES[arrival.source]?.icon ?? "Plug"} size={12} />{WATCH_SOURCES[arrival.source]?.app ?? "App"}</span>}
           </p>
           <div className="flex flex-wrap items-center gap-1">
             {arrival.fields.length > 0 && (
@@ -578,9 +732,9 @@ function ArrivalRow({ arrival, now }) {
                 <Icon name="ChevronDown" size={14} className={`transition-transform duration-120 ${open ? "rotate-180" : ""}`} />{open ? "Hide fields" : arrival.full ? `All ${arrival.fields.length} ${arrival.fields.length === 1 ? "field" : "fields"}` : "Preview"}
               </button>
             )}
-            <button type="button" onClick={replay} disabled={pending || !arrival.full} title={arrival.full ? "Run the workflow again with these fields" : "Only a short preview was kept for this one, so it cannot be replayed"} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-sm font-medium hover:bg-raised disabled:pointer-events-none disabled:opacity-50">
+            {!arrival.source && <button type="button" onClick={replay} disabled={pending || !arrival.full} title={arrival.full ? "Run the workflow again with these fields" : "Only a short preview was kept for this one, so it cannot be replayed"} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-sm font-medium hover:bg-raised disabled:pointer-events-none disabled:opacity-50">
               <Icon name={pending ? "Loader2" : "RotateCcw"} size={14} className={pending ? "hw-spin" : ""} />{pending ? "Replaying" : "Replay"}
-            </button>
+            </button>}
             {arrival.runId ? <Link href={`/app/runs?run=${encodeURIComponent(arrival.runId)}`} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent-text hover:bg-accent-subtle">Open run<Icon name="ArrowRight" size={14} /></Link> : arrival.status === "started" ? <span className="px-3 py-2 text-sm text-mute">Running…</span> : null}
           </div>
         </div>
@@ -603,7 +757,7 @@ function ArrivalRow({ arrival, now }) {
                 <dd className="min-w-0 whitespace-pre-wrap break-words text-sm">{field.value}</dd>
               </div>
             ))}
-            <p className="border-t border-line bg-sunken px-4 py-2 text-xs text-mute">{arrival.full ? "Someone else wrote this. Hushwork only ever uses it as information." : "Only this short preview was kept, from before Hushwork kept every field."}</p>
+            <p className="border-t border-line bg-sunken px-4 py-2 text-xs text-mute">{arrival.source ? "A short preview of what started it. The full words are on the run." : arrival.full ? "Someone else wrote this. Hushwork only ever uses it as information." : "Only this short preview was kept, from before Hushwork kept every field."}</p>
           </motion.dl>
         )}
         {result && (result.error
@@ -627,7 +781,7 @@ function Arrivals({ arrivals, now, keepsFields }) {
         <p className="max-w-[46ch] text-sm text-mute">{keepsFields ? "Every field is kept. Open one to read it all, or replay it after you change the workflow." : "Only a short preview is kept until supabase/hook-fields.sql is run in Supabase. Then every field is kept and can be replayed."}</p>
       </div>
       {arrivals.length === 0 ? (
-        <p className="mt-5 border-t border-line pt-5 text-sm text-mute">Nothing has arrived yet. Press <b className="font-medium text-ink">Send a test</b> on a link to see one travel the line.</p>
+        <p className="mt-5 border-t border-line pt-5 text-sm text-mute">Nothing has arrived yet. Press <b className="font-medium text-ink">Send a test</b> on a link, or <b className="font-medium text-ink">Check now</b> after a new email, to see one travel the line.</p>
       ) : (
         <ol className="mt-5">
           {shown.map((arrival) => <ArrivalRow key={arrival.id} arrival={arrival} now={now} />)}
@@ -638,7 +792,7 @@ function Arrivals({ arrivals, now, keepsFields }) {
   );
 }
 
-export default function LinksBoard({ links, arrivals, candidates, limits, keepsFields = true }) {
+export default function LinksBoard({ links, arrivals, candidates, limits, keepsFields = true, watches = [], watchSetup = false, linksSetup = "" }) {
   const now = useNow();
   const reduce = usePrefersReducedMotion();
   const tzOffset = now === null ? 0 : -new Date(now).getTimezoneOffset();
@@ -662,28 +816,35 @@ export default function LinksBoard({ links, arrivals, candidates, limits, keepsF
   const started = arrivals.filter((arrival) => arrival.status === "started");
   const numbers = [
     { value: arrivals.length, words: "arrived in 14 days" },
-    { value: links.filter((link) => link.enabled).length, words: links.length === 1 ? "link listening" : "links listening" },
+    { value: links.filter((link) => link.enabled).length + watches.filter((watch) => watch.enabled).length, words: "listening now" },
     { value: started.length, words: started.length === 1 ? "run started" : "runs started" },
     { value: 0, words: "sent without your OK" },
   ];
   const timesOf = useMemo(() => {
     const map = new Map();
-    for (const arrival of arrivals) map.set(arrival.linkId, [...(map.get(arrival.linkId) ?? []), arrival.at]);
+    for (const arrival of arrivals) if (arrival.linkId) map.set(arrival.linkId, [...(map.get(arrival.linkId) ?? []), arrival.at]);
     return map;
   }, [arrivals]);
 
   return (
     <div className="mt-8 min-w-0 space-y-6">
       <SignalStage beat={beat} numbers={numbers} reduce={reduce} />
-      {links.length === 0 && <NewLink candidates={candidates} first full={false} maxLinks={limits.maxLinks} />}
-      {links.length > 0 && (
-        <ul className="grid grid-cols-[minmax(0,1fr)] gap-6">
-          {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} limits={limits} />)}
-        </ul>
+      {linksSetup ? (
+        <p className={`${frame} flex items-start gap-2 p-5 text-sm`}><Icon name="Info" className="mt-0.5 shrink-0 text-accent-text" /><span><b className="font-semibold">Start links need one setup step.</b> {linksSetup}</span></p>
+      ) : (
+        <>
+          {links.length === 0 && <NewLink candidates={candidates} first full={false} maxLinks={limits.maxLinks} />}
+          {links.length > 0 && (
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-6">
+              {links.map((link, index) => <LinkCard key={link.id} link={link} times={timesOf.get(link.id) ?? []} now={now} tzOffset={tzOffset} onSignal={signal} index={index} limits={limits} />)}
+            </ul>
+          )}
+          {links.length > 0 && <NewLink candidates={candidates} first={false} full={links.length >= limits.maxLinks} maxLinks={limits.maxLinks} />}
+        </>
       )}
-      {links.length > 0 && <Arrivals arrivals={arrivals} now={now} keepsFields={keepsFields} />}
-      {links.length > 0 && <NewLink candidates={candidates} first={false} full={links.length >= limits.maxLinks} maxLinks={limits.maxLinks} />}
-      <p className="text-xs text-mute">Each person&rsquo;s links can start up to {limits.perMinute} runs a minute and {limits.perDay} a day; more than that is written down and not run. Fields that look like a card number or a secret key are left out before anything is saved.</p>
+      <AppWatches watches={watches} setup={watchSetup} arrivals={arrivals} now={now} tzOffset={tzOffset} onSignal={signal} />
+      {(links.length > 0 || watches.length > 0) && <Arrivals arrivals={arrivals} now={now} keepsFields={keepsFields} />}
+      <p className="text-xs text-mute">Each person&rsquo;s links can start up to {limits.perMinute} runs a minute and {limits.perDay} a day, and new emails and events up to {limits.watchPerDay} a day; more than that is written down and not run. Fields that look like a card number or a secret key are left out before anything is saved.</p>
     </div>
   );
 }

@@ -37,3 +37,36 @@ export async function fetchUpcomingEvents({ authorization, fetchImpl = fetch, no
     return { ok: false, error: CALENDAR_FAILED.network };
   }
 }
+
+// ---- new events for a watch (lib/app-event-runner.js) ---------------------------------------------------------------------------------------------------------------
+// Events on the main calendar that were CHANGED after `sinceMs`, of which only the ones CREATED after it count as new (an edited old meeting is not
+// news). Cancelled ones are left out. A repeating event counts once, not once per day. Read-only (a GET with the read-only permission).
+// Returns { ok: true, events: [{ id, at (when it was created), title, start, end, where, organizer, guests }] } or { ok: false, error }.
+const when = (part) => text(part?.dateTime ?? part?.date, 30);
+export async function fetchNewEvents({ authorization, sinceMs, fetchImpl = fetch }) {
+  const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
+  url.searchParams.set("updatedMin", new Date(Math.max(0, Number(sinceMs) - 60_000)).toISOString());
+  url.searchParams.set("showDeleted", "false");
+  url.searchParams.set("maxResults", "25");
+  url.searchParams.set("fields", "items(id,status,created,summary,start,end,location,organizer(displayName,email),attendees(email))");
+  try {
+    const response = await fetchImpl(url.toString(), { method: "GET", headers: { authorization }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (response.status === 401 || response.status === 403) return { ok: false, error: CALENDAR_FAILED.auth };
+    if (response.status === 429 || response.status >= 500) return { ok: false, error: CALENDAR_FAILED.busy };
+    if (!response.ok) return { ok: false, error: CALENDAR_FAILED.network };
+    const body = await response.json();
+    if (!Array.isArray(body?.items)) return { ok: false, error: CALENDAR_FAILED.network };
+    return { ok: true, events: body.items.slice(0, 25).filter((item) => item && item.status !== "cancelled" && typeof item.id === "string").map((item) => ({
+      id: item.id.slice(0, 120),
+      at: Date.parse(item.created),
+      title: text(item.summary, 100) || "(no title)",
+      start: when(item.start),
+      end: when(item.end),
+      where: text(item.location, 100),
+      organizer: text(item.organizer?.displayName, 60) || text(item.organizer?.email, 80),
+      guests: Array.isArray(item.attendees) ? item.attendees.length : 0,
+    })) };
+  } catch {
+    return { ok: false, error: CALENDAR_FAILED.network };
+  }
+}

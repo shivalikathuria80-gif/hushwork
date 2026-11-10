@@ -391,7 +391,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                         const describedBy = bad || (field.type === "text" && length >= field.max - 20) ? noteId : undefined;
                         return (
                           <div key={field.key}>
-                            <label htmlFor={id} className="text-sm font-medium">{field.label}{field.optional ? " (optional)" : ""}<span className="sr-only"> of step {number}</span></label>
+                            <label htmlFor={id} className="text-sm font-medium">{field.labelFor?.[row.fields?.how] ?? field.label}{field.optional ? " (optional)" : ""}<span className="sr-only"> of step {number}</span></label>
                             {field.type === "choice" ? (
                               <select
                                 id={id} value={value} disabled={busy}
@@ -408,7 +408,7 @@ export default function StepEditor({ steps, onChange, announce, showErrors, busy
                                 onChange={(event) => edit(row.key, { fields: { ...row.fields, [field.key]: event.target.value } })}
                                 onBlur={() => leaveTitle(`${row.key}.${field.key}`)}
                                 aria-invalid={bad || undefined} aria-describedby={describedBy}
-                                placeholder={field.hint}
+                                placeholder={field.hintFor?.[row.fields?.how] ?? field.hint}
                                 className={`mt-1 ${inputBase} ${bad ? "border-error" : "border-field"}`}
                               />
                             )}

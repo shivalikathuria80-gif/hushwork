@@ -76,7 +76,7 @@ export function capabilityOf(step) {
   let why;
   if (skill) why = skill.about;
   else if (kind === "ai") why = f.task ? `Asks the AI to: ${f.task}` : "Asks the AI to do a job (write the job in the step).";
-  else if (kind === "trigger") why = f.how === "watch" ? "This is how the workflow begins: it checks on its schedule and stays quiet unless something is new. It never speaks at night, at most 3 times a day, and never acts alone." : "This is how the workflow begins.";
+  else if (kind === "trigger") why = f.how === "watch" ? "This is how the workflow begins: it checks on its schedule and stays quiet unless something is new. It never speaks at night, at most 3 times a day, and never acts alone." : f.how === "email" ? "This is how the workflow begins: Hushwork looks at your Gmail inbox every 2 minutes, and each new email (never your own) starts it once. An Ask the AI step reads the email with {incoming}. Nothing is sent without your Approve." : f.how === "event" ? "This is how the workflow begins: Hushwork looks at your Google Calendar every 2 minutes, and each newly added event starts it once. An Ask the AI step reads the event with {incoming}. Nothing is sent without your Approve." : "This is how the workflow begins.";
   else if (kind === "approve") why = "A stop sign before anything is written: you read it, then say yes.";
   else if (kind === "action") why = `Really does one thing in another app: ${findAction(f.action)?.name ?? "an action"}. It happens only after you approve it.`;
   else if (kind === "issue") why = "Adds one new task in Linear. It happens only after you approve it.";

@@ -349,7 +349,7 @@ export default async function RunsViewer({ searchParams }) {
                   </div>
                   {index === 0 && step.incoming && (
                     <div className="mt-3 max-w-[75ch] rounded-2xl border border-line bg-surface p-4 shadow-sm">
-                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-mute">Arrived at its start link</p>
+                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-mute">{step.incomingFrom === "gmail" ? "The email that started it" : step.incomingFrom === "calendar" ? "The event that started it" : "Arrived at its start link"}</p>
                       <p className="mt-2 whitespace-pre-wrap break-words text-sm">{step.incoming}</p>
                       <p className="mt-2 text-xs text-mute">Someone else wrote this. Hushwork treats it as information only, never as instructions.</p>
                     </div>

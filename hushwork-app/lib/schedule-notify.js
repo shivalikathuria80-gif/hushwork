@@ -50,6 +50,16 @@ const NUDGE = {
     text: (name, siteUrl) => `Your scheduled workflow "${name}" ran and has a step waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
     record: "Hushwork emailed you once to say a step is waiting for you. Nothing was approved or sent for you.",
   },
+  email: {
+    title: "Hushwork: a new email started a workflow",
+    text: (name, siteUrl) => `A new email started "${name}", and a step is waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
+    record: "Hushwork emailed you once to say a new email started this workflow and a step is waiting for you. Nothing was approved or sent for you.",
+  },
+  event: {
+    title: "Hushwork: a new calendar event started a workflow",
+    text: (name, siteUrl) => `A new calendar event started "${name}", and a step is waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,
+    record: "Hushwork emailed you once to say a new calendar event started this workflow and a step is waiting for you. Nothing was approved or sent for you.",
+  },
   arrived: {
     title: "Hushwork: something arrived",
     text: (name, siteUrl) => `Something arrived at the start link of "${name}", and a step is waiting for you. Open the Runs page to read it and approve only what you want: ${siteUrl}/app/runs`,

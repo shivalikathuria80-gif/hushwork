@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "supabase");
 // The tables that belong to one person each. (waitlist is public-insert-only and usage_counters is reached through a function: both are checked elsewhere.)
-const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens", "oauth.sql": "oauth_grants", "hooks.sql": "hooks" };
+const PER_PERSON = { "workflows.sql": "workflows", "runs.sql": "runs", "connections.sql": "connections", "schedules.sql": "schedules", "memory.sql": "workflow_memories", "skills.sql": "enabled_bundles", "agent.sql": "agent_state", "api-tokens.sql": "api_tokens", "oauth.sql": "oauth_grants", "hooks.sql": "hooks", "app-events.sql": "app_watches" };
 const read = (file) => fs.readFileSync(path.join(dir, file), "utf8").replace(/\r\n/g, "\n");
 const noComments = (sql) => sql.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n");
 
@@ -55,7 +55,7 @@ test("RLS: every table made in supabase/ is either checked above or is one of th
   }
   for (const [file, table] of found) {
     if (PER_PERSON[file] === table) continue;
-    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)) || (["hooks.sql", "hooks-signing.sql"].includes(file) && ["hook_events", "hook_seen"].includes(table)), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
+    assert.ok(["waitlist.sql", "usage.sql", "app-controls.sql"].includes(file) || (file === "oauth.sql" && ["oauth_clients", "oauth_codes"].includes(table)) || (["hooks.sql", "hooks-signing.sql"].includes(file) && ["hook_events", "hook_seen"].includes(table)) || (file === "app-events.sql" && table === "app_watch_events"), `${file}: the table ${table} is not covered by the RLS test: add it to PER_PERSON or explain why not`);
     assert.match(noComments(read(file)), new RegExp(`alter table public\\.${table} enable row level security`), `${table}: row level security is on`);
   }
   assert.ok(found.length >= 8);

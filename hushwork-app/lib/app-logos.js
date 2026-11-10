@@ -74,6 +74,7 @@ export const ARTWORK = {
 };
 
 ARTWORK.gcalwrite = ARTWORK.calendar; // the Calendar picture, for the event-adding connection through Composio
+ARTWORK.gcalevents = ARTWORK.calendar; // the same, for the new-events reader on that connection
 ARTWORK.gmailsend = ARTWORK.gmail; // the same picture, for the send-only Gmail connection through Composio
 ARTWORK.gsheets = ARTWORK.sheets; // the Sheets and Drive pictures, for the Google files made through Composio
 ARTWORK.gdrivewrite = ARTWORK.drive;

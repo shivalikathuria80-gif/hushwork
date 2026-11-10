@@ -21,7 +21,7 @@ test("the list: every app has an id, a plain name, a toolkit and ONE read-only t
     for (const key of ["name", "what", "about"]) assert.ok(app[key] && typeof app[key] === "string");
     if (app.noLookup) { assert.equal(app.tool, null, `${app.id}: an app with no lookup has no read tool`); continue; }
     assert.match(app.tool, new RegExp(`^${app.toolkit.toUpperCase()}_[A-Z0-9_]+$`), `${app.id}: the tool belongs to the toolkit`);
-    assert.match(app.tool, /_(?:LIST|GET|SEARCH|READ|FETCH)_/, `${app.id}: the tool name says it only reads`);
+    assert.match(app.tool, /_(?:LIST|GET|SEARCH|READ|FETCH)(?:_|$)/, `${app.id}: the tool name says it only reads`);
     assert.doesNotMatch(app.tool, /(?:CREATE|UPDATE|DELETE|ADD|SEND|REMOVE|SET|MERGE|ARCHIVE|UPSERT|WRITE|POST|PUT|PATCH|UPLOAD|MOVE|REPLACE)/, `${app.id}: no writing word`);
   }
   assert.equal(new Set(COMPOSIO_IDS).size, COMPOSIO_IDS.length);

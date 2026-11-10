@@ -173,3 +173,58 @@ export async function fetchInboxText({ authorization, fetchImpl = fetch }) {
     return { ok: false, error: GMAIL_FAILED.network };
   }
 }
+
+// ---- new mail for a watch (lib/app-event-runner.js) ---------------------------------------------------------------------------------------------------------------
+// The newest messages that match ONE search (lib/app-events.js gmailQuery: the inbox, never the person's own, after a moment, plus their filter), with
+// who sent it, the subject, when Gmail received it (internalDate, in milliseconds) and Gmail's own short snippet of the text. Read-only, like the rest.
+// Returns { ok: true, mails: [{ id, at, from, address, subject, snippet }] } or { ok: false, error }.
+const NEW_HOW_MANY = 10;
+const ENTITY = /&(?:#(\d{1,6})|#x([0-9a-f]{1,6})|(amp|lt|gt|quot|apos|nbsp));/gi;
+const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const unescapeSnippet = (text) => String(text ?? "").replace(ENTITY, (whole, dec, hex, name) => {
+  if (name) return NAMED[name.toLowerCase()];
+  const code = dec ? Number(dec) : Number.parseInt(hex, 16);
+  return code > 31 && code < 0x110000 ? String.fromCodePoint(code) : " ";
+});
+const addressOf = (header) => flat(decodeMimeWords(header), 200).match(/<([^<>\s]{3,120})>/)?.[1] ?? (/^[^\s<>@]+@[^\s<>@]+$/.test(flat(header, 200)) ? flat(header, 120) : "");
+
+export async function fetchNewMail({ authorization, query, fetchImpl = fetch }) {
+  try {
+    const list = new URL(BASE);
+    list.searchParams.set("q", String(query).slice(0, 300));
+    list.searchParams.set("maxResults", String(NEW_HOW_MANY));
+    list.searchParams.set("fields", "messages(id)");
+    const listed = await getJson(list.toString(), authorization, fetchImpl);
+    if (listed.error) return { ok: false, error: listed.error };
+    const messages = listed.body?.messages ?? [];
+    if (!Array.isArray(messages)) return { ok: false, error: GMAIL_FAILED.network };
+    const ids = messages.slice(0, NEW_HOW_MANY).map((message) => message?.id).filter((id) => typeof id === "string" && /^[A-Za-z0-9]{1,40}$/.test(id));
+
+    const mails = await Promise.all(ids.map(async (id) => {
+      const url = new URL(`${BASE}/${id}`);
+      url.searchParams.set("format", "metadata");
+      for (const name of ["From", "Subject", "Date"]) url.searchParams.append("metadataHeaders", name);
+      url.searchParams.set("fields", "id,internalDate,snippet,payload(headers(name,value))");
+      return getJson(url.toString(), authorization, fetchImpl);
+    }));
+    const failed = mails.find((entry) => entry.error);
+    if (failed) return { ok: false, error: failed.error };
+    return {
+      ok: true,
+      mails: mails.map(({ body }, index) => {
+        const headers = Array.isArray(body?.payload?.headers) ? body.payload.headers : [];
+        const at = Number(body?.internalDate);
+        return {
+          id: ids[index],
+          at: Number.isFinite(at) && at > 0 ? at : Date.parse(flat(headerOf(headers, "date"), 60)),
+          from: senderName(headerOf(headers, "from")) || "(unknown sender)",
+          address: addressOf(headerOf(headers, "from")),
+          subject: flat(decodeMimeWords(headerOf(headers, "subject")), 100) || "(no subject)",
+          snippet: flat(unescapeSnippet(body?.snippet), 300),
+        };
+      }),
+    };
+  } catch {
+    return { ok: false, error: GMAIL_FAILED.network };
+  }
+}

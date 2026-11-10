@@ -20,7 +20,6 @@ import { startPracticeRun } from "@/lib/actions/runs";
 import { LIMITS, checkSteps, cleanName, defaultName, sameSteps } from "@/lib/validate";
 import { stepsToPlan } from "@/lib/steps";
 import { planOnlyWarning } from "@/lib/run-engine";
-import { isScheduledStart } from "@/lib/watch-rules";
 import { insertRow, moveRow, newRow, newRowForBlock, rowsForEmailList, rowsForSkill, blockName } from "@/lib/step-rows";
 
 // The Builder: a studio for one workflow. A copilot chat on the left (say what you want, apply the plan), the workflow drawn as a
@@ -211,11 +210,13 @@ export default function Builder({ initial, connections, runs = [], ai = { enable
     return { name: checkedName.value, steps: checked.value };
   }
 
-  // When the Start step says "On a schedule" (or "Keep watching"), saving also makes that schedule real (lib/schedule-sync.js). Returns a sentence to add to the
+  // When the Start step says "On a schedule" (or "Keep watching"), saving also makes that schedule real (lib/schedule-sync.js), and "When an email
+  // arrives" or "When a calendar event is added" makes its watch real (lib/app-event-sync.js). Returns a sentence to add to the
   // "Saved" message (empty when the Start step has nothing to do with a schedule).
   async function scheduleSentence(id, steps) {
     const start = steps[0];
-    if (!id || !isScheduledStart(start)) return "";
+    // Saving is also what switches a watch OFF when the Start no longer says email or calendar, so every typed Start is synced.
+    if (!id || start?.kind !== "trigger") return "";
     try {
       const result = await syncScheduleFromStart({ id, tzOffset: -new Date().getTimezoneOffset() });
       return result?.text ? ` ${result.text}` : "";

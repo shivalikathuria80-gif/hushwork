@@ -83,7 +83,7 @@ export const linearCreateSummary = (step, answer = "") => {
 
 // A "Look in another app" step can be approved on the Runs page: Hushwork then asks Composio to read one fixed thing from the app
 // (its list entry in lib/connectors/composio-apps.js). Read-only.
-export const isAppLookup = (step) => step?.kind === "app" && Boolean(findComposioApp(step?.fields?.app)) && !findComposioApp(step.fields.app).input && !findComposioApp(step.fields.app).noLookup; // a lookup that needs a typed channel is only used inside an Ask the AI step
+export const isAppLookup = (step) => step?.kind === "app" && Boolean(findComposioApp(step?.fields?.app)) && !findComposioApp(step.fields.app).input && !findComposioApp(step.fields.app).noLookup && !findComposioApp(step.fields.app).watchOnly; // a lookup that needs a typed channel is only used inside an Ask the AI step
 
 export const appSummary = (step) => {
   const app = findComposioApp(step?.fields?.app);
@@ -274,6 +274,7 @@ export function readSavedResults(value) {
     if (r?.note === true) read.note = true; // a stop note: words for the person, not a step's state
     if (typeof r?.incoming === "string" && r.incoming) read.incoming = r.incoming.slice(0, 5200); // what arrived at the workflow's start link (lib/hooks.js); only ever on the Start step
     if (Array.isArray(r?.incomingFields)) read.incomingFields = readFieldList(r.incomingFields); // the same, field by field, for {incoming.name} (lib/hook-fields.js)
+    if (r?.incomingFrom === "gmail" || r?.incomingFrom === "calendar") read.incomingFrom = r.incomingFrom; // which app it came from (lib/app-events.js); missing = a start link
     if (r?.quiet === true) read.quiet = true; // a watch run that found NOTHING NEW and stopped quietly (the Runs page folds these into one line)
     if (checkId(r?.from).value) read.from = r.from; // a real run remembers the practice run it was approved from (a plain id, nothing else)
     if (Number.isInteger(r?.fromStep) && r.fromStep >= 0 && r.fromStep < 100) read.fromStep = r.fromStep; // which step of that practice run

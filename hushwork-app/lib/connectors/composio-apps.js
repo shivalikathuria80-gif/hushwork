@@ -19,11 +19,15 @@
 //   lookupOf  (optional) the id of the app whose sign-in this lookup shares (a second read-only tool of the same app). It has no Connect button or box of its own.
 //   noLookup  (optional) true when the app has no read-only tool that works with nothing typed (then `tool` is null): the app only holds the sign-in for its actions.
 //             It is never offered as a lookup (not in "Look in another app", not to the AI plan writer, and not tried by Test all my connections).
+//   watchOnly (optional) true for a tool only a watched Start step uses (lib/app-events.js): never offered as a lookup anywhere.
 //   unavailable  (optional) a plain sentence saying why this app cannot be connected yet. Such an app shows that sentence instead of a Connect
 //             button, and the server refuses to start its sign-in. Checked against Composio's toolkit pages on 2026-10-23.
 export const COMPOSIO_APPS = [
   { id: "todoist", name: "Todoist", toolkit: "todoist", tool: "TODOIST_GET_ALL_TASKS", what: "your open tasks", about: "Reads your open Todoist tasks, and adds a task when you approve it." },
   { id: "gmailsend", name: "Gmail (send)", toolkit: "gmail", tool: "GMAIL_LIST_LABELS", what: "your Gmail label names", about: "Sends an email or saves a draft when you approve it." },
+  // A second read-only tool on the Google Calendar (events) sign-in, used ONLY by "When a calendar event is added" (lib/app-event-read.js): `watchOnly`
+  // keeps it out of every lookup list. If Google Calendar (events) was connected before it was added, press Disconnect and Connect once more.
+  { id: "gcalevents", name: "Google Calendar (new events)", toolkit: "googlecalendar", tool: "GOOGLECALENDAR_EVENTS_LIST", lookupOf: "gcalwrite", watchOnly: true, what: "your newest calendar events", about: "Notices new calendar events, so a workflow can start from one." },
   { id: "gcalwrite", name: "Google Calendar (events)", toolkit: "googlecalendar", tool: "GOOGLECALENDAR_LIST_CALENDARS", what: "the names of your calendars", about: "Adds a calendar event when you approve it." },
   { id: "notion", name: "Notion", toolkit: "notion", tool: "NOTION_SEARCH_NOTION_PAGE", what: "your recent pages", about: "Finds your Notion pages, and creates a new page when you approve it." },
   { id: "airtable", name: "Airtable", toolkit: "airtable", tool: "AIRTABLE_LIST_BASES", what: "your bases", about: "Lists your Airtable bases." },
@@ -70,7 +74,7 @@ export function parseAppAddress(raw) {
   const text = typeof raw === "string" ? raw.trim() : "";
   const colon = text.indexOf(":");
   const app = findComposioApp((colon === -1 ? text : text.slice(0, colon)).toLowerCase());
-  if (!app || app.noLookup) return null;
+  if (!app || app.noLookup || app.watchOnly) return null;
   const input = colon === -1 ? "" : text.slice(colon + 1).trim().replace(/^#/, "");
   if (!app.input) return input ? null : { app, input: "" };
   return input && app.input.pattern.test(input) ? { app, input } : null;

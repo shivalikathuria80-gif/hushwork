@@ -435,3 +435,68 @@ export async function disconnectEverything({ key, userId, fetchImpl }) {
   }
   return { ok: true };
 }
+
+// ---- new mail and new events for a watch (lib/app-event-runner.js), through Composio's Gmail and Google Calendar ---------------------------------------------------
+// For people who use Composio's Google apps instead of "Connect Google" (which is paused for most people, lib/connectors/google-gate.js). Same answers as
+// the Hushwork Google readers (google-gmail.js fetchNewMail, google-calendar.js fetchNewEvents). Composio is asked for each tool's inputs first; a tool that
+// needs something we do not fill in is not run. Read-only tools only, and only ones the app's sign-in already allows (composio-apps.js).
+const CALENDAR_INPUTS = { calendar: ["calendarId", "calendar_id"], since: ["updatedMin", "updated_min"], max: ["maxResults", "max_results"], deleted: ["showDeleted", "show_deleted"] };
+const pickName = (names, list) => list.find((name) => names.has(name));
+async function toolInputs(key, tool, fetchImpl) {
+  const described = await call(key, "GET", `/tools/${tool}`, { fetchImpl, notFound: COMPOSIO_FAILED.cannotFill });
+  return described.error ? { error: described.error, said: described.said } : readToolInputs(described.body);
+}
+const fitsInputs = (inputs, filled) => [...inputs.required].every((name) => filled.includes(name) || name === "user_id");
+
+// Returns { ok: true, mails: [{ id, at, from, address, subject, snippet }] } or { ok: false, error, said }.
+export async function runNewMail({ key, userId, app, query, fetchImpl }) {
+  const inputs = await toolInputs(key, app.tool, fetchImpl);
+  if (inputs.error) return { ok: false, error: inputs.error, said: inputs.said };
+  const queryName = QUERY_INPUTS.find((name) => inputs.names.has(name));
+  const maxName = MAX_INPUTS.find((name) => inputs.names.has(name));
+  if (!queryName || !fitsInputs(inputs, [queryName, maxName])) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
+  const found = await executeTool({ key, userId, tool: app.tool, args: { [queryName]: String(query).slice(0, 300), ...(maxName ? { [maxName]: 10 } : {}), ...(inputs.names.has("include_payload") ? { include_payload: false } : {}) }, fetchImpl });
+  if (!found.ok) return found;
+  const snippets = new Map();
+  walkAnswer(found.data, (item) => {
+    const id = firstText(item, ["messageId", "message_id", "id"]);
+    const words = typeof item.preview?.body === "string" ? item.preview.body : firstText(item, ["snippet", "messageText"]);
+    if (PLAIN_ID.test(id) && words && !snippets.has(id)) snippets.set(id, flat(words, 300));
+  });
+  const mails = mailMessages(found.data).filter((one) => !one.sent).map((one) => ({
+    id: one.id, at: one.time,
+    from: one.from.replace(/\s*<[^>]*>\s*$/, "").replace(/^"|"$/g, "").trim() || one.from || "(unknown sender)",
+    address: one.from.match(/<([^<>\s]{3,120})>/)?.[1] ?? (/^[^\s<>@]+@[^\s<>@]+$/.test(one.from) ? one.from : ""),
+    subject: one.subject || "(no subject)", snippet: snippets.get(one.id) ?? "",
+  }));
+  return { ok: true, mails };
+}
+
+// The events in an answer, found by their shape (an id with a start or a summary, and when it was made). Returns the same list as fetchNewEvents.
+export function calendarEvents(data) {
+  const found = [];
+  const seen = new Set();
+  const at = (part) => (part && typeof part === "object" ? flat(part.dateTime ?? part.date ?? "", 30) : "");
+  walkAnswer(data, (item) => {
+    if (typeof item.id !== "string" || !/^[A-Za-z0-9_@.-]{1,120}$/.test(item.id) || seen.has(item.id) || typeof item.created !== "string" || !(item.start || typeof item.summary === "string")) return;
+    if (item.status === "cancelled") return;
+    seen.add(item.id);
+    found.push({
+      id: item.id, at: Date.parse(item.created), title: flat(item.summary, 100) || "(no title)", start: at(item.start), end: at(item.end), where: flat(item.location, 100),
+      organizer: flat(item.organizer?.displayName, 60) || flat(item.organizer?.email, 80), guests: Array.isArray(item.attendees) ? item.attendees.length : 0,
+    });
+  });
+  return found.slice(0, 25);
+}
+
+// Returns { ok: true, events } or { ok: false, error, said }.
+export async function runNewEvents({ key, userId, app, sinceMs, fetchImpl }) {
+  const inputs = await toolInputs(key, app.tool, fetchImpl);
+  if (inputs.error) return { ok: false, error: inputs.error, said: inputs.said };
+  const names = Object.fromEntries(Object.entries(CALENDAR_INPUTS).map(([part, list]) => [part, pickName(inputs.names, list)]));
+  if (!names.since || !fitsInputs(inputs, Object.values(names).filter(Boolean))) return { ok: false, error: COMPOSIO_FAILED.cannotFill };
+  const args = { [names.since]: new Date(Math.max(0, Number(sinceMs) - 60_000)).toISOString(), ...(names.calendar ? { [names.calendar]: "primary" } : {}), ...(names.max ? { [names.max]: 25 } : {}), ...(names.deleted ? { [names.deleted]: false } : {}) };
+  const found = await executeTool({ key, userId, tool: app.tool, args, fetchImpl });
+  if (!found.ok) return { ...found, error: found.error === COMPOSIO_FAILED.notConnected || /not allowed|restrict/i.test(found.said ?? "") ? `${COMPOSIO_FAILED.notConnected} If Google Calendar (events) was connected before new events could start workflows, press Disconnect for it and Connect once more.` : found.error };
+  return { ok: true, events: calendarEvents(found.data) };
+}

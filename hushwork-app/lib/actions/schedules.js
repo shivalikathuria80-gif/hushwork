@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { checkId } from "@/lib/validate";
 import { checkSchedule, nextRun } from "@/lib/schedule";
 import { syncStartSchedule } from "@/lib/schedule-sync";
+import { syncStartWatch } from "@/lib/app-event-sync";
 
 // The Schedule panel under each workflow on the home page. A person chooses WHEN one of their own workflows runs by itself; the clock that actually runs
 // it is lib/schedule-tick.js. Same four habits as the other actions: requireUser first, validate, talk to the database (user_id is filled in
@@ -79,6 +80,9 @@ export async function syncScheduleFromStart(input) {
   if (error || !rows?.[0]) return { error: "That workflow no longer exists." };
   const result = await syncStartSchedule({ supabase, userId: user.id, workflowId: id.value, plan: rows[0].plan, tzOffset: input?.tzOffset });
   if (result.text) { revalidatePath("/app"); revalidatePath("/app/agents"); }
-  return result;
+  // "When an email arrives" / "When a calendar event is added": the watch is made real the same way (lib/app-event-sync.js).
+  const watch = await syncStartWatch({ supabase, userId: user.id, workflowId: id.value, plan: rows[0].plan, tzOffset: input?.tzOffset }).catch(() => ({ text: "" }));
+  if (watch.text) revalidatePath("/app/links");
+  return { ...result, text: [result.text, watch.text].filter(Boolean).join(" ") };
 }
 

@@ -32,7 +32,7 @@ const LOOKS_AT = {
 const words = (text) => String(text ?? "").replaceAll("{answers}", "what the AI found").replaceAll("{answer}", "what the AI found").replaceAll(" ({myEmail})", "").replaceAll(" (the step says {myEmail})", "").replaceAll("{myEmail}", "you");
 
 function plainStep(step) {
-  if (step.kind === "trigger") return { kind: "trigger", title: step.fields.how === "schedule" ? "Starts by itself" : "Starts when you press Run", detail: step.fields.how === "schedule" ? step.fields.when : "", approve: false };
+  if (step.kind === "trigger") return { kind: "trigger", title: step.fields.how === "schedule" || step.fields.how === "watch" ? "Starts by itself" : step.fields.how === "email" ? "Starts when a new email arrives" : step.fields.how === "event" ? "Starts when a calendar event is added" : step.fields.how === "lead" || step.fields.how === "link" ? "Starts when something arrives" : "Starts when you press Run", detail: step.fields.how === "schedule" || step.fields.how === "watch" ? step.fields.when : "", approve: false };
   if (step.kind === "ai") {
     const where = step.fields.uses === "app" && step.fields.address.startsWith("gmailsearch:") ? "your sent emails (who replied, never the text)" : step.fields.uses === "app" ? "an app you connected" : LOOKS_AT[step.fields.uses] ?? "";
     return { kind: "ai", title: where ? `The AI reads ${where}` : "The AI thinks it through", detail: words(step.fields.task), approve: false };
